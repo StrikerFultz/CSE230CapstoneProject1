@@ -19,11 +19,17 @@ pub struct Memory {
     heap_pointer: u32,
     static_data_base_address: u32,
     text_base_address: u32,
-    pub pages: HashMap<u32, Box<[u8; PAGE_SIZE]>>,
+    pub pages: HashMap<u32, Box<[i8; PAGE_SIZE]>>,
 }
 
 impl Memory {
-    pub fn set_word(&mut self, address: u32, value: u32) {
+    /*
+    Store a word (4 bytes) at the specified address
+    inputs:
+        address: u32 - the memory address to store the word
+        value: i32 - the word value to store
+    */
+    pub fn set_word(&mut self, address: u32, value: i32) {
         let page = address >> PAGE_POWER as u32;                    // Find the page that the address belongs to
         let offset = (address & (PAGE_SIZE as u32 - 1)) as usize;   // Find the offset within the page
 
@@ -33,23 +39,29 @@ impl Memory {
 
         let page_data = self.pages.get_mut(&page).unwrap();     // Get a mutable reference to the page data
 
-        let bytes = value.to_le_bytes();        // Convert the u32 value to bytes (little-endian)
+        let bytes = value.to_le_bytes();        // Convert the i32 value to bytes (little-endian)
         for i in 0..WORD_SIZE {                 // Write each byte to the correct offset
-            page_data[offset + i] = bytes[i];
+            page_data[offset + i] = bytes[i] as i8;
         }
     }
-    pub fn get_word(&mut self, address: u32) -> u32 {
+    /*
+    Retrieve a word (4 bytes) from the specified address
+    inputs:
+        address: u32 - the memory address to retrieve the word from
+    outputs:
+        i32 - the retrieved word value
+    */
+    pub fn load_word(&mut self, address: u32) -> i32 {
         let page = address >> PAGE_POWER as u32;                    // Find the page that the address belongs to
         let offset = (address & (PAGE_SIZE as u32 - 1)) as usize;   // Find the offset within the page
 
         if let Some(page_data) = self.pages.get(&page) {    // Ensure the page exists
             let mut bytes = [0 as u8; WORD_SIZE];           // Prepare an array to hold the bytes
             for i in 0..WORD_SIZE {                         // Read each byte from the correct offset
-                bytes[i] = page_data[offset + i];
+                bytes[i] = page_data[offset + i] as u8;
             }
-            u32::from_le_bytes(bytes)             // Convert the bytes (little-endian) back to a u32 value 
+            i32::from_le_bytes(bytes)             // Convert the bytes (little-endian) back to a i32 value 
         } else {
-            // Handle page not found (e.g., return 0 or error)
             0
         }
     }

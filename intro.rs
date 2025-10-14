@@ -11,7 +11,7 @@ use std::collections::HashMap;
 
 struct CPU { // this is hle not lle which isnt what we wanted but i wasnt sure how to lle it? 
     registers: HashMap<String, i32>,
-    memory: HashMap<i32, i32>, // simple memory: address -> value
+    memory: Memory, // simple memory: address -> value
 }
 
 impl CPU {
@@ -21,13 +21,18 @@ impl CPU {
         registers.insert("$t0".to_string(), 0);
         registers.insert("$t1".to_string(), 0);
         registers.insert("$t2".to_string(), 0);
-        CPU { registers, memory: HashMap::new() }
+        registers.insert("$sp".to_string(), 0); // Stack Pointer
+        CPU { registers, memory: Memory::new() }
     }
 
     fn add(&mut self, dest: &str, src1: &str, src2: &str) {
         let val1 = *self.registers.get(src1).unwrap_or(&0);
         let val2 = *self.registers.get(src2).unwrap_or(&0);
         self.registers.insert(dest.to_string(), val1 + val2);
+    }
+    fn addi(&mut self, dest: &str, src: &str, imm: i32) {
+        let val = *self.registers.get(src).unwrap_or(&0);
+        self.registers.insert(dest.to_string(), val + imm);
     }
 
     fn sub(&mut self, dest: &str, src1: &str, src2: &str) {
@@ -38,6 +43,15 @@ impl CPU {
 
     fn li(&mut self, dest: &str, imm: i32) {
         self.registers.insert(dest.to_string(), imm);
+    }
+    
+    fn sw(&mut self, src: &str, address: u32) {
+        let val = *self.registers.get(src).unwrap_or(&0) as i32;
+        self.memory.set_word(address, val);
+    }
+    fn lw(&mut self, dest: &str, address: u32) {
+        let val = self.memory.load_word(address);
+        self.registers.insert(dest.to_string(), val);
     }
 
 
@@ -58,6 +72,7 @@ fn execute_line(cpu: &mut CPU, line: &str) {
 
     match parts[0] {
         "add" => cpu.add(parts[1], parts[2], parts[3]),
+        "addi" => cpu.addi(parts[1], parts[2], parts[3].parse().unwrap_or(0)),
         "sub" => cpu.sub(parts[1], parts[2], parts[3]),
         "li"  => {
             if let Ok(imm) = parts[2].parse::<i32>() {
@@ -66,6 +81,8 @@ fn execute_line(cpu: &mut CPU, line: &str) {
                 println!("Invalid immediate: {}", parts[2]);
             }
         }
+        "sw" => cpu.sw(parts[1], parts[2].parse().unwrap_or(0)),
+        "lw" => cpu.lw(parts[1], parts[2].parse().unwrap_or(0)),
         _ => println!("Unknown instruction: {}", parts[0]),
     }
 }
@@ -74,10 +91,10 @@ use std::io::{self, Write};
 
 fn main() {
     let mut cpu = CPU::new();
-    let mut memory = Memory::new(); // Initialize memory module
-    memory.set_word(0x00400000, 42); // Example usage of memory module
-    let val = memory.get_word(0x00400000);
-    println!("Memory at 0x00400000: {}", val);
+    // let mut memory = Memory::new(); // Initialize memory module
+    // memory.set_word(0x00400000, 42); // Example usage of memory module
+    // let val = memory.get_word(0x00400000);
+    // println!("Memory at 0x00400000: {}", val);
 
     loop {
         print!("> ");
