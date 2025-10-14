@@ -1,3 +1,9 @@
+// Modules
+mod memory;
+
+// Structs
+use memory::Memory;
+
 use std::collections::HashMap;
 
 //https://github.com/insou22/mipsy partial code used since its a rough outline of the code 
@@ -68,6 +74,10 @@ use std::io::{self, Write};
 
 fn main() {
     let mut cpu = CPU::new();
+    let mut memory = Memory::new(); // Initialize memory module
+    memory.set_word(0x00400000, 42); // Example usage of memory module
+    let val = memory.get_word(0x00400000);
+    println!("Memory at 0x00400000: {}", val);
 
     loop {
         print!("> ");
