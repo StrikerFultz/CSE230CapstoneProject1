@@ -13,13 +13,13 @@ pub struct Snapshot {
     pub registers: HashMap<String, i32>,
 }
 
-struct CPU { 
+pub struct CPU { 
     registers: HashMap<String, i32>,
     memory: Memory, // simple memory: address -> value
 }
 
 impl CPU {
-    fn new() -> Self {
+    pub fn new() -> Self {
         let mut registers = HashMap::new();
 
         // initialize registers
@@ -31,40 +31,40 @@ impl CPU {
         CPU { registers, memory: Memory::new() }
     }
 
-    fn get_reg(&self, name: &str) -> i32 {
+    pub fn get_reg(&self, name: &str) -> i32 {
         *self.registers.get(name).unwrap_or(&0)
     }
 
-    fn set_reg(&mut self, name: &str, value: i32) {
+    pub fn set_reg(&mut self, name: &str, value: i32) {
         self.registers.insert(name.to_string(), value);
     }
 
-    fn add(&mut self, dest: &str, src1: &str, src2: &str) {
+    pub fn add(&mut self, dest: &str, src1: &str, src2: &str) {
         self.set_reg(dest, self.get_reg(src1) + self.get_reg(src2));
     }
 
-    fn addi(&mut self, dest: &str, src: &str, imm: i32) {
+    pub fn addi(&mut self, dest: &str, src: &str, imm: i32) {
         self.set_reg(dest, self.get_reg(src) + imm);
     }
 
-    fn sub(&mut self, dest: &str, src1: &str, src2: &str) {
+    pub fn sub(&mut self, dest: &str, src1: &str, src2: &str) {
         self.set_reg(dest, self.get_reg(src1) - self.get_reg(src2));
     }
 
-    fn li(&mut self, dest: &str, imm: i32) {
+    pub fn li(&mut self, dest: &str, imm: i32) {
         self.set_reg(dest, imm);
     }
     
-    fn sw(&mut self, src: &str, address: u32) {
+    pub fn sw(&mut self, src: &str, address: u32) {
         self.memory.set_word(address, self.get_reg(src));
     }
 
-    fn lw(&mut self, dest: &str, address: u32) {
+    pub fn lw(&mut self, dest: &str, address: u32) {
         let val = self.memory.load_word(address);
         self.set_reg(dest, val);
     }
 
-    fn print_registers(&self) {
+    pub fn print_registers(&self) {
         let regs = ["$t0", "$t1", "$t2"];
         for r in regs {
             let val = self.get_reg(r);
@@ -79,7 +79,7 @@ impl CPU {
     }
 }
 
-fn execute_line(cpu: &mut CPU, line: &str) {
+pub fn execute_line(cpu: &mut CPU, line: &str) {
     let cleaned = line.replace(",", "");
     let parts: Vec<&str> = cleaned.split_whitespace().collect();
     if parts.is_empty() { return; }
@@ -125,5 +125,19 @@ impl WasmCpu {
     // we want to print out values on the web browser so we'll serialize it to JSON using Serde 
     pub fn registers_json(&self) -> JsValue {
         serde_wasm_bindgen::to_value(&self.inner.snapshot()).unwrap()
+    }
+}
+
+
+#[cfg(test)]
+mod tests {
+    use super::{CPU, execute_line};
+
+    #[test]
+    fn addi_test_1() {
+        let mut cpu = CPU::new();
+        execute_line(&mut cpu, "addi $t0, $t0, 5");
+
+        assert_eq!(cpu.get_reg("$t0"), 5);
     }
 }

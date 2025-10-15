@@ -1,25 +1,28 @@
 use std::collections::HashMap;
 
-const WORD_SIZE: usize = 4; // 4 bytes for a word
-const PAGE_SIZE: usize = 512; // 512 bytes for a page
-const PAGE_POWER: u32 = 9; // 2^9 = 512
+const WORD_SIZE: usize  = 4;             // 4 bytes for a word
+const PAGE_SIZE: usize  = 512;           // 512 bytes for a page
+const PAGE_POWER: u32   = 9;              // 2^9 = 512
+const PAGE_MASK: u32    = (PAGE_SIZE as u32) - 1;
 
 // Memory Configurations
-const DEFAULT_STACK_BASE_ADDRESS: u32 = 0x7FFFFFFF;
-const DEFAULT_STACK_POINTER: u32 = 0x7FFFFFFC;      // Stack 4 bytes below base
-const DEFAULT_TEXT_BASE_ADDRESS: u32 = 0x00400000;
-const DEFAULT_STATIC_DATA_BASE_ADDRESS: u32 = 0x10000000;
-const DEFAULT_HEAP_BASE_ADDRESS: u32 = 0x10008000;
-const DEFAULT_HEAP_POINTER: u32 = 0x10008000;
+const DEFAULT_MMIO_ADDRESS: u32 = 0xFFFF_0000;
+
+const DEFAULT_STACK_BASE_ADDRESS: u32 = 0x7FFF_FFFF;
+const DEFAULT_STACK_POINTER: u32 = 0x7FFF_FFFC;      // Stack 4 bytes below base
+const DEFAULT_TEXT_BASE_ADDRESS: u32 = 0x0040_0000;
+const DEFAULT_STATIC_DATA_BASE_ADDRESS: u32 = 0x1000_0000;
+const DEFAULT_HEAP_BASE_ADDRESS: u32 = 0x1000_8000;
+const DEFAULT_HEAP_POINTER: u32 = 0x1000_8000;
+
+#[inline]
+fn page_index(addr: u32) -> u32 { addr >> PAGE_POWER }
+
+#[inline]
+fn page_offset(addr: u32) -> usize { (addr & PAGE_MASK) as usize }
 
 pub struct Memory {
-    stack_base_address: u32,
-    stack_pointer: u32,
-    heap_base_address: u32,
-    heap_pointer: u32,
-    static_data_base_address: u32,
-    text_base_address: u32,
-    pub pages: HashMap<u32, Box<[i8; PAGE_SIZE]>>,
+    pub pages: HashMap<u32, Box<[i8; PAGE_SIZE]>>
 }
 
 impl Memory {
@@ -30,8 +33,8 @@ impl Memory {
         value: i32 - the word value to store
     */
     pub fn set_word(&mut self, address: u32, value: i32) {
-        let page = address >> PAGE_POWER as u32;                    // Find the page that the address belongs to
-        let offset = (address & (PAGE_SIZE as u32 - 1)) as usize;   // Find the offset within the page
+        let page = page_index(address);       // Find the page that the address belongs to
+        let offset = page_offset(address);  // Find the offset within the page
 
         if !self.pages.contains_key(&page) {                   // If the page doesn't exist, create it        
             self.pages.insert(page, Box::new([0; PAGE_SIZE]));
@@ -52,8 +55,8 @@ impl Memory {
         i32 - the retrieved word value
     */
     pub fn load_word(&mut self, address: u32) -> i32 {
-        let page = address >> PAGE_POWER as u32;                    // Find the page that the address belongs to
-        let offset = (address & (PAGE_SIZE as u32 - 1)) as usize;   // Find the offset within the page
+        let page = page_index(address);        // Find the page that the address belongs to
+        let offset = page_offset(address);   // Find the offset within the page
 
         if let Some(page_data) = self.pages.get(&page) {    // Ensure the page exists
             let mut bytes = [0 as u8; WORD_SIZE];           // Prepare an array to hold the bytes
@@ -72,20 +75,26 @@ impl Memory {
         println!("Stack Page Pointer: {:x}", DEFAULT_STACK_BASE_ADDRESS - PAGE_SIZE as u32);
 
         let mut pages = HashMap::new();
-        pages.insert((DEFAULT_STACK_BASE_ADDRESS - PAGE_SIZE as u32) >> PAGE_POWER as u32, Box::new([0; PAGE_SIZE]));
-        pages.insert(DEFAULT_HEAP_BASE_ADDRESS >> PAGE_POWER as u32, Box::new([0; PAGE_SIZE]));
-        pages.insert(DEFAULT_STATIC_DATA_BASE_ADDRESS >> PAGE_POWER as u32, Box::new([0; PAGE_SIZE]));
-        pages.insert(DEFAULT_TEXT_BASE_ADDRESS >> PAGE_POWER as u32, Box::new([0; PAGE_SIZE]));
-        pages.insert(DEFAULT_TEXT_BASE_ADDRESS >> PAGE_POWER as u32, Box::new([0; PAGE_SIZE]));
 
-        Memory { 
-            stack_base_address: DEFAULT_STACK_BASE_ADDRESS,
-            stack_pointer: DEFAULT_STACK_POINTER,
-            heap_base_address: DEFAULT_HEAP_BASE_ADDRESS,
-            heap_pointer: DEFAULT_HEAP_POINTER,
-            static_data_base_address: DEFAULT_STATIC_DATA_BASE_ADDRESS,
-            text_base_address: DEFAULT_TEXT_BASE_ADDRESS,
-            pages,
+        // stack 
+        pages.insert((DEFAULT_STACK_BASE_ADDRESS - PAGE_SIZE as u32) >> PAGE_POWER, Box::new([0; PAGE_SIZE]));
+
+        // heap
+        pages.insert(DEFAULT_HEAP_BASE_ADDRESS >> PAGE_POWER, Box::new([0; PAGE_SIZE]));
+
+        // static data (.bss)
+        pages.insert(DEFAULT_STATIC_DATA_BASE_ADDRESS >> PAGE_POWER, Box::new([0; PAGE_SIZE]));
+
+        // .text  
+        pages.insert(DEFAULT_TEXT_BASE_ADDRESS >> PAGE_POWER, Box::new([0; PAGE_SIZE]));
+
+        // MMIO range
+        // probably want to specify the actual address for each MMIO register instead of mapping an entire page 
+        // so we want to have an address for each register and then map 32/64/128 bits for the register
+        pages.insert(DEFAULT_MMIO_ADDRESS >> PAGE_POWER, Box::new([0; PAGE_SIZE]));
+
+        Memory {
+            pages
         } 
     }
 }
