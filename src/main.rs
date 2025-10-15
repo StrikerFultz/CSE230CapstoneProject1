@@ -16,6 +16,7 @@ fn main() {
         if io::stdin().read_line(&mut input).is_err() {
             break;
         }
+        
         let line = input.trim();
         if line == "exit" {
             break;
