@@ -49,8 +49,12 @@ python3 -m http.server
 
 **Option 2: Build local binary**
 1. Compile and run the program
-```
+```sh
 cargo run
+```
+2. Run test cases
+```sh
+cargo test
 ```
 
 **Team Members**:
