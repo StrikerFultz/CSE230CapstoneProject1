@@ -47,8 +47,20 @@ impl CPU {
         self.set_reg(dest, self.get_reg(src) + imm);
     }
 
+    pub fn addiu(&mut self, dest: &str, src: &str, imm: i32) {
+        self.set_reg(dest, self.get_reg(src) + imm);
+    }
+
     pub fn sub(&mut self, dest: &str, src1: &str, src2: &str) {
         self.set_reg(dest, self.get_reg(src1) - self.get_reg(src2));
+    }
+
+    pub fn subi(&mut self, dest: &str, src: &str, imm: i32) {
+        self.set_reg(dest, self.get_reg(src) - imm);
+    }
+
+    pub fn subiu(&mut self, dest: &str, src: &str, imm: i32) {
+        self.set_reg(dest, self.get_reg(src) - imm);
     }
 
     pub fn li(&mut self, dest: &str, imm: i32) {
@@ -87,7 +99,11 @@ pub fn execute_line(cpu: &mut CPU, line: &str) {
     match parts[0] {
         "add" => cpu.add(parts[1], parts[2], parts[3]),
         "addi" => cpu.addi(parts[1], parts[2], parts[3].parse().unwrap_or(0)),
+        "addiu" => cpu.addiu(parts[1], parts[2], parts[3].parse().unwrap_or(0)),
         "sub" => cpu.sub(parts[1], parts[2], parts[3]),
+        "subi"  => cpu.subi(parts[1], parts[2], parts[3].parse().unwrap_or(0)),
+        "subiu" => cpu.subiu(parts[1], parts[2], parts[3].parse().unwrap_or(0)),
+
         "li"  => {
             if let Ok(imm) = parts[2].parse::<i32>() {
                 cpu.li(parts[1], imm);
@@ -140,4 +156,30 @@ mod tests {
 
         assert_eq!(cpu.get_reg("$t0"), 5);
     }
+
+    #[test]
+    fn addiu_test() {
+        let mut cpu = CPU::new();
+        execute_line(&mut cpu, "li $t0, 100");
+        execute_line(&mut cpu, "addiu $t1, $t0, 55");
+        assert_eq!(cpu.get_reg("$t1"), 155);
+    }
+
+    #[test]
+    fn subi_test() {
+        let mut cpu = CPU::new();
+        execute_line(&mut cpu, "li $t0, 10");
+        execute_line(&mut cpu, "subi $t1, $t0, 4");
+        assert_eq!(cpu.get_reg("$t1"), 6);
+    }
+
+
+    #[test]
+    fn subiu_test() {
+        let mut cpu = CPU::new();
+        execute_line(&mut cpu, "li $t0, 20");
+        execute_line(&mut cpu, "subiu $t1, $t0, 5");
+        assert_eq!(cpu.get_reg("$t1"), 15);
+    }
+
 }

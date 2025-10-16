@@ -8,6 +8,9 @@ fn main() {
     // let val = memory.get_word(0x00400000);
     // println!("Memory at 0x00400000: {}", val);
 
+    println!("MIPS Emulator started! Type MIPS instructions below.");
+    println!("Type 'exit' to quit.\n");
+
     loop {
         print!("> ");
         io::stdout().flush().unwrap();
@@ -22,7 +25,18 @@ fn main() {
             break;
         }
 
-        execute_line(&mut cpu, line);
-        cpu.print_registers();
+        let lines: Vec<&str> = trimmed
+        .split('/n') // can handle new or empty lines
+        .flat_map(|s| s.split(';')) // this is for lines seperated by ;
+        .map(|s| s.trim())
+        .filter(|s| !s.is_empty())
+        .collect();
+
+        for line in lines {
+            execute_line(&mut cpu, line);
+            print!("Executed: {}\n", line);
+            cpu.print_registers();
+        }
+        
     }
 }
