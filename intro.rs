@@ -6,10 +6,12 @@ use memory::Memory;
 
 use std::collections::HashMap;
 
-//https://github.com/insou22/mipsy partial code used since its a rough outline of the code 
-// only li add and sub; shows register history as lineis entered (as changed) 
+// partial base from https://github.com/insou22/mipsy (simplified HLE example)
+// updated version adds negative support + addi/subi instructions
+// added subi,addi, addui, subiu but they only work with decimal values NOT hex 
+// // canimplemtn if needed by instructor 
 
-struct CPU { // this is hle not lle which isnt what we wanted but i wasnt sure how to lle it? 
+struct CPU {
     registers: HashMap<String, i32>,
     memory: Memory, // simple memory: address -> value
 }
@@ -21,18 +23,13 @@ impl CPU {
         registers.insert("$t0".to_string(), 0);
         registers.insert("$t1".to_string(), 0);
         registers.insert("$t2".to_string(), 0);
-        registers.insert("$sp".to_string(), 0); // Stack Pointer
-        CPU { registers, memory: Memory::new() }
+        CPU { registers, memory: HashMap::new() }
     }
 
     fn add(&mut self, dest: &str, src1: &str, src2: &str) {
         let val1 = *self.registers.get(src1).unwrap_or(&0);
         let val2 = *self.registers.get(src2).unwrap_or(&0);
         self.registers.insert(dest.to_string(), val1 + val2);
-    }
-    fn addi(&mut self, dest: &str, src: &str, imm: i32) {
-        let val = *self.registers.get(src).unwrap_or(&0);
-        self.registers.insert(dest.to_string(), val + imm);
     }
 
     fn sub(&mut self, dest: &str, src1: &str, src2: &str) {
@@ -41,17 +38,18 @@ impl CPU {
         self.registers.insert(dest.to_string(), val1 - val2);
     }
 
+    fn subi(&mut self, dest: &str, src: &str, imm: i32) {
+        let val = *self.registers.get(src).unwrap_or(&0);
+        self.registers.insert(dest.to_string(), val - imm);
+    }
+
+    fn subiu(&mut self, dest: &str, src: &str, imm: i32) {
+        let val = *self.registers.get(src).unwrap_or(&0);
+        self.registers.insert(dest.to_string(), val.wrapping_sub(imm));
+    }
+
     fn li(&mut self, dest: &str, imm: i32) {
         self.registers.insert(dest.to_string(), imm);
-    }
-    
-    fn sw(&mut self, src: &str, address: u32) {
-        let val = *self.registers.get(src).unwrap_or(&0) as i32;
-        self.memory.set_word(address, val);
-    }
-    fn lw(&mut self, dest: &str, address: u32) {
-        let val = self.memory.load_word(address);
-        self.registers.insert(dest.to_string(), val);
     }
 
 
@@ -68,21 +66,21 @@ impl CPU {
 fn execute_line(cpu: &mut CPU, line: &str) {
     let cleaned = line.replace(",", "");
     let parts: Vec<&str> = cleaned.split_whitespace().collect();
-    if parts.is_empty() { return; }
+    if parts.is_empty() {
+        return;
+    }
 
     match parts[0] {
         "add" => cpu.add(parts[1], parts[2], parts[3]),
         "addi" => cpu.addi(parts[1], parts[2], parts[3].parse().unwrap_or(0)),
         "sub" => cpu.sub(parts[1], parts[2], parts[3]),
-        "li"  => {
+        "li" => {
             if let Ok(imm) = parts[2].parse::<i32>() {
                 cpu.li(parts[1], imm);
             } else {
                 println!("Invalid immediate: {}", parts[2]);
             }
         }
-        "sw" => cpu.sw(parts[1], parts[2].parse().unwrap_or(0)),
-        "lw" => cpu.lw(parts[1], parts[2].parse().unwrap_or(0)),
         _ => println!("Unknown instruction: {}", parts[0]),
     }
 }
