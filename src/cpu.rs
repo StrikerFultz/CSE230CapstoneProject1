@@ -42,12 +42,12 @@ impl CPU {
         }
     }
 
-    /// returns the value of a register (as u32)
+    /// returns the value of a register as a 32-bit unsigned integer
     pub fn get_reg(&self, name: &str) -> u32 {
         *self.registers.get(name).unwrap_or(&0)
     }
 
-    /// sets a register value (as u32)
+    /// sets a register value to a 32-bit unsigned integer 
     pub fn set_reg(&mut self, name: &str, value: u32) {
         self.registers.insert(name.to_string(), value);
     }
@@ -57,8 +57,40 @@ impl CPU {
         self.pc = DEFAULT_TEXT_BASE_ADDRESS;
     }
 
+    pub fn execute(&mut self, insn: &Instruction) {
+        let mut is_branch = false;
+        println!("{:?}", insn);
+
+        // TODO: probably have to handle overflow or integer bounds for 32-bit signed integer
+        
+        // handle instruction based on type
+        match insn {
+            Instruction::Add { rd, rs, rt } => {
+                let r1 = self.get_reg(rs) as i32; 
+                let r2 = self.get_reg(rt) as i32;
+                
+                self.set_reg(rd, r1.wrapping_add(r2) as u32);
+            },
+            Instruction::Addi { rt, rs, imm } => {
+                let r = self.get_reg(rs) as i32;
+                self.set_reg(rt, r.wrapping_add(*imm) as u32);
+            },
+            Instruction::Li { rd, imm } => {
+                self.set_reg(rd, *imm as u32);
+            }
+            _ => {
+                println!("Unimplemented instruction");
+            }
+        }
+
+        // branch instructions will modify the PC to another address instead of the sequential instruction
+        if !is_branch {
+            self.pc += 4;
+        }
+    }
+
     /// executes a single MIPS instruction 
-    pub fn execute(&mut self) -> Result<(), EmuError> {
+    pub fn next(&mut self) -> Result<(), EmuError> {
         let program = self.program.as_ref().unwrap();
 
         // get the current instruction using the $pc register
@@ -67,16 +99,15 @@ impl CPU {
             .ok_or(EmuError::Termination)?;
         
         let insn = program.instructions[index].clone();
-        println!("{:?}", insn);
+        self.execute(&insn);
 
-        self.pc += 4;
         Ok(())
     }
 
     /// launches the emulator instance and executes line-by-line using a `Program`
     pub fn run(&mut self) -> Result<(), EmuError> {
         loop {
-            match self.execute() {
+            match self.next() {
                 Ok(_) => {},
                 Err(EmuError::Termination) => {
                     println!("Finished execution!");
