@@ -6,14 +6,14 @@ const PAGE_POWER: u32   = 9;              // 2^9 = 512
 const PAGE_MASK: u32    = (PAGE_SIZE as u32) - 1;
 
 // Memory Configurations
-const DEFAULT_MMIO_ADDRESS: u32 = 0xFFFF_0000;
+pub const DEFAULT_MMIO_ADDRESS: u32 = 0xFFFF_0000;
 
-const DEFAULT_STACK_BASE_ADDRESS: u32 = 0x7FFF_FFFF;
-const DEFAULT_STACK_POINTER: u32 = 0x7FFF_FFFC;      // Stack 4 bytes below base
-const DEFAULT_TEXT_BASE_ADDRESS: u32 = 0x0040_0000;
-const DEFAULT_STATIC_DATA_BASE_ADDRESS: u32 = 0x1000_0000;
-const DEFAULT_HEAP_BASE_ADDRESS: u32 = 0x1000_8000;
-const DEFAULT_HEAP_POINTER: u32 = 0x1000_8000;
+pub const DEFAULT_STACK_BASE_ADDRESS: u32 = 0x7FFF_FFFF;
+pub const DEFAULT_STACK_POINTER: u32 = 0x7FFF_FFFC;      // Stack 4 bytes below base
+pub const DEFAULT_TEXT_BASE_ADDRESS: u32 = 0x0040_0000;
+pub const DEFAULT_STATIC_DATA_BASE_ADDRESS: u32 = 0x1000_0000;
+pub const DEFAULT_HEAP_BASE_ADDRESS: u32 = 0x1000_8000;
+pub const DEFAULT_HEAP_POINTER: u32 = 0x1000_8000;
 
 #[inline]
 fn page_index(addr: u32) -> u32 { addr >> PAGE_POWER }

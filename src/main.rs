@@ -23,6 +23,10 @@ fn main() {
 
     match Program::parse(&source) {
         Ok(program) => cpu.load_program(program),
-        Err(e) => panic!("{:?}", e),
+        Err(e) => print!("Paring Error -- {:?}", e),
+    }
+
+    if let Err(e) = cpu.run() {
+        print!("Runtime Error -- {:?}", e);
     }
 }

@@ -34,7 +34,7 @@ fn is_valid_register(name: &str) -> bool {
 }
 
 /// checks whether the register is supported ($t0, $t1, $t2 only supported atm)
-fn validate_register(name: &str) -> Result<String, EmuError> {
+fn parse_register(name: &str) -> Result<String, EmuError> {
     if is_valid_register(name) {
         Ok(name.to_string())
     } else {
@@ -96,9 +96,20 @@ pub fn parse_instruction(line_num: usize, line: &str) -> Result<Option<Instructi
             }
 
             Instruction::Add {
-                rd: validate_register(operands[0])?,
-                rs: validate_register(operands[1])?,
-                rt: validate_register(operands[2])?
+                rd: parse_register(operands[0])?,
+                rs: parse_register(operands[1])?,
+                rt: parse_register(operands[2])?
+            }
+        },
+        "addi" => {
+            if operands.len() != 3 {
+                 return Err(EmuError::ParsingError(format!("Line {}", line_num)))
+            }
+
+            Instruction::Addi {
+                rt: parse_register(operands[0])?,
+                rs: parse_register(operands[1])?,
+                imm: parse_immediate::<i32>(operands[2])?
             }
         },
         "li" => {
@@ -107,7 +118,7 @@ pub fn parse_instruction(line_num: usize, line: &str) -> Result<Option<Instructi
             }
 
             Instruction::Li {
-                rd: validate_register(operands[0])?,
+                rd: parse_register(operands[0])?,
                 imm: parse_immediate::<u32>(operands[1])?
             }
         }

@@ -1,100 +1,99 @@
 use serde::{Serialize, Deserialize};
 use std::collections::HashMap;
 
-use crate::instruction::Instruction;
-use crate::program::Program;
-use crate::memory::Memory;
+use crate::{program::*, Instruction};
+use crate::memory::*;
+
+/// represents the state of the CPU at an instruction
+pub struct ExecutionState {
+    pc: u32,
+    instruction: Instruction
+}
 
 pub struct CPU { 
     // processor state 
-    registers: HashMap<String, i32>,
-    pc: usize,
+    registers: HashMap<String, u32>,
+    pc: u32,
 
     // program + memory
     program: Option<Program>,
-    memory: Memory, 
-}
+    memory: Memory,     
 
-// serialize registers to JSON for debug logging 
-#[derive(Serialize, Deserialize, Default)]
-pub struct Snapshot {
-    pub registers: HashMap<String, i32>,
+    // log of all executed instructions 
+    state_history: Vec<ExecutionState>
 }
 
 impl CPU {
     pub fn new() -> Self {
-        let mut registers = HashMap::new();
+        let mut registers: HashMap<String, u32> = HashMap::new();
 
         // initialize registers
         registers.insert("$t0".to_string(), 0);
         registers.insert("$t1".to_string(), 0);
         registers.insert("$t2".to_string(), 0);
-        registers.insert("$sp".to_string(), 0); // Stack Pointer
+        registers.insert("$sp".to_string(), DEFAULT_STACK_POINTER); // Stack Pointer
 
-        CPU { registers, pc: 0, program: None, memory: Memory::new() }
+        CPU { 
+            registers, 
+            pc: DEFAULT_TEXT_BASE_ADDRESS, 
+            program: None, 
+            memory: Memory::new(),
+            state_history: Vec::new()
+        }
     }
 
-    pub fn get_reg(&self, name: &str) -> i32 {
+    /// returns the value of a register (as u32)
+    pub fn get_reg(&self, name: &str) -> u32 {
         *self.registers.get(name).unwrap_or(&0)
     }
 
-    pub fn set_reg(&mut self, name: &str, value: i32) {
+    /// sets a register value (as u32)
+    pub fn set_reg(&mut self, name: &str, value: u32) {
         self.registers.insert(name.to_string(), value);
-    }
-
-    pub fn add(&mut self, dest: &str, src1: &str, src2: &str) {
-        self.set_reg(dest, self.get_reg(src1) + self.get_reg(src2));
-    }
-
-    pub fn addi(&mut self, dest: &str, src: &str, imm: i32) {
-        self.set_reg(dest, self.get_reg(src) + imm);
-    }
-
-    pub fn addiu(&mut self, dest: &str, src: &str, imm: i32) {
-        self.set_reg(dest, self.get_reg(src) + imm);
-    }
-
-    pub fn sub(&mut self, dest: &str, src1: &str, src2: &str) {
-        self.set_reg(dest, self.get_reg(src1) - self.get_reg(src2));
-    }
-
-    pub fn subi(&mut self, dest: &str, src: &str, imm: i32) {
-        self.set_reg(dest, self.get_reg(src) - imm);
-    }
-
-    pub fn subiu(&mut self, dest: &str, src: &str, imm: i32) {
-        self.set_reg(dest, self.get_reg(src) - imm);
-    }
-
-    pub fn li(&mut self, dest: &str, imm: i32) {
-        self.set_reg(dest, imm);
-    }
-    
-    pub fn sw(&mut self, src: &str, address: u32) {
-        self.memory.set_word(address, self.get_reg(src));
-    }
-
-    pub fn lw(&mut self, dest: &str, address: u32) {
-        let val = self.memory.load_word(address);
-        self.set_reg(dest, val);
-    }
-
-    pub fn print_registers(&self) {
-        let regs = ["$t0", "$t1", "$t2"];
-        for r in regs {
-            let val = self.get_reg(r);
-
-            print!("{}: {}  ", r, val);
-        }
-        println!();
-    }
-
-    pub fn snapshot(&self) -> Snapshot {
-        Snapshot { registers: self.registers.clone() }
     }
 
     pub fn load_program(&mut self, program: Program) {
         self.program = Some(program);
-        self.pc = 0;
+        self.pc = DEFAULT_TEXT_BASE_ADDRESS;
+    }
+
+    /// executes a single MIPS instruction 
+    pub fn execute(&mut self) -> Result<(), EmuError> {
+        let program = self.program.as_ref().unwrap();
+
+        // get the current instruction using the $pc register
+        // we could iterate the array but this is better when we also deal with branches and jumps 
+        let index = program.pc_to_index(self.pc)
+            .ok_or(EmuError::Termination)?;
+        
+        let insn = program.instructions[index].clone();
+        println!("{:?}", insn);
+
+        self.pc += 4;
+        Ok(())
+    }
+
+    /// launches the emulator instance and executes line-by-line using a `Program`
+    pub fn run(&mut self) -> Result<(), EmuError> {
+        loop {
+            match self.execute() {
+                Ok(_) => {},
+                Err(EmuError::Termination) => {
+                    println!("Finished execution!");
+                    break;
+                },
+                Err(e) => return Err(e)
+            }
+        }   
+
+        Ok(())
+    }   
+
+    /// used to run a multiline string directly 
+    pub fn run_input(&mut self, source: &str) -> Result<(), EmuError> {
+        let program = Program::parse(source)?;
+
+        self.load_program(program);
+        self.run()
     }
 }
