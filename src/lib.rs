@@ -1,95 +1,17 @@
-mod memory;
-use memory::Memory;
+pub mod instruction;
+pub mod program;
+pub mod cpu;
+pub mod memory;
 
-use std::collections::HashMap;
+pub use instruction::*;
+pub use program::*;
+pub use cpu::*;
+pub use memory::*;
+
 use wasm_bindgen::prelude::*;
-use serde::{Serialize, Deserialize};
 
 //https://github.com/insou22/mipsy partial code used since its a rough outline of the code 
 // only li add and sub; shows register history as lineis entered (as changed) 
-
-#[derive(Serialize, Deserialize, Default)]
-pub struct Snapshot {
-    pub registers: HashMap<String, i32>,
-}
-
-pub struct CPU { 
-    registers: HashMap<String, i32>,
-    memory: Memory, // simple memory: address -> value
-}
-
-impl CPU {
-    pub fn new() -> Self {
-        let mut registers = HashMap::new();
-
-        // initialize registers
-        registers.insert("$t0".to_string(), 0);
-        registers.insert("$t1".to_string(), 0);
-        registers.insert("$t2".to_string(), 0);
-        registers.insert("$sp".to_string(), 0); // Stack Pointer
-
-        CPU { registers, memory: Memory::new() }
-    }
-
-    pub fn get_reg(&self, name: &str) -> i32 {
-        *self.registers.get(name).unwrap_or(&0)
-    }
-
-    pub fn set_reg(&mut self, name: &str, value: i32) {
-        self.registers.insert(name.to_string(), value);
-    }
-
-    pub fn add(&mut self, dest: &str, src1: &str, src2: &str) {
-        self.set_reg(dest, self.get_reg(src1) + self.get_reg(src2));
-    }
-
-    pub fn addi(&mut self, dest: &str, src: &str, imm: i32) {
-        self.set_reg(dest, self.get_reg(src) + imm);
-    }
-
-    pub fn addiu(&mut self, dest: &str, src: &str, imm: i32) {
-        self.set_reg(dest, self.get_reg(src) + imm);
-    }
-
-    pub fn sub(&mut self, dest: &str, src1: &str, src2: &str) {
-        self.set_reg(dest, self.get_reg(src1) - self.get_reg(src2));
-    }
-
-    pub fn subi(&mut self, dest: &str, src: &str, imm: i32) {
-        self.set_reg(dest, self.get_reg(src) - imm);
-    }
-
-    pub fn subiu(&mut self, dest: &str, src: &str, imm: i32) {
-        self.set_reg(dest, self.get_reg(src) - imm);
-    }
-
-    pub fn li(&mut self, dest: &str, imm: i32) {
-        self.set_reg(dest, imm);
-    }
-    
-    pub fn sw(&mut self, src: &str, address: u32) {
-        self.memory.set_word(address, self.get_reg(src));
-    }
-
-    pub fn lw(&mut self, dest: &str, address: u32) {
-        let val = self.memory.load_word(address);
-        self.set_reg(dest, val);
-    }
-
-    pub fn print_registers(&self) {
-        let regs = ["$t0", "$t1", "$t2"];
-        for r in regs {
-            let val = self.get_reg(r);
-
-            print!("{}: {}  ", r, val);
-        }
-        println!();
-    }
-
-    pub fn snapshot(&self) -> Snapshot {
-        Snapshot { registers: self.registers.clone() }
-    }
-}
 
 pub fn execute_line(cpu: &mut CPU, line: &str) {
     let cleaned = line.replace(",", "");
