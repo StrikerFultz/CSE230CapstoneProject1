@@ -57,6 +57,7 @@ fn parse_immediate<T: std::str::FromStr>(s: &str) -> Result<T, EmuError> {
 /// returns an `Instruction` enum or `EmuError`
 pub fn parse_instruction(line_num: usize, line: &str) -> Result<Option<Instruction>, EmuError> {
     // skip comments
+    let line = line.trim(); // ignores empty lines 
     if line.is_empty() || line.starts_with('#') {
         return Ok(None);
     }
@@ -71,13 +72,13 @@ pub fn parse_instruction(line_num: usize, line: &str) -> Result<Option<Instructi
     let operands_str: String = parts.collect::<Vec<&str>>().join(" ");
     if operands_str.is_empty() {
         return Err(EmuError::ParsingError(
-            format!("Line {}: Unrecognized syntax", line_num)
+            format!("Line {}: Unrecognized instruction syntax", line_num)
         ));
     }
     
     if !operands_str.contains(',') {
         return Err(EmuError::ParsingError(
-            format!("Line {}: Unrecognized syntax", line_num)
+            format!("Line {}: Invalid Instruction syntax", line_num) // specifying error more specificially 
         ));
     }
     
@@ -90,20 +91,29 @@ pub fn parse_instruction(line_num: usize, line: &str) -> Result<Option<Instructi
     // this is the CORE of the parser itself 
     // check against supported instructions
     let insn = match opcode.as_str() {
-        "add" => {
+        "add"| "sub" => { // added sub as well 
             if operands.len() != 3 {
-                return Err(EmuError::ParsingError(format!("Line {}", line_num)))
+                return Err(EmuError::ParsingError(format!("Line {}: Invalid Instruction Syntax", line_num)))
             }
-
-            Instruction::Add {
+            
+            match opcode.as_str() {
+                "add" => Instruction::Add {
+                rd: parse_register(operands[0])?,
+                rs: parse_register(operands[1])?,
+                rt: parse_register(operands[2])? 
+            },
+            "sub" => Instruction::Sub {
                 rd: parse_register(operands[0])?,
                 rs: parse_register(operands[1])?,
                 rt: parse_register(operands[2])?
+            },
+            _ => unreachable!(),
             }
+            
         },
         "addi" => {
             if operands.len() != 3 {
-                 return Err(EmuError::ParsingError(format!("Line {}", line_num)))
+                 return Err(EmuError::ParsingError(format!("Line {}: Invalid Instruction Syntax", line_num)))
             }
 
             Instruction::Addi {
@@ -112,9 +122,21 @@ pub fn parse_instruction(line_num: usize, line: &str) -> Result<Option<Instructi
                 imm: parse_immediate::<i32>(operands[2])?
             }
         },
+
+        "addiu" => { // accepted instructions 
+            if operands.len() != 3 {
+                 return Err(EmuError::ParsingError(format!("Line {}: Invalid Instruction Syntax", line_num)))
+            }
+
+            Instruction::Addiu {
+                rt: parse_register(operands[0])?,
+                rs: parse_register(operands[1])?,
+                imm: parse_immediate::<u32>(operands[2])?
+            }
+        },
         "li" => {
             if operands.len() != 2 {
-                return Err(EmuError::ParsingError(format!("Line {}", line_num)))
+                return Err(EmuError::ParsingError(format!("Line {}: Invalid Instruction Syntax", line_num)))
             }
 
             Instruction::Li {
@@ -122,6 +144,59 @@ pub fn parse_instruction(line_num: usize, line: &str) -> Result<Option<Instructi
                 imm: parse_immediate::<u32>(operands[1])?
             }
         }
+        "lw" | "sw" => { // added lw/sw to be accepted as insutrcitons 
+            if operands.len()  != 2 {
+                return Err(EmuError::ParsingError(
+                    format!("Line {}: load/store must have 2 operands", line_num)
+                ));
+            }
+            
+            let mem_operand = operands[1].replace(" ",""); // inside spaces removed
+
+            if !mem_operand.contains('(') || !mem_operand.ends_with(')') {
+                return Err(EmuError::ParsingError(format!("Line {}: missing parenthesis in load/store", line_num)));
+            }
+
+            let parent_idx = mem_operand.find('(').unwrap();
+            let imm_str = &mem_operand[..parent_idx];
+            let rs_str = &mem_operand[parent_idx + 1..mem_operand.len() -1];
+
+            let imm: i32 = match imm_str.parse(){
+                Ok(val) => val,
+                Err(_) => {
+                    return Err(EmuError::ParsingError(format!("Line {} invalid immediate in load/store", line_num)));
+                }
+            };
+
+// only doing base 10 not hex allowed 
+            if rs_str.is_empty(){
+                return Err(EmuError::ParsingError(
+                    format!("Line {}: missing register in load/store", line_num)
+                ));
+            }
+
+            let rs = parse_register(rs_str)?;
+
+
+           /* let imm_rs = operands[1].split('(');
+            if imm_rs.clone().count() != 2 || !imm._rs.clone().nth(1).unwrap().ends_with(')') {
+                return Err(EmuError::ParsingError(format!("Line {}: load/store must use imm(rs) format", line_num)));
+            }*/
+
+            match opcode.as_str(){
+                "lw" => Instruction::Lw {
+                    rt: parse_register(operands[0])?,
+                    rs,
+                    imm,
+                },
+                "sw" => Instruction::Sw { 
+                    rt: parse_register(operands[0])?,
+                    rs,
+                    imm,
+                },
+                _ => unreachable!(),
+            }
+        },
         _ => {
             return Err(
                 EmuError::ParsingError(format!("Line {}: Unknown instruction", line_num))
