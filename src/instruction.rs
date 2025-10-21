@@ -57,8 +57,8 @@ fn parse_immediate<T: std::str::FromStr>(s: &str) -> Result<T, EmuError> {
 /// returns an `Instruction` enum or `EmuError`
 pub fn parse_instruction(line_num: usize, line: &str) -> Result<Option<Instruction>, EmuError> {
     // skip comments
-    let line = line.trim(); // ignores empty lines 
-    if line.is_empty() || line.starts_with('#') {
+    let line = line.split('#').next().unwrap().trim(); // ignores empty lines 
+    if line.is_empty() { //|| line.starts_with('#') {
         return Ok(None);
     }
 

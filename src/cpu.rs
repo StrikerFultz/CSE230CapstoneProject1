@@ -75,6 +75,30 @@ impl CPU {
                 let r = self.get_reg(rs) as i32;
                 self.set_reg(rt, r.wrapping_add(*imm) as u32);
             },
+            Instruction::Addiu { rt, rs, imm } => {
+                let r = self.get_reg(rs) as i32;
+                self.set_reg(rt, r.wrapping_add(*imm as i32) as u32);
+            },
+
+            Instruction::Sub { rd, rs, rt } => {
+                let r1 = self.get_reg(rs) as i32;
+                let r2 = self.get_reg(rt) as i32;
+                self.set_reg(rd, r1.wrapping_sub(r2) as u32);
+            },
+
+            Instruction::Lw { rt, rs, imm } => {
+                let base = self.get_reg(rs);
+                let addr = base.wrapping_add(*imm as u32);
+                let val = self.memory.load_word(addr);
+                self.set_reg(rt, val as u32);
+            },
+
+        Instruction::Sw { rs, rt, imm } => {
+                let base = self.get_reg(rs);
+                let addr = base.wrapping_add(*imm as u32);
+                let val = self.get_reg(rt)as i32;
+                self.memory.set_word(addr, val);
+            },
             Instruction::Li { rd, imm } => {
                 self.set_reg(rd, *imm as u32);
             }
