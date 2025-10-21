@@ -60,24 +60,48 @@ cargo test
 
 
 **Steps on Apple**
+```sh
 curl https://sh.rustup.rs -sSf | sh
+```
+```sh
 source $HOME/.cargo/env
+```
     **installing rust ^^, only once needed**
+```sh
 rustup update
+```
+```sh
 rustup default stable
+```
+```sh
 rustup target add wasm32-unknown-unknown
+```
+```sh
 cargo install wasm-pack
+```
 
 
 **Option 1 Run web server**
+```sh
 wasm-pack build --target web --release --out-dir web/pkg
+```
+```sh
 cd web
+```
+```sh
 python3 -m http.server
+```
 **open http://localhost:8000 in browser**
+**remember to kill the pid if still running**
 
 **Option 2: Build local binary**
+```sh
 cargo run
-cargo test **this checks agsint the test cases so it can be run after they are updated for validity**
+```
+```sh
+cargo test
+``` 
+**this checks agsint the test cases so it can be run after they are updated for validity**
 
 
 **Team Members**:
