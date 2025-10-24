@@ -32,10 +32,22 @@ impl CPU {
         registers.insert("$t1".to_string(), 0);
         registers.insert("$t2".to_string(), 0);
 
+        registers.insert("$v0".to_string(), 0);
+        registers.insert("$v1".to_string(), 0);
+
+        registers.insert("$a0".to_string(), 0);
+        registers.insert("$a1".to_string(), 0);
+        registers.insert("$a2".to_string(), 0);
+        registers.insert("$a3".to_string(), 0);
+
+        registers.insert("$s1".to_string(), 0);
+        registers.insert("$s2".to_string(), 0);
+
         // special registers
         registers.insert("$zero".to_string(), 0);
         registers.insert("$ra".to_string(), 0);
         registers.insert("$sp".to_string(), DEFAULT_STACK_POINTER); 
+        registers.insert("$fp".to_string(), DEFAULT_STACK_BASE_ADDRESS); 
 
         // $pc should be modified by accessing `self.pc`
 
@@ -188,6 +200,11 @@ impl CPU {
                 Ok(_) => {},
                 Err(EmuError::Termination) => {
                     println!("Finished execution!");
+
+                    for (reg, val) in &self.registers {
+                        println!("{}: {}", reg, *val as i32);
+                    }
+
                     break;
                 },
                 Err(e) => return Err(e)

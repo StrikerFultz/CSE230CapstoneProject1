@@ -37,7 +37,8 @@ pub enum Instruction {
 /// checks a register against a list of currently supported registers 
 fn is_valid_register(name: &str) -> bool {
     matches!(name,
-        "$zero" | "$0" | "$t0" | "$t1" | "$t2"
+        "$zero" | "$0" | "$t0" | "$t1" | "$t2" | "$s1" | "$s2" | "$a0"
+        | "$v0"
         | "$sp" | "$fp" | "$ra"
     )
 }
