@@ -30,7 +30,7 @@ impl Parser {
         return tokens;
     }
     pub fn parse_statement(&mut self) {
-        greet("Parsing Statement"); // Implementation of statement parsing logic goes here
+        greet("Parsing Statement");
         let x = self.lexer.peek();
         if let Some(token) = x {
             if token.token_type == TokenType::Mnemonic {
@@ -56,10 +56,9 @@ impl Parser {
         }
     }
     pub fn parse_instruction(&mut self) {
-        greet("Parsing Instruction"); // Implementation of instruction parsing logic goes here
+        greet("Parsing Instruction");
         let x = self.lexer.peek();
         if let Some(token_ref) = x {
-            // clone the token value so we don't hold an immutable borrow across the mutable `expect` call
             let lexeme = token_ref.lexeme.clone();
             let instruction = self.instruction_set.instructions.get(&lexeme).unwrap();
             if instruction.opcode == 0 {
@@ -72,7 +71,6 @@ impl Parser {
                 // I-type instruction parsing
                 self.parse_i_type();
             }
-            // Further parsing based on instruction type
         } else {
             panic!("Unknown instruction: {:?}", x);
         }
@@ -87,7 +85,6 @@ impl Parser {
         self.expect(TokenType::RegisterName); // rt
         self.expect(TokenType::Delimiter);    // ,
         self.expect(TokenType::RegisterName); // rd
-        // Implementation of R-type instruction parsing logic goes here
     }
     pub fn parse_i_type(&mut self) {
         greet("Parsing I-Type Instruction");
@@ -103,7 +100,6 @@ impl Parser {
             self.expect(TokenType::LeftParen);    // (
             self.expect(TokenType::RegisterName); // rs
             self.expect(TokenType::RightParen);    // )
-            // Implementation of load/store instruction parsing logic goes here
         } else {
             self.expect(TokenType::RegisterName); // rs
             self.expect(TokenType::Delimiter);    // ,
@@ -111,14 +107,12 @@ impl Parser {
             self.expect(TokenType::Delimiter);    // ,
             self.expect(TokenType::Integer);    // integer immediate
         }
-        // Implementation of I-type instruction parsing logic goes here
     }
     pub fn parse_j_type(&mut self) {
         greet("Parsing J-Type Instruction");
         let Some(token) = self.lexer.peek() else { return; };
         self.expect(TokenType::Mnemonic);
         self.expect(TokenType::Integer);    // address immediate
-        // Implementation of J-type instruction parsing logic goes here
     }
     pub fn expect(&mut self, expected: TokenType) {
         if self.syntax_error {
