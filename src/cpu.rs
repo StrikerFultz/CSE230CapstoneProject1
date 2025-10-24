@@ -27,11 +27,17 @@ impl CPU {
     pub fn new() -> Self {
         let mut registers: HashMap<String, u32> = HashMap::new();
 
-        // initialize registers
+        // general purpose registers
         registers.insert("$t0".to_string(), 0);
         registers.insert("$t1".to_string(), 0);
         registers.insert("$t2".to_string(), 0);
-        registers.insert("$sp".to_string(), DEFAULT_STACK_POINTER); // Stack Pointer
+
+        // special registers
+        registers.insert("$zero".to_string(), 0);
+        registers.insert("$ra".to_string(), 0);
+        registers.insert("$sp".to_string(), DEFAULT_STACK_POINTER); 
+
+        // $pc should be modified by accessing `self.pc`
 
         CPU { 
             registers, 
@@ -57,7 +63,7 @@ impl CPU {
         self.pc = DEFAULT_TEXT_BASE_ADDRESS;
     }
 
-    pub fn execute(&mut self, insn: &Instruction) {
+    pub fn execute(&mut self, insn: &Instruction) -> Result<(), EmuError> {
         let mut is_branch = false;
         println!("{:?}", insn);
 
@@ -71,10 +77,12 @@ impl CPU {
                 
                 self.set_reg(rd, r1.wrapping_add(r2) as u32);
             },
+
             Instruction::Addi { rt, rs, imm } => {
                 let r = self.get_reg(rs) as i32;
                 self.set_reg(rt, r.wrapping_add(*imm) as u32);
             },
+
             Instruction::Addiu { rt, rs, imm } => {
                 let r = self.get_reg(rs) as i32;
                 self.set_reg(rt, r.wrapping_add(*imm as i32) as u32);
@@ -83,27 +91,70 @@ impl CPU {
             Instruction::Sub { rd, rs, rt } => {
                 let r1 = self.get_reg(rs) as i32;
                 let r2 = self.get_reg(rt) as i32;
+
                 self.set_reg(rd, r1.wrapping_sub(r2) as u32);
             },
-
+            
             Instruction::Lw { rt, rs, imm } => {
                 let base = self.get_reg(rs);
                 let addr = base.wrapping_add(*imm as u32);
                 let val = self.memory.load_word(addr);
+
                 self.set_reg(rt, val as u32);
             },
 
-        Instruction::Sw { rs, rt, imm } => {
+            Instruction::Sw { rs, rt, imm } => {
                 let base = self.get_reg(rs);
                 let addr = base.wrapping_add(*imm as u32);
                 let val = self.get_reg(rt)as i32;
+
                 self.memory.set_word(addr, val);
             },
+
             Instruction::Li { rd, imm } => {
                 self.set_reg(rd, *imm as u32);
-            }
-            _ => {
-                println!("Unimplemented instruction");
+            },
+
+            Instruction::J { label } => {
+                let target = self.program.as_ref()
+                    .unwrap()
+                    .get_label_address(label)
+                    .ok_or(EmuError::UndefinedLabel(label.clone()))?;
+
+                self.pc = target;
+                is_branch = true;
+            },
+
+            Instruction::Jal { label } => {
+                let return_addr = self.pc + 4;
+                self.set_reg("$ra", return_addr);
+
+                let target = self.program.as_ref()
+                    .unwrap()
+                    .get_label_address(label)
+                    .unwrap();
+
+                self.pc = target;
+                is_branch = true;       
+            },
+
+            Instruction::Jr { rs } => {
+                let target = self.get_reg(rs);
+                
+                // check if 4-byte aligned
+                if target % 4 != 0 {
+                    return Err(EmuError::UnalignedAccess(target));
+                }
+            
+                // check if $pc maps to some instruction in the array 
+                if let Some(program) = &self.program {
+                    if program.pc_to_index(target).is_none() {
+                        return Err(EmuError::InvalidJump(target));
+                    }
+                }
+            
+                self.pc = target;
+                is_branch = true;
             }
         }
 
@@ -111,6 +162,8 @@ impl CPU {
         if !is_branch {
             self.pc += 4;
         }
+
+        Ok(())
     }
 
     /// executes a single MIPS instruction 
@@ -123,7 +176,7 @@ impl CPU {
             .ok_or(EmuError::Termination)?;
         
         let insn = program.instructions[index].clone();
-        self.execute(&insn);
+        self.execute(&insn)?;
 
         Ok(())
     }

@@ -14,6 +14,15 @@ pub enum EmuError {
     /// indicates an invalid immediate when parsing 
     InvalidImm(String),
 
+    // indicates unaligned memory access during runtime execution
+    UnalignedAccess(u32),
+
+    // indicates invalid jump target during runtime 
+    InvalidJump(u32),
+
+    // indicates a label that does not exist 
+    UndefinedLabel(String),
+
     /// indicates emulation termination
     Termination
 }
@@ -51,12 +60,25 @@ impl Program {
                 continue;
             }
 
-            match parse_instruction(line_num + 1, line)? {
+            match parse_instruction(line_num, line)? {
                 Some(insn) => {
                     instructions.push(insn);
-                    line_numbers.push(line_num + 1);
+                    line_numbers.push(line_num);
                 },
                 None => {} 
+            }
+        }
+
+        // check if all labels are valid 
+        for insn in &instructions {
+            match insn {
+                Instruction::J { label } |
+                Instruction::Jal { label } => {
+                    if !labels.contains_key(label) {
+                        return Err(EmuError::UndefinedLabel(label.clone()));
+                    }
+                }
+                _ => {}
             }
         }
 

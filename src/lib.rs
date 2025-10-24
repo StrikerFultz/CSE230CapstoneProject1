@@ -54,7 +54,6 @@ mod tests {
         assert_eq!(cpu.get_reg("$t2"), 30);
     }
 
-
     #[test]
     fn lw_sw_test() {
         let mut cpu = CPU::new();
@@ -69,7 +68,39 @@ mod tests {
         assert_eq!(cpu.get_reg("$t0"), 42);
     }
 
+    #[test]
+    fn jump_test() {
+        let mut cpu = CPU::new();
+        let program = r#"
+            j skip
+            addi $t0, $zero, 100
+
+            skip:
+            addi $t0, $zero, 50
+        "#;
+
+        cpu.run_input(program).unwrap();
+        assert_eq!(cpu.get_reg("$t0"), 50); 
+    }
     
+    #[test]
+    fn jal_test() {
+        let mut cpu = CPU::new();
+        let program = r#"
+            start:
+            j main
+        
+            add_five:
+            addi $t1, $t0, 5
+            jr $ra
+        
+            main:
+            addi $t0, $zero, 10
+            jal add_five
+            add $t0, $t0, $t1
+        "#;
 
-
+        cpu.run_input(program).unwrap();
+        assert_eq!(cpu.get_reg("$t0"), 25); 
+    }
 }

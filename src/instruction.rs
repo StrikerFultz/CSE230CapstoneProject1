@@ -22,7 +22,16 @@ pub enum Instruction {
     Sw { rs: String, imm: i32, rt: String },
 
     /// R[rt] = M[R[rs]+SignExtImm]
-    Lw { rt: String, rs: String, imm: i32 }
+    Lw { rt: String, rs: String, imm: i32 },
+
+    /// PC=JumpAddr
+    J { label: String },
+
+    /// R[$ra]=PC+8;PC=JumpAddr
+    Jal { label: String },
+
+    /// PC=R[rs] 
+    Jr { rs: String }
 }
 
 /// checks a register against a list of currently supported registers 
@@ -34,22 +43,21 @@ fn is_valid_register(name: &str) -> bool {
 }
 
 /// checks whether the register is supported ($t0, $t1, $t2 only supported atm)
-fn parse_register(name: &str) -> Result<String, EmuError> {
+fn parse_register(name: &str, line_num: usize) -> Result<String, EmuError> {
     if is_valid_register(name) {
         Ok(name.to_string())
     } else {
         Err(
-            // probably match the error name with the one on ZyLabs later
-            EmuError::InvalidReg(format!("{} is not a valid register name", name.to_string()))
+            EmuError::InvalidReg(format!("Line {}: Invalid Register {}", line_num, name.to_string()))
         )
     }
 }
 
 /// generic function that will parse an expected immediate and return a type `T`
-fn parse_immediate<T: std::str::FromStr>(s: &str) -> Result<T, EmuError> {
+fn parse_immediate<T: std::str::FromStr>(s: &str, line_num: usize) -> Result<T, EmuError> {
     s.trim()
         .parse::<T>()
-        .map_err(|_| EmuError::InvalidImm(s.to_string()))
+        .map_err(|_| EmuError::InvalidImm(format!("Line {}: Invalid Immediate {}", line_num, s.to_string())))
 }
 
 /// parses a provided instruction string given a line number and line 
@@ -76,7 +84,7 @@ pub fn parse_instruction(line_num: usize, line: &str) -> Result<Option<Instructi
         ));
     }
     
-    if !operands_str.contains(',') {
+    if !operands_str.contains(',') && !opcode.starts_with("j") {
         return Err(EmuError::ParsingError(
             format!("Line {}: Invalid Instruction syntax", line_num) // specifying error more specificially 
         ));
@@ -90,24 +98,28 @@ pub fn parse_instruction(line_num: usize, line: &str) -> Result<Option<Instructi
     
     // this is the CORE of the parser itself 
     // check against supported instructions
+
+    // in the future we can use the lexer to extract the relevant tokens 
+
     let insn = match opcode.as_str() {
-        "add"| "sub" => { // added sub as well 
+        "add" | "sub" => { 
+            // added sub as well 
             if operands.len() != 3 {
                 return Err(EmuError::ParsingError(format!("Line {}: Invalid Instruction Syntax", line_num)))
             }
             
             match opcode.as_str() {
                 "add" => Instruction::Add {
-                rd: parse_register(operands[0])?,
-                rs: parse_register(operands[1])?,
-                rt: parse_register(operands[2])? 
-            },
-            "sub" => Instruction::Sub {
-                rd: parse_register(operands[0])?,
-                rs: parse_register(operands[1])?,
-                rt: parse_register(operands[2])?
-            },
-            _ => unreachable!(),
+                    rd: parse_register(operands[0], line_num)?,
+                    rs: parse_register(operands[1], line_num)?,
+                    rt: parse_register(operands[2], line_num)? 
+                },
+                "sub" => Instruction::Sub {
+                    rd: parse_register(operands[0], line_num)?,
+                    rs: parse_register(operands[1], line_num)?,
+                    rt: parse_register(operands[2], line_num)?
+                },
+                _ => unreachable!(),
             }
             
         },
@@ -117,21 +129,21 @@ pub fn parse_instruction(line_num: usize, line: &str) -> Result<Option<Instructi
             }
 
             Instruction::Addi {
-                rt: parse_register(operands[0])?,
-                rs: parse_register(operands[1])?,
-                imm: parse_immediate::<i32>(operands[2])?
+                rt: parse_register(operands[0], line_num)?,
+                rs: parse_register(operands[1], line_num)?,
+                imm: parse_immediate::<i32>(operands[2], line_num)?
             }
         },
-
-        "addiu" => { // accepted instructions 
+        "addiu" => { 
+            // accepted instructions 
             if operands.len() != 3 {
                  return Err(EmuError::ParsingError(format!("Line {}: Invalid Instruction Syntax", line_num)))
             }
 
             Instruction::Addiu {
-                rt: parse_register(operands[0])?,
-                rs: parse_register(operands[1])?,
-                imm: parse_immediate::<u32>(operands[2])?
+                rt: parse_register(operands[0], line_num)?,
+                rs: parse_register(operands[1], line_num)?,
+                imm: parse_immediate::<u32>(operands[2], line_num)?
             }
         },
         "li" => {
@@ -140,11 +152,12 @@ pub fn parse_instruction(line_num: usize, line: &str) -> Result<Option<Instructi
             }
 
             Instruction::Li {
-                rd: parse_register(operands[0])?,
-                imm: parse_immediate::<u32>(operands[1])?
+                rd: parse_register(operands[0], line_num)?,
+                imm: parse_immediate::<u32>(operands[1], line_num)?
             }
         }
-        "lw" | "sw" => { // added lw/sw to be accepted as insutrcitons 
+        "lw" | "sw" => { 
+            // added lw/sw to be accepted as instructions
             if operands.len()  != 2 {
                 return Err(EmuError::ParsingError(
                     format!("Line {}: load/store must have 2 operands", line_num)
@@ -161,46 +174,69 @@ pub fn parse_instruction(line_num: usize, line: &str) -> Result<Option<Instructi
             let imm_str = &mem_operand[..parent_idx];
             let rs_str = &mem_operand[parent_idx + 1..mem_operand.len() -1];
 
-            let imm: i32 = match imm_str.parse(){
-                Ok(val) => val,
-                Err(_) => {
-                    return Err(EmuError::ParsingError(format!("Line {} invalid immediate in load/store", line_num)));
-                }
-            };
-
-// only doing base 10 not hex allowed 
+            // only doing base 10 not hex allowed 
             if rs_str.is_empty(){
                 return Err(EmuError::ParsingError(
                     format!("Line {}: missing register in load/store", line_num)
                 ));
             }
 
-            let rs = parse_register(rs_str)?;
-
-
            /* let imm_rs = operands[1].split('(');
             if imm_rs.clone().count() != 2 || !imm._rs.clone().nth(1).unwrap().ends_with(')') {
                 return Err(EmuError::ParsingError(format!("Line {}: load/store must use imm(rs) format", line_num)));
             }*/
-
+            
             match opcode.as_str(){
                 "lw" => Instruction::Lw {
-                    rt: parse_register(operands[0])?,
-                    rs,
-                    imm,
+                    rt: parse_register(operands[0], line_num)?,
+                    rs: parse_register(rs_str, line_num)?,
+                    imm: parse_immediate::<i32>(imm_str, line_num)?,
                 },
                 "sw" => Instruction::Sw { 
-                    rt: parse_register(operands[0])?,
-                    rs,
-                    imm,
+                    rt: parse_register(operands[0], line_num)?,
+                    rs: parse_register(rs_str, line_num)?,
+                    imm: parse_immediate::<i32>(imm_str, line_num)?,
                 },
                 _ => unreachable!(),
             }
         },
+        "j" => {
+            if operands.len() != 1 {
+                return Err(EmuError::ParsingError(
+                    format!("Line {}: missing label in jump instruction", line_num)
+                ));
+            }
+
+            Instruction::J {
+                label: operands[0].to_string()
+            }
+        },
+        "jal" => {
+            if operands.len() != 1 {
+                return Err(EmuError::ParsingError(
+                    format!("Line {}: missing label in jal instruction", line_num)
+                ));
+            }
+
+            Instruction::Jal {
+                label: operands[0].to_string()
+            }
+        },
+        "jr" => {
+            if operands.len() != 1 {
+                return Err(EmuError::ParsingError(
+                    format!("Line {}: invalid register in jr instruction", line_num)
+                ));
+            }
+
+            Instruction::Jr {
+                rs: parse_register(operands[0], line_num)?
+            }
+        }
         _ => {
             return Err(
-                EmuError::ParsingError(format!("Line {}: Unknown instruction", line_num))
-            );
+                EmuError::ParsingError(format!("Line {}: Unknown instruction", line_num)
+            ));
         }
     };
 
