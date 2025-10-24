@@ -148,7 +148,6 @@ impl Lexer {
 
                 // dollar sign indicates possible register
                 if c == '$' {
-                    // Possible register
                     let mut register_end = consumeTilPuncAndWs(i + 1, line);
                     let possible_register = &line[i..register_end];
                     let new_token = Token {
@@ -186,7 +185,6 @@ impl Lexer {
 
                 // digit indicates possible integer
                 if c.is_ascii_digit() {
-                    // Possible integer
                     let mut integer_end = consumeInteger(i + 1, line);
                     let possible_integer = &line[i..integer_end];
                     let new_token = Token {
@@ -202,7 +200,6 @@ impl Lexer {
 
                 // alphabetic indicates possible Mnemonic
                 if c.is_ascii_alphabetic() {
-                    // Possible Mnemonic
                     let mut mnemonic_end = consumeTilPuncAndWs(i + 1, line);
                     let possible_mnemonic = &line[i..mnemonic_end];
                     if !matchMnemonic(possible_mnemonic, &InstructionSet::new()) {
