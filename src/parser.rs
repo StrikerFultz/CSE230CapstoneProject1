@@ -17,7 +17,12 @@ pub struct Parser {
 
 impl Parser {
     pub fn new() -> Self {
-        Parser { lexer: Lexer::new(), instruction_set: InstructionSet::new(), syntax_error: false, syntax_error_message: String::from("No Errors") }
+        Parser { 
+            lexer: Lexer::new(), 
+            instruction_set: InstructionSet::new(), 
+            syntax_error: false, 
+            syntax_error_message: String::from("No Errors") 
+        }
     }
     pub fn parse_program(&mut self, code: &str) -> VecDeque<Token> {
         self.reset();
