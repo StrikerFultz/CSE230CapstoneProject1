@@ -103,4 +103,33 @@ mod tests {
         cpu.run_input(program).unwrap();
         assert_eq!(cpu.get_reg("$t0"), 25); 
     }
+
+        #[test]
+    fn or_test() {
+        let mut cpu = CPU::new();
+        let program = r#"
+            li  $t0, 5     # 0b0101
+            li  $t1, 8     # 0b1000
+            or  $t2, $t0, $t1
+        "#;
+
+        cpu.run_input(program).unwrap();
+        assert_eq!(cpu.get_reg("$t2"), 13);
+    }
+
+    #[test]
+    fn ori_test() {
+        let mut cpu = CPU::new();
+        let program = r#"
+            li   $t0, 3     # 0b0011
+            ori  $t1, $t0, 12  # 0b1100
+        "#;
+
+        cpu.run_input(program).unwrap();
+        assert_eq!(cpu.get_reg("$t1"), 15);
+    }
+
+
+
+
 }

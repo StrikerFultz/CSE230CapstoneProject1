@@ -31,7 +31,11 @@ pub enum Instruction {
     Jal { label: String },
 
     /// PC=R[rs] 
-    Jr { rs: String }
+    Jr { rs: String },
+
+    Or { rd: String, rs: String, rt: String },
+
+    Ori { rt:String, rs:String, imm: u32}
 }
 
 /// checks a register against a list of currently supported registers 
@@ -234,6 +238,34 @@ pub fn parse_instruction(line_num: usize, line: &str) -> Result<Option<Instructi
                 rs: parse_register(operands[0], line_num)?
             }
         }
+
+        "or" => {
+            if operands.len() != 3 {
+                return Err(EmuError::ParsingError(
+                    format!("Line {}: invalid register in or instruction", line_num)
+                ));
+            }
+            Instruction::Or{
+                rd: parse_register(operands[0], line_num)?,
+                rs: parse_register(operands[1], line_num)?,
+                rt: parse_register(operands[2], line_num)?,
+
+            }
+        },
+
+        "ori" => {
+            if operands.len() != 3 {
+                return Err(EmuError::ParsingError(
+                    format!("Line {}: invalid register in ori instruction", line_num)
+                ));
+            }
+            Instruction::Ori{
+                rt: parse_register(operands[0], line_num)?,
+                rs: parse_register(operands[1], line_num)?,
+                imm: parse_immediate::<u32>(operands[2], line_num)?,
+
+            }
+        },
         _ => {
             return Err(
                 EmuError::ParsingError(format!("Line {}: Unknown instruction", line_num)

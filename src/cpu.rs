@@ -167,7 +167,16 @@ impl CPU {
             
                 self.pc = target;
                 is_branch = true;
-            }
+            },
+            Instruction::Or {rd, rs, rt } => {
+                let r1 = self.get_reg(rs);
+                let r2 = self.get_reg(rt);
+                self.set_reg(rd, r1 | r2);
+            },
+            Instruction::Ori {rt, rs, imm} => {
+                let r = self.get_reg(rs);
+                self.set_reg(rt, r | *imm);
+            },
         }
 
         // branch instructions will modify the PC to another address instead of the sequential instruction
