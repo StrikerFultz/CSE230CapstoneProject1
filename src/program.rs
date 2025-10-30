@@ -69,11 +69,13 @@ impl Program {
             }
         }
 
-        // check if all labels are valid 
+        // check if all labels from certain instructions are valid 
         for insn in &instructions {
             match insn {
                 Instruction::J { label } |
-                Instruction::Jal { label } => {
+                Instruction::Jal { label } |
+                Instruction::Beq { label, .. } |
+                Instruction::Bne { label, .. } => {
                     if !labels.contains_key(label) {
                         return Err(EmuError::UndefinedLabel(label.clone()));
                     }

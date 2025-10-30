@@ -129,7 +129,39 @@ mod tests {
         assert_eq!(cpu.get_reg("$t1"), 15);
     }
 
+    #[test]
+    fn beq_test() {
+        let mut cpu = CPU::new();
+        let program = r#"
+            li $t0, 10
+            li $t1, 10
+            beq $t0, $t1, skip
+            li $t2, 100
+            j exit
+            skip:
+            li $t2, 50
+            exit:
+        "#;
 
+        cpu.run_input(program).unwrap();
+        assert_eq!(cpu.get_reg("$t2"), 50);
+    }
 
-
+    #[test]
+    fn bne_test() {
+        let mut cpu = CPU::new();
+        let program = r#"
+            li $t0, 10
+            li $t1, 11
+            bne $t0, $t1, skip
+            li $t2, 100
+            j exit
+            skip:
+            li $t2, 50
+            exit:
+        "#;
+        
+        cpu.run_input(program).unwrap();
+        assert_eq!(cpu.get_reg("$t2"), 50);
+    }
 }

@@ -168,15 +168,47 @@ impl CPU {
                 self.pc = target;
                 is_branch = true;
             },
+
             Instruction::Or {rd, rs, rt } => {
                 let r1 = self.get_reg(rs);
                 let r2 = self.get_reg(rt);
                 self.set_reg(rd, r1 | r2);
             },
+
             Instruction::Ori {rt, rs, imm} => {
                 let r = self.get_reg(rs);
                 self.set_reg(rt, r | *imm);
             },
+
+            Instruction::Beq { rs, rt, label } => {
+                let r1 = self.get_reg(rs);
+                let r2 = self.get_reg(rt);
+
+                if r1 == r2 {
+                    let target = self.program.as_ref()
+                        .unwrap()
+                        .get_label_address(label)
+                        .ok_or(EmuError::UndefinedLabel(label.clone()))?;
+                    
+                    self.pc = target;
+                    is_branch = true;
+                }
+            },
+
+            Instruction::Bne { rs, rt, label } => {
+                let r1 = self.get_reg(rs);
+                let r2 = self.get_reg(rt);
+
+                if r1 != r2 {
+                    let target = self.program.as_ref()
+                        .unwrap()
+                        .get_label_address(label)
+                        .ok_or(EmuError::UndefinedLabel(label.clone()))?;
+                    
+                    self.pc = target;
+                    is_branch = true;
+                }
+            }
         }
 
         // branch instructions will modify the PC to another address instead of the sequential instruction

@@ -33,9 +33,17 @@ pub enum Instruction {
     /// PC=R[rs] 
     Jr { rs: String },
 
+    /// R[rd] = R[rs] | R[rt]
     Or { rd: String, rs: String, rt: String },
 
-    Ori { rt:String, rs:String, imm: u32}
+    /// R[rt] = R[rs] | ZeroExtImm
+    Ori { rt:String, rs:String, imm: u32},
+
+    /// if(R[rs] == R[rt]) PC=JumpAddr
+    Beq { rs: String, rt: String, label: String },
+
+    /// if(R[rs] != R[rt]) PC=JumpAddr
+    Bne { rs: String, rt: String, label: String },
 }
 
 /// checks a register against a list of currently supported registers 
@@ -186,11 +194,6 @@ pub fn parse_instruction(line_num: usize, line: &str) -> Result<Option<Instructi
                 ));
             }
 
-           /* let imm_rs = operands[1].split('(');
-            if imm_rs.clone().count() != 2 || !imm._rs.clone().nth(1).unwrap().ends_with(')') {
-                return Err(EmuError::ParsingError(format!("Line {}: load/store must use imm(rs) format", line_num)));
-            }*/
-            
             match opcode.as_str(){
                 "lw" => Instruction::Lw {
                     rt: parse_register(operands[0], line_num)?,
@@ -245,7 +248,7 @@ pub fn parse_instruction(line_num: usize, line: &str) -> Result<Option<Instructi
                     format!("Line {}: invalid register in or instruction", line_num)
                 ));
             }
-            Instruction::Or{
+            Instruction::Or {
                 rd: parse_register(operands[0], line_num)?,
                 rs: parse_register(operands[1], line_num)?,
                 rt: parse_register(operands[2], line_num)?,
@@ -259,13 +262,36 @@ pub fn parse_instruction(line_num: usize, line: &str) -> Result<Option<Instructi
                     format!("Line {}: invalid register in ori instruction", line_num)
                 ));
             }
-            Instruction::Ori{
+            Instruction::Ori {
                 rt: parse_register(operands[0], line_num)?,
                 rs: parse_register(operands[1], line_num)?,
                 imm: parse_immediate::<u32>(operands[2], line_num)?,
 
             }
         },
+
+        "beq" | "bne" => {
+            if operands.len() != 3 {
+                return Err(EmuError::ParsingError(
+                    format!("Line {}: Invalid Instruction Syntax", line_num)
+                ));
+            }
+
+            match opcode.as_str() {
+                "beq" => Instruction::Beq {
+                    rs: parse_register(operands[0], line_num)?,
+                    rt: parse_register(operands[1], line_num)?,
+                    label: operands[2].to_string(),
+                },
+                "bne" => Instruction::Bne {
+                    rs: parse_register(operands[0], line_num)?,
+                    rt: parse_register(operands[1], line_num)?,
+                    label: operands[2].to_string(),
+                },
+                _ => unreachable!(),
+            }
+        },
+
         _ => {
             return Err(
                 EmuError::ParsingError(format!("Line {}: Unknown instruction", line_num)
