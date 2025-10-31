@@ -100,11 +100,24 @@ impl CPU {
                 self.set_reg(rt, r.wrapping_add(*imm as i32) as u32);
             },
 
+            Instruction::Addu { rd, rs, rt } => {
+                let r1 = self.get_reg(rs) ;
+                let r2 = self.get_reg(rt);
+                self.set_reg(rd,r1.wrapping_add(r2));
+            },          
+
             Instruction::Sub { rd, rs, rt } => {
                 let r1 = self.get_reg(rs) as i32;
                 let r2 = self.get_reg(rt) as i32;
 
                 self.set_reg(rd, r1.wrapping_sub(r2) as u32);
+            },
+
+            Instruction::Subu { rd, rs, rt } => {
+                let r1 = self.get_reg(rs);
+                let r2 = self.get_reg(rt);
+
+                self.set_reg(rd, r1.wrapping_sub(r2));
             },
             
             Instruction::Lw { rt, rs, imm } => {
@@ -177,6 +190,19 @@ impl CPU {
                 let r = self.get_reg(rs);
                 self.set_reg(rt, r | *imm);
             },
+
+            Instruction::And { rd, rs, rt } => {
+                let r1 = self.get_reg(rs);
+                let r2 = self.get_reg(rt);
+                self.set_reg(rd, r1 & r2);
+            },
+
+            Instruction::Andi { rt, rs, imm } => {
+                let r = self.get_reg(rs);
+                self.set_reg(rt, r & (*imm as u32));
+            }
+
+
         }
 
         // branch instructions will modify the PC to another address instead of the sequential instruction
