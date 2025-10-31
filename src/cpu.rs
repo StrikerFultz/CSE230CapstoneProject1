@@ -101,9 +101,9 @@ impl CPU {
             },
             
             Instruction::Addu { rd, rs, rt } => {
-                let r1 = self.get_reg(rs) as u32;
-                let r2 = self.get_reg(rt) as u32;
-                self.set_reg(rd,r1.wrapping_add(r2) as u32);
+                let r1 = self.get_reg(rs);
+                let r2 = self.get_reg(rt);
+                self.set_reg(rd,r1.wrapping_add(r2));
             },   
 
             Instruction::Sub { rd, rs, rt } => {
@@ -201,7 +201,7 @@ impl CPU {
 
             Instruction::Andi { rt, rs, imm } => {
                 let r = self.get_reg(rs);
-                self.set_reg(rt, r & (*imm as u32));
+                self.set_reg(rt, r & *imm);
             },
 
             Instruction::Beq { rs, rt, label } => {
