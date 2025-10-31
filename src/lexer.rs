@@ -198,7 +198,7 @@ impl Lexer {
                 }
 
                 // alphabetic indicates possible Mnemonic
-                if c.is_ascii_alphabetic() {
+                if c.is_ascii_alphabetic() || c == '_' {
                     let mut end = consumeTilPuncAndWs(i + 1, line);
                     
                     // check if label
@@ -313,7 +313,8 @@ fn matchDirective(s: &str) -> bool {
 fn consumeTilPuncAndWs(i: usize, s: &str) -> usize {
     let mut index = i;
     for c in s.chars().skip(i) {
-        if c.is_whitespace() || c.is_ascii_punctuation() {
+        // skip underscores since those are used by labels
+        if c.is_whitespace() || (c.is_ascii_punctuation() && c != '_') { 
             return index;
         }
         index += 1;
