@@ -6,6 +6,9 @@ pub enum Instruction {
     /// R[rd] = R[rs] + R[rt] 
     Add { rd: String, rs: String, rt: String },
 
+    /// R[rd] = R[rs] + R[rt]
+    Addu { rd: String, rs: String, rt: String },
+
     /// R[rt] = R[rs] + SignExtImm 
     Addi { rt: String, rs: String, imm: i32 },
 
@@ -14,6 +17,9 @@ pub enum Instruction {
 
     /// R[rd] = R[rs] - R[rt]
     Sub { rd: String, rs: String, rt: String },
+
+    /// R[rd] = R[rs] - R[rt] 
+    Subu { rd: String, rs: String, rt: String },
 
     /// R[rd] = immediate
     Li { rd: String, imm: u32 },
@@ -37,7 +43,13 @@ pub enum Instruction {
     Or { rd: String, rs: String, rt: String },
 
     /// R[rt] = R[rs] | ZeroExtImm
-    Ori { rt:String, rs:String, imm: u32},
+    Ori { rt: String, rs: String, imm: u32 },
+
+    /// R[rd] = R[rs] & R[rt] 
+    And { rd: String, rs: String, rt: String },
+
+    /// R[rt] = R[rs] & ZeroExtImm
+    Andi { rt: String, rs: String, imm: u32 },
 
     /// if(R[rs] == R[rt]) PC=JumpAddr
     Beq { rs: String, rt: String, label: String },
@@ -115,8 +127,7 @@ pub fn parse_instruction(line_num: usize, line: &str) -> Result<Option<Instructi
     // in the future we can use the lexer to extract the relevant tokens 
 
     let insn = match opcode.as_str() {
-        "add" | "sub" => { 
-            // added sub as well 
+        "add" | "sub" | "addu" | "subu" => { 
             if operands.len() != 3 {
                 return Err(EmuError::ParsingError(format!("Line {}: Invalid Instruction Syntax", line_num)))
             }
@@ -132,7 +143,17 @@ pub fn parse_instruction(line_num: usize, line: &str) -> Result<Option<Instructi
                     rs: parse_register(operands[1], line_num)?,
                     rt: parse_register(operands[2], line_num)?
                 },
-                _ => unreachable!(),
+                "addu" => Instruction::Addu {
+                    rd: parse_register(operands[0], line_num)?,
+                    rs: parse_register(operands[1], line_num)?,
+                    rt: parse_register(operands[2], line_num)?
+                },
+                "subu" => Instruction::Subu {
+                    rd: parse_register(operands[0], line_num)?,
+                    rs: parse_register(operands[1], line_num)?,
+                    rt: parse_register(operands[2], line_num)?
+                },
+                _ => unreachable!()
             }
             
         },
@@ -262,13 +283,41 @@ pub fn parse_instruction(line_num: usize, line: &str) -> Result<Option<Instructi
                     format!("Line {}: invalid register in ori instruction", line_num)
                 ));
             }
+
             Instruction::Ori {
                 rt: parse_register(operands[0], line_num)?,
                 rs: parse_register(operands[1], line_num)?,
-                imm: parse_immediate::<u32>(operands[2], line_num)?,
-
+                imm: parse_immediate::<u32>(operands[2], line_num)?
             }
         },
+
+        "and" => {
+            if operands.len() != 3 {
+                return Err(EmuError::ParsingError(
+                    format!("Line {}: invalid register in and instruction", line_num)
+                ));
+            }
+
+            Instruction::And {
+                rd: parse_register(operands[0], line_num)?,
+                rs: parse_register(operands[1], line_num)?,
+                rt: parse_register(operands[2], line_num)?,
+            }
+        },
+
+        "andi" => {
+            if operands.len() != 3 {
+                return Err(EmuError::ParsingError(
+                    format!("Line {}: invalid register in andi instruction", line_num)
+                ));
+            }
+
+            Instruction::Andi {
+                rt: parse_register(operands[0], line_num)?,
+                rs: parse_register(operands[1], line_num)?,
+                imm: parse_immediate::<u32>(operands[2], line_num)?
+            }
+        }
 
         "beq" | "bne" => {
             if operands.len() != 3 {
