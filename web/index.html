@@ -1,12 +1,87 @@
-<!doctype html>
-<html>
-<head><meta charset="utf-8"><title>MIPS WASM</title></head>
-  <body>
-    <h1>MIPS32 Emulator</h1>
-    <textarea id="code" placeholder='e.g. "addi $t0, $t0, 5"'></textarea>
-    <button id="run">Run</button>
-    <pre id="out"></pre>
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>MIPS Emulator</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
 
-    <script type="module" src="./main.js"></script>
+  <body>
+    <header>
+      <div>MIPS Emulator</div>
+      <div>Labs</div>
+    </header>
+
+    <!--labs/lessons-->
+    <section id="lesson-container" class="lesson-container hidden">
+      <div class="lesson-header">
+        <h2 id="lesson-title"></h2>
+        <button id="lesson-hide" class="lesson-hide-btn">Hide</button>
+      </div>
+      <div id="lesson-body"></div>
+    </section>
+
+    <div class="workspace">
+      <!--files-->
+      <div class="panel">
+        <h3>Files</h3>
+        <!-- add labs here -->
+        <div class="files-list">
+          <div class="file-item" data-lesson="lab-12-2">
+  12.2 LAB: Arithmetic expression - add/sub
+</div>
+          <div class="file-item" data-lesson="lab-12-3">
+            12.3 LAB: Arithmetic expression - add/sub/mult
+          </div>
+        </div>
+      </div>
+
+      <!--assembler-->
+      <div class="panel assembler">
+        <h3>Assembly</h3>
+        <div class="assembler-content">
+          <textarea
+            spellcheck="false"
+            placeholder="Type your MIPS code here..."
+          ></textarea>
+        </div>
+      </div>
+
+      <!--panels on the right-->
+      <div class="panel right-panel">
+        <div class="side-box">
+          <strong>Registers</strong>
+          <div id="registers"></div>
+        </div>
+
+        <div class="side-box">
+          <strong>Memory</strong>
+          <div id="memory"></div>
+        </div>
+
+        <div class="side-box">
+          <strong>Widgets</strong>
+          <div id="widgets"></div>
+        </div>
+      </div>
+
+      <!--console-->
+      <div class="console">
+        <div class="console-header">
+          <span>Console</span>
+          <div class="buttons">
+            <button id="run">Run</button>
+            <button id="step">Step</button>
+            <button id="stop">Stop</button>
+          </div>
+        </div>
+        <div class="console-inner" id="console-output"></div>
+      </div>
+    </div>
+
+    <script type="module" src="lessons.js"></script>
+    <script type="module" src="main.js"></script>
+
   </body>
 </html>
