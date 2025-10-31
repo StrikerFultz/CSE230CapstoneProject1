@@ -1,201 +1,322 @@
-use crate::memory::Memory;
-
+use crate::instruction::Instruction;
+use crate::memory::*;
+use crate::program::{EmuError, Program};
+use crate::Snapshot;
 use std::collections::HashMap;
-use wasm_bindgen::prelude::*;
-use serde::{Serialize, Deserialize};
 
-//https://github.com/insou22/mipsy partial code used since its a rough outline of the code 
-// only li add and sub; shows register history as lineis entered (as changed) 
-
-#[derive(Serialize, Deserialize, Default)]
-pub struct Snapshot {
-    pub registers: HashMap<String, i32>,
+/// represents the state of the CPU at an instruction
+pub struct ExecutionState {
+    pc: u32,
+    instruction: Instruction
 }
 
-#[wasm_bindgen]
 pub struct CPU { 
-    registers: HashMap<String, i32>,
-    memory: Memory, // simple memory: address -> value
+    // processor state 
+    registers: HashMap<String, u32>,
+    pc: u32,
+
+    // program + memory
+    program: Option<Program>,
+    memory: Memory,     
+
+    // log of all executed instructions 
+    state_history: Vec<ExecutionState>
 }
 
-#[wasm_bindgen]
 impl CPU {
-    #[wasm_bindgen(constructor)]
     pub fn new() -> Self {
-        let mut registers = HashMap::new();
+        CPU { 
+            registers: Self::create_register_map(), 
+            pc: DEFAULT_TEXT_BASE_ADDRESS, 
+            program: None, 
+            memory: Memory::new(),
+            state_history: Vec::new()
+        }
+    }
 
-        // initialize registers
+    fn create_register_map() -> HashMap<String, u32> {
+        let mut registers: HashMap<String, u32> = HashMap::new();
+        // $pc should be modified by accessing `self.pc`
+
+        // general purpose
+        registers.insert("$zero".to_string(), 0);
+        registers.insert("$at".to_string(), 0);
+        registers.insert("$v0".to_string(), 0);
+        registers.insert("$v1".to_string(), 0);
+        registers.insert("$a0".to_string(), 0);
+        registers.insert("$a1".to_string(), 0);
+        registers.insert("$a2".to_string(), 0);
+        registers.insert("$a3".to_string(), 0);
         registers.insert("$t0".to_string(), 0);
         registers.insert("$t1".to_string(), 0);
         registers.insert("$t2".to_string(), 0);
-        registers.insert("$sp".to_string(), 0); // Stack Pointer
+        registers.insert("$t3".to_string(), 0);
+        registers.insert("$t4".to_string(), 0);
+        registers.insert("$t5".to_string(), 0);
+        registers.insert("$t6".to_string(), 0);
+        registers.insert("$t7".to_string(), 0);
+        registers.insert("$s0".to_string(), 0);
+        registers.insert("$s1".to_string(), 0);
+        registers.insert("$s2".to_string(), 0);
+        registers.insert("$s3".to_string(), 0);
+        registers.insert("$s4".to_string(), 0);
+        registers.insert("$s5".to_string(), 0);
+        registers.insert("$s6".to_string(), 0);
+        registers.insert("$s7".to_string(), 0);
+        registers.insert("$t8".to_string(), 0);
+        registers.insert("$t9".to_string(), 0);
+        registers.insert("$k0".to_string(), 0);
+        registers.insert("$k1".to_string(), 0);
+        registers.insert("$ra".to_string(), 0);
 
-        CPU { registers, memory: Memory::new() }
+        // special
+        registers.insert("$gp".to_string(), DEFAULT_STATIC_DATA_BASE_ADDRESS);
+        registers.insert("$sp".to_string(), DEFAULT_STACK_POINTER); 
+        registers.insert("$fp".to_string(), DEFAULT_STACK_BASE_ADDRESS); 
+
+        registers
     }
 
-    pub fn get_reg(&self, name: &str) -> i32 {
+    /// returns the value of a register as a 32-bit unsigned integer
+    pub fn get_reg(&self, name: &str) -> u32 {
         *self.registers.get(name).unwrap_or(&0)
     }
 
-    pub fn set_reg(&mut self, name: &str, value: i32) {
+    /// sets a register value to a 32-bit unsigned integer 
+    pub fn set_reg(&mut self, name: &str, value: u32) {
         self.registers.insert(name.to_string(), value);
     }
 
-    pub fn add(&mut self, dest: &str, src1: &str, src2: &str) {
-        self.set_reg(dest, self.get_reg(src1) + self.get_reg(src2));
+    pub fn load_program(&mut self, program: Program) {
+        self.program = Some(program);
+        self.pc = DEFAULT_TEXT_BASE_ADDRESS;
     }
 
-    pub fn addi(&mut self, dest: &str, src: &str, imm: i32) {
-        self.set_reg(dest, self.get_reg(src) + imm);
-    }
+    pub fn execute(&mut self, insn: &Instruction) -> Result<(), EmuError> {
+        let mut is_branch = false;
+        println!("{:?}", insn);
 
-    pub fn addiu(&mut self, dest: &str, src: &str, imm: i32) {
-        self.set_reg(dest, self.get_reg(src) + imm);
-    }
+        // TODO: probably have to handle overflow or integer bounds for 32-bit signed integer
+        
+        // handle instruction based on type
+        match insn {
+            Instruction::Add { rd, rs, rt } => {
+                let r1 = self.get_reg(rs) as i32; 
+                let r2 = self.get_reg(rt) as i32;
+                
+                self.set_reg(rd, r1.wrapping_add(r2) as u32);
+            },
 
-    pub fn sub(&mut self, dest: &str, src1: &str, src2: &str) {
-        self.set_reg(dest, self.get_reg(src1) - self.get_reg(src2));
-    }
+            Instruction::Addi { rt, rs, imm } => {
+                let r = self.get_reg(rs) as i32;
+                self.set_reg(rt, r.wrapping_add(*imm) as u32);
+            },
 
-    pub fn subi(&mut self, dest: &str, src: &str, imm: i32) {
-        self.set_reg(dest, self.get_reg(src) - imm);
-    }
+            Instruction::Addiu { rt, rs, imm } => {
+                let r = self.get_reg(rs) as i32;
+                self.set_reg(rt, r.wrapping_add(*imm as i32) as u32);
+            },
+            
+            Instruction::Addu { rd, rs, rt } => {
+                let r1 = self.get_reg(rs);
+                let r2 = self.get_reg(rt);
+                self.set_reg(rd,r1.wrapping_add(r2));
+            },   
 
-    pub fn subiu(&mut self, dest: &str, src: &str, imm: i32) {
-        self.set_reg(dest, self.get_reg(src) - imm);
-    }
+            Instruction::Sub { rd, rs, rt } => {
+                let r1 = self.get_reg(rs) as i32;
+                let r2 = self.get_reg(rt) as i32;
 
-    pub fn li(&mut self, dest: &str, imm: i32) {
-        self.set_reg(dest, imm);
-    }
-    
-    pub fn sw(&mut self, src: &str, address: u32) {
-        self.memory.set_word(address, self.get_reg(src));
-    }
+                self.set_reg(rd, r1.wrapping_sub(r2) as u32);
+            },
 
-    pub fn lw(&mut self, dest: &str, address: u32) {
-        let val = self.memory.load_word(address);
-        self.set_reg(dest, val);
-    }
+            Instruction::Subu { rd, rs, rt } => {
+                let r1 = self.get_reg(rs) as u32;
+                let r2 = self.get_reg(rt) as u32;
 
-    pub fn print_registers(&self) {
-        let regs = ["$t0", "$t1", "$t2"];
-        for r in regs {
-            let val = self.get_reg(r);
+                self.set_reg(rd, r1.wrapping_sub(r2) as u32);
+            },
+            
+            Instruction::Lw { rt, rs, imm } => {
+                let base = self.get_reg(rs);
+                let addr = base.wrapping_add(*imm as u32);
+                let val = self.memory.load_word(addr);
 
-            print!("{}: {}  ", r, val);
-        }
-        println!();
-    }
+                self.set_reg(rt, val as u32);
+            },
 
-    // Return snapshot as a JsValue so wasm_bindgen can pass it to JavaScript
-    pub fn snapshot(&self) -> JsValue {
-        let snap = Snapshot { registers: self.registers.clone() };
-        serde_wasm_bindgen::to_value(&snap).unwrap()
-    }
+            Instruction::Sw { rs, rt, imm } => {
+                let base = self.get_reg(rs);
+                let addr = base.wrapping_add(*imm as u32);
+                let val = self.get_reg(rt)as i32;
 
-    // #[wasm_bindgen]
-    // // we want to print out values on the web browser so we'll serialize it to JSON using Serde 
-    // pub fn registers_json(&self) -> JsValue {
-    //     serde_wasm_bindgen::to_value(&self.snapshot()).unwrap()
-    // }
-}
+                self.memory.set_word(addr, val);
+            },
 
-#[wasm_bindgen]
-pub fn execute_line(cpu: &mut CPU, line: &str) -> String {
-    let cleaned = line.replace(",", "");
-    let parts: Vec<&str> = cleaned.split_whitespace().collect();
-    if parts.is_empty() { return "".to_string(); }
+            Instruction::Li { rd, imm } => {
+                self.set_reg(rd, *imm as u32);
+            },
 
-    match parts[0] {
-        "add" => cpu.add(parts[1], parts[2], parts[3]),
-        "addi" => cpu.addi(parts[1], parts[2], parts[3].parse().unwrap_or(0)),
-        "addiu" => cpu.addiu(parts[1], parts[2], parts[3].parse().unwrap_or(0)),
-        "sub" => cpu.sub(parts[1], parts[2], parts[3]),
-        "subi"  => cpu.subi(parts[1], parts[2], parts[3].parse().unwrap_or(0)),
-        "subiu" => cpu.subiu(parts[1], parts[2], parts[3].parse().unwrap_or(0)),
+            Instruction::J { label } => {
+                let target = self.program.as_ref()
+                    .unwrap()
+                    .get_label_address(label)
+                    .ok_or(EmuError::UndefinedLabel(label.clone()))?;
 
-        "li"  => {
-            if let Ok(imm) = parts[2].parse::<i32>() {
-                cpu.li(parts[1], imm);
-            } else {
-                println!("Invalid immediate: {}", parts[2]);
+                self.pc = target;
+                is_branch = true;
+            },
+
+            Instruction::Jal { label } => {
+                let return_addr = self.pc + 4;
+                self.set_reg("$ra", return_addr);
+
+                let target = self.program.as_ref()
+                    .unwrap()
+                    .get_label_address(label)
+                    .unwrap();
+
+                self.pc = target;
+                is_branch = true;       
+            },
+
+            Instruction::Jr { rs } => {
+                let target = self.get_reg(rs);
+                
+                // check if 4-byte aligned
+                if target % 4 != 0 {
+                    return Err(EmuError::UnalignedAccess(target));
+                }
+            
+                // check if $pc maps to some instruction in the array 
+                if let Some(program) = &self.program {
+                    if program.pc_to_index(target).is_none() {
+                        return Err(EmuError::InvalidJump(target));
+                    }
+                }
+            
+                self.pc = target;
+                is_branch = true;
+            },
+
+            Instruction::Or {rd, rs, rt } => {
+                let r1 = self.get_reg(rs);
+                let r2 = self.get_reg(rt);
+                self.set_reg(rd, r1 | r2);
+            },
+
+            Instruction::Ori {rt, rs, imm} => {
+                let r = self.get_reg(rs);
+                self.set_reg(rt, r | *imm);
+            },
+
+            Instruction::And { rd, rs, rt } => {
+                let r1 = self.get_reg(rs);
+                let r2 = self.get_reg(rt);
+                self.set_reg(rd, r1 & r2);
+            },
+
+            Instruction::Andi { rt, rs, imm } => {
+                let r = self.get_reg(rs);
+                self.set_reg(rt, r & *imm);
+            },
+
+            Instruction::Beq { rs, rt, label } => {
+                let r1 = self.get_reg(rs);
+                let r2 = self.get_reg(rt);
+
+                if r1 == r2 {
+                    let target = self.program.as_ref()
+                        .unwrap()
+                        .get_label_address(label)
+                        .ok_or(EmuError::UndefinedLabel(label.clone()))?;
+                    
+                    self.pc = target;
+                    is_branch = true;
+                }
+            },
+
+            Instruction::Bne { rs, rt, label } => {
+                let r1 = self.get_reg(rs);
+                let r2 = self.get_reg(rt);
+
+                if r1 != r2 {
+                    let target = self.program.as_ref()
+                        .unwrap()
+                        .get_label_address(label)
+                        .ok_or(EmuError::UndefinedLabel(label.clone()))?;
+                    
+                    self.pc = target;
+                    is_branch = true;
+                }
             }
         }
-        "sw" => cpu.sw(parts[1], parts[2].parse().unwrap_or(0)),
-        "lw" => cpu.lw(parts[1], parts[2].parse().unwrap_or(0)),
-        _ => println!("Unknown instruction: {}", parts[0]),
+
+        // branch instructions will modify the PC to another address instead of the sequential instruction
+        if !is_branch {
+            self.pc += 4;
+        }
+
+        Ok(())
     }
 
-    let snap = Snapshot { registers: cpu.registers.clone() };
-    serde_json::to_string(&snap).unwrap()
-}
+    /// executes a single MIPS instruction 
+    pub fn next(&mut self) -> Result<(), EmuError> {
+        let program = self.program.as_ref().unwrap();
 
+        // get the current instruction using the $pc register
+        // we could iterate the array but this is better when we also deal with branches and jumps 
+        let index = program.pc_to_index(self.pc)
+            .ok_or(EmuError::Termination)?;
+        
+        let insn = program.instructions[index].clone();
+        self.execute(&insn)?;
 
-
-// #[wasm_bindgen]
-// pub struct WasmCpu {
-//     inner: CPU
-// }
-
-// #[wasm_bindgen]
-// impl WasmCpu {
-//     #[wasm_bindgen(constructor)]
-//     pub fn new() -> WasmCpu {
-//         WasmCpu { inner: CPU::new() }
-//     }
-
-//     #[wasm_bindgen]
-//     pub fn execute_line(&mut self, line: &str) -> String {
-//         execute_line(&mut self.inner, line);
-//         let snap = self.inner.snapshot();
-
-//         serde_json::to_string(&snap).unwrap()
-//     }
-
-//     #[wasm_bindgen]
-//     // we want to print out values on the web browser so we'll serialize it to JSON using Serde 
-//     pub fn registers_json(&self) -> JsValue {
-//         serde_wasm_bindgen::to_value(&self.inner.snapshot()).unwrap()
-//     }
-// }
-
-
-#[cfg(test)]
-mod tests {
-    use super::{CPU, execute_line};
-
-    #[test]
-    fn addi_test_1() {
-        let mut cpu = CPU::new();
-        execute_line(&mut cpu, "addi $t0, $t0, 5");
-
-        assert_eq!(cpu.get_reg("$t0"), 5);
+        Ok(())
     }
 
-    #[test]
-    fn addiu_test() {
-        let mut cpu = CPU::new();
-        execute_line(&mut cpu, "li $t0, 100");
-        execute_line(&mut cpu, "addiu $t1, $t0, 55");
-        assert_eq!(cpu.get_reg("$t1"), 155);
+    /// launches the emulator instance and executes line-by-line using a `Program`
+    pub fn run(&mut self) -> Result<(), EmuError> {
+        loop {
+            match self.next() {
+                Ok(_) => {},
+                Err(EmuError::Termination) => {
+                    println!("Finished execution!");
+
+                    for (reg, val) in &self.registers {
+                        println!("{}: {}", reg, *val as i32);
+                    }
+
+                    break;
+                },
+                Err(e) => return Err(e)
+            }
+        }   
+
+        Ok(())
+    }   
+
+    /// used to run a multiline string directly 
+    pub fn run_input(&mut self, source: &str) -> Result<(), EmuError> {
+        let program = Program::parse(source)?;
+
+        self.load_program(program);
+        self.run()
     }
 
-    #[test]
-    fn subi_test() {
-        let mut cpu = CPU::new();
-        execute_line(&mut cpu, "li $t0, 10");
-        execute_line(&mut cpu, "subi $t1, $t0, 4");
-        assert_eq!(cpu.get_reg("$t1"), 6);
+    // below functions are used for Web Assembly only
+    pub fn reset(&mut self) {
+        self.registers = Self::create_register_map();
+        self.memory = Memory::new();
+        self.pc = DEFAULT_TEXT_BASE_ADDRESS;
+        self.program = None;
+
+        self.state_history.clear(); 
     }
 
-
-    #[test]
-    fn subiu_test() {
-        let mut cpu = CPU::new();
-        execute_line(&mut cpu, "li $t0, 20");
-        execute_line(&mut cpu, "subiu $t1, $t0, 5");
-        assert_eq!(cpu.get_reg("$t1"), 15);
+    pub fn snapshot(&self) -> Snapshot {
+        Snapshot {
+            registers: self.registers.clone(),
+        }
     }
-
 }
