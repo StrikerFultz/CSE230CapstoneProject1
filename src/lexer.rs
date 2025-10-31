@@ -181,9 +181,29 @@ impl Lexer {
                     tokenFound = true;
                     // // green("Found right parenthesis token");
                 }
+                
+                // handle negative integers also 
+                if c == '-' {
+                    if let Some(next_char) = line.chars().nth(i + 1) {
+                        if next_char.is_ascii_digit() {
+                            let integer_end = consumeInteger(i + 1, line); 
+
+                            // get entire integer 
+                            let possible_integer = &line[i..integer_end]; 
+                            let new_token = Token {
+                                lexeme: possible_integer.to_string(),
+                                token_type: TokenType::Integer,
+                                line_number: self.line_number,
+                            };
+                            self.tokens.push_back(new_token);
+                            tokenFound = true;
+                            i = integer_end - 1; 
+                        }
+                    }
+                }
 
                 // digit indicates possible integer
-                if c.is_ascii_digit() {
+                if !tokenFound && c.is_ascii_digit() {
                     let mut integer_end = consumeInteger(i + 1, line);
                     let possible_integer = &line[i..integer_end];
                     let new_token = Token {

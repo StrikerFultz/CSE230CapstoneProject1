@@ -219,7 +219,9 @@ impl Parser {
         self.expect(TokenType::Mnemonic)?;
         let rd = self.parse_register()?;
         self.expect(TokenType::Delimiter)?;
-        let imm = self.parse_immediate::<u32>()?;
+
+        let imm = self.parse_immediate::<i32>()?;
+        let imm = imm as u32;
         
         Ok(Instruction::Li { rd, imm })
     }
