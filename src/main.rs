@@ -1,5 +1,6 @@
 use std::io::{self, Write};
-use mips_emu_wasm::{CPU, Program};
+use mips_emu_wasm::cpu::CPU;
+use mips_emu_wasm::program::{Program};
 
 fn main() {
     let mut cpu = CPU::new();

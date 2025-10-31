@@ -1,37 +1,80 @@
-pub mod instruction;
-pub mod program;
-pub mod cpu;
-pub mod memory;
-
-pub use instruction::*;
-pub use program::*;
-pub use cpu::*;
-pub use memory::*;
-
-// paul's code 
-pub mod lexer;
-pub mod parser;
 pub mod assembler;
+pub mod cpu;
+pub mod instruction;
+pub mod lexer;
+pub mod memory;
+pub mod parser;
+pub mod program;
 
-pub use lexer::*;
-pub use parser::*;
-pub use assembler::*;
-
+use cpu::CPU;
+use program::Program;
 use wasm_bindgen::prelude::*;
+use serde::{Serialize, Deserialize};
+use std::collections::HashMap;
 
 //https://github.com/insou22/mipsy partial code used since its a rough outline of the code 
 // only li add and sub; shows register history as lineis entered (as changed) 
 
-#[wasm_bindgen]
-pub struct WasmCpu {
-    inner: CPU
+#[derive(Serialize, Deserialize, Default)]
+pub struct Snapshot {
+    pub registers: HashMap<String, u32>,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct WasmResult {
+    error: String,
+    snapshot: Option<Snapshot>,
 }
 
 #[wasm_bindgen]
-impl WasmCpu {
+pub struct WasmCPU {
+    cpu: CPU,
+}
+
+#[wasm_bindgen]
+impl WasmCPU {
     #[wasm_bindgen(constructor)]
-    pub fn new() -> WasmCpu {
-        WasmCpu { inner: CPU::new() }
+    pub fn new() -> Self {
+        Self {
+            cpu: CPU::new(),
+        }
+    }
+
+    #[wasm_bindgen]
+    pub fn run_program(&mut self, source_code: &str) -> JsValue {
+        self.cpu.reset();
+
+        // parse the program then run using provided code from HTML
+        match Program::parse(source_code) {
+            Ok(program) => {
+                self.cpu.load_program(program);
+
+                match self.cpu.run() {
+                    Ok(_) => {
+                        let snap = self.cpu.snapshot();
+                        let result = WasmResult {
+                            error: String::new(),
+                            snapshot: Some(snap),
+                        };
+                        serde_wasm_bindgen::to_value(&result).unwrap()
+                    }
+                    Err(e) => {
+                        let result: WasmResult = WasmResult {
+                            error: format!("Runtime Error: {:?}", e),
+                            snapshot: None,
+                        };
+                        serde_wasm_bindgen::to_value(&result).unwrap()
+                    }
+                }
+            }
+            Err(e) => {
+                let result = WasmResult {
+                    error: format!("Syntax Error: {:?}", e),
+                    snapshot: None,
+                };
+                serde_wasm_bindgen::to_value(&result).unwrap()
+            }
+        }
     }
 }
 

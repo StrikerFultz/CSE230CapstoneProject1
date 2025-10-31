@@ -1,8 +1,8 @@
-use serde::{Serialize, Deserialize};
-use std::collections::HashMap;
-
-use crate::{program::*, Instruction};
+use crate::instruction::Instruction;
 use crate::memory::*;
+use crate::program::{EmuError, Program};
+use crate::Snapshot;
+use std::collections::HashMap;
 
 /// represents the state of the CPU at an instruction
 pub struct ExecutionState {
@@ -25,39 +25,56 @@ pub struct CPU {
 
 impl CPU {
     pub fn new() -> Self {
-        let mut registers: HashMap<String, u32> = HashMap::new();
-
-        // general purpose registers
-        registers.insert("$t0".to_string(), 0);
-        registers.insert("$t1".to_string(), 0);
-        registers.insert("$t2".to_string(), 0);
-
-        registers.insert("$v0".to_string(), 0);
-        registers.insert("$v1".to_string(), 0);
-
-        registers.insert("$a0".to_string(), 0);
-        registers.insert("$a1".to_string(), 0);
-        registers.insert("$a2".to_string(), 0);
-        registers.insert("$a3".to_string(), 0);
-
-        registers.insert("$s1".to_string(), 0);
-        registers.insert("$s2".to_string(), 0);
-
-        // special registers
-        registers.insert("$zero".to_string(), 0);
-        registers.insert("$ra".to_string(), 0);
-        registers.insert("$sp".to_string(), DEFAULT_STACK_POINTER); 
-        registers.insert("$fp".to_string(), DEFAULT_STACK_BASE_ADDRESS); 
-
-        // $pc should be modified by accessing `self.pc`
-
         CPU { 
-            registers, 
+            registers: Self::create_register_map(), 
             pc: DEFAULT_TEXT_BASE_ADDRESS, 
             program: None, 
             memory: Memory::new(),
             state_history: Vec::new()
         }
+    }
+
+    fn create_register_map() -> HashMap<String, u32> {
+        let mut registers: HashMap<String, u32> = HashMap::new();
+        // $pc should be modified by accessing `self.pc`
+
+        // general purpose
+        registers.insert("$zero".to_string(), 0);
+        registers.insert("$at".to_string(), 0);
+        registers.insert("$v0".to_string(), 0);
+        registers.insert("$v1".to_string(), 0);
+        registers.insert("$a0".to_string(), 0);
+        registers.insert("$a1".to_string(), 0);
+        registers.insert("$a2".to_string(), 0);
+        registers.insert("$a3".to_string(), 0);
+        registers.insert("$t0".to_string(), 0);
+        registers.insert("$t1".to_string(), 0);
+        registers.insert("$t2".to_string(), 0);
+        registers.insert("$t3".to_string(), 0);
+        registers.insert("$t4".to_string(), 0);
+        registers.insert("$t5".to_string(), 0);
+        registers.insert("$t6".to_string(), 0);
+        registers.insert("$t7".to_string(), 0);
+        registers.insert("$s0".to_string(), 0);
+        registers.insert("$s1".to_string(), 0);
+        registers.insert("$s2".to_string(), 0);
+        registers.insert("$s3".to_string(), 0);
+        registers.insert("$s4".to_string(), 0);
+        registers.insert("$s5".to_string(), 0);
+        registers.insert("$s6".to_string(), 0);
+        registers.insert("$s7".to_string(), 0);
+        registers.insert("$t8".to_string(), 0);
+        registers.insert("$t9".to_string(), 0);
+        registers.insert("$k0".to_string(), 0);
+        registers.insert("$k1".to_string(), 0);
+        registers.insert("$ra".to_string(), 0);
+
+        // special
+        registers.insert("$gp".to_string(), DEFAULT_STATIC_DATA_BASE_ADDRESS);
+        registers.insert("$sp".to_string(), DEFAULT_STACK_POINTER); 
+        registers.insert("$fp".to_string(), DEFAULT_STACK_BASE_ADDRESS); 
+
+        registers
     }
 
     /// returns the value of a register as a 32-bit unsigned integer
@@ -285,5 +302,21 @@ impl CPU {
 
         self.load_program(program);
         self.run()
+    }
+
+    // below functions are used for Web Assembly only
+    pub fn reset(&mut self) {
+        self.registers = Self::create_register_map();
+        self.memory = Memory::new();
+        self.pc = DEFAULT_TEXT_BASE_ADDRESS;
+        self.program = None;
+
+        self.state_history.clear(); 
+    }
+
+    pub fn snapshot(&self) -> Snapshot {
+        Snapshot {
+            registers: self.registers.clone(),
+        }
     }
 }
