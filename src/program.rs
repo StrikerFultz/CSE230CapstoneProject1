@@ -1,6 +1,7 @@
 use std::collections::HashMap;
-use crate::instruction::{parse_instruction, Instruction};
+use crate::instruction::{Instruction};
 use crate::memory::*;
+use crate::assembler::Assembler;
 
 /// enum used to indicate a runtime emulation error (e.g. parsing error)
 #[derive(Debug, Clone)]
@@ -42,53 +43,20 @@ pub struct Program {
 
 impl Program {
     pub fn parse(src: &str) -> Result<Self, EmuError> {
-        let mut instructions = Vec::new();
-        let mut labels = HashMap::new();
-        let mut line_numbers = Vec::new();
-
-        for (line_num, line) in src.lines().enumerate() {
-            let line = line.trim();
-
-            // check for labels (e.g. start:) and avoid comments 
-            if line.ends_with(':') && !line.starts_with('#') {
-                let label = line[..line.len() - 1].trim();
-
-                // set the label address to base with an offset of 4 for fixed size instruction length
-                let address = DEFAULT_TEXT_BASE_ADDRESS + (instructions.len() as u32 * 4);
-                labels.insert(label.to_string(), address);
-
-                continue;
-            }
-
-            match parse_instruction(line_num, line)? {
-                Some(insn) => {
-                    instructions.push(insn);
-                    line_numbers.push(line_num);
-                },
-                None => {} 
+        let mut assembler = Assembler::new();
+        
+        match assembler.assemble(src) {
+            Ok((instructions, labels, line_numbers)) => {
+                Ok(Program {
+                    instructions,
+                    labels,
+                    line_numbers
+                })
+            },
+            Err(e) => {
+                Err(e)
             }
         }
-
-        // check if all labels from certain instructions are valid 
-        for insn in &instructions {
-            match insn {
-                Instruction::J { label } |
-                Instruction::Jal { label } |
-                Instruction::Beq { label, .. } |
-                Instruction::Bne { label, .. } => {
-                    if !labels.contains_key(label) {
-                        return Err(EmuError::UndefinedLabel(label.clone()));
-                    }
-                }
-                _ => {}
-            }
-        }
-
-        Ok(Program { 
-            instructions,
-            labels,
-            line_numbers
-        })
     }
 
     /// get the line number for a label 
