@@ -311,4 +311,38 @@ mod tests {
         cpu.run_input(program).unwrap();
         assert_eq!(cpu.get_reg("$t0"), 12345);
     }
+
+    #[test]
+    fn beq_not_taken() {
+        let mut cpu = CPU::new();
+        let program = r#"
+            li $t0, 6
+            li $t1, 7
+            beq $t0, $t1, skip   
+            li $t2, 1 
+            j end
+            skip:
+            li $t2, 2
+            end:
+        "#;
+    
+        cpu.run_input(program).unwrap();
+        assert_eq!(cpu.get_reg("$t2"), 2);
+    }
+
+    #[test]
+    fn lw_sw_offset() {
+        let mut cpu = CPU::new();
+        let program = r#"
+            li $t0, 1
+            li $t1, 2
+            li $t2, 3
+            sw $t1, 0($t0)
+            sw $t2, 4($t0)
+            lw $t3, 4($t0)
+        "#;
+    
+        cpu.run_input(program).unwrap();
+        assert_eq!(cpu.get_reg("$t3"), 3);
+    }
 }
