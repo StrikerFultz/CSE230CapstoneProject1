@@ -162,6 +162,10 @@ th {
   border: 0;
 }
 
+.cm-highlighted-line {
+  background-color: #fef9c3;
+}
+
 .CodeMirror {
   flex-grow: 1;
   border-top: 1px solid #000;

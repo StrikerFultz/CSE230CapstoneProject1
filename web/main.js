@@ -138,6 +138,26 @@ const cpuEditor = CodeMirror.fromTextArea(codeEl, {
 const cpu = new WasmCPU();
 let isProgramLoaded = false;
 
+let currentLineMarker = null;
+
+function clearHighlight() {
+  if (currentLineMarker) {
+    cpuEditor.removeLineClass(currentLineMarker, "background", "cm-highlighted-line");
+    currentLineMarker = null;
+  }
+}
+
+// highlights line of execution
+function highlightCurrentLine() {
+  clearHighlight();
+
+  const line = cpu.get_current_line();
+  if (line >= 0) {
+    currentLineMarker = cpuEditor.addLineClass(line, "background", "cm-highlighted-line");
+    cpuEditor.scrollIntoView({line: line, ch: 0}, 50);
+  }
+}
+
 function resetEmulator() {
   cpu.reset();
   consoleOut.textContent = "Ready to load program.\n";
@@ -146,6 +166,8 @@ function resetEmulator() {
   isProgramLoaded = false;
   stepBtn.disabled = false;
   runBtn.disabled = false;
+
+  clearHighlight();
 }
 
 function loadProgram() {
@@ -164,6 +186,7 @@ function loadProgram() {
 
   log("Program loaded successfully.");
   isProgramLoaded = true;
+  highlightCurrentLine();
   return true;
 }
 
@@ -178,6 +201,8 @@ function handleWasmResult(result, isStep = false) {
 
   if (result.error) {
     if (result.error === "Termination") {
+      clearHighlight();
+      
       log("\n--- Program Finished ---");
       
       //for the console to show all
@@ -205,6 +230,8 @@ function handleWasmResult(result, isStep = false) {
 }
 
 runBtn.addEventListener("click", async () => {
+  clearHighlight();
+
   if (!isProgramLoaded) {
     if (!loadProgram()) {
       return;
@@ -223,27 +250,30 @@ stepBtn.addEventListener("click", async () => {
     if (!loadProgram()) {
       return;
     }
-    handleWasmResult({ snapshot: { registers: lastRegs } }, true);
+
+    return;
   }
 
   const nextInsn = cpu.next_instruction();
-  if (nextInsn === "---" && isProgramLoaded) {
-    log("\n--- Program Finished ---");
-    isProgramLoaded = false;
-    stepBtn.disabled = true;
-    runBtn.disabled = true;
+  log(`\n${nextInsn}`);
+
+  if (nextInsn === "---") {
+    handleWasmResult({ error: "Termination", snapshot: { registers: lastRegs } }, true);
     return;
   }
-  log(`\n${nextInsn}`);
 
   await new Promise(requestAnimationFrame);
 
   const result = cpu.step();
   handleWasmResult(result, true);
+  
+  if (isProgramLoaded) {
+    highlightCurrentLine();
+  }
 });
 
 stopBtn.addEventListener("click", () => {
   resetEmulator();
 });
 
-log("MIPS Emulator Initialized. Ready to load program.");
+log("Ready to load program.");

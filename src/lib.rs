@@ -134,6 +134,22 @@ impl WasmCPU {
         // to help the UI know when the next instruction is empty
         "---".to_string()
     }
+
+    /// gets the current line number using $PC register (due to mapping)
+    #[wasm_bindgen]
+    pub fn get_current_line(&self) -> i32 {
+        let pc = self.cpu.pc;
+
+        if let Some(program) = self.cpu.get_program() {
+            if let Some(index) = program.pc_to_index(pc) {
+                if index < program.line_numbers.len() {
+                    return (program.line_numbers[index] as i32) - 1;
+                }
+            }
+        }
+
+        -1
+    }
 }
 
 #[cfg(test)]
