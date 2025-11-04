@@ -123,6 +123,12 @@ impl CPU {
                 self.set_reg(rd,r1.wrapping_add(r2));
             },   
 
+            Instruction::Addu { rd, rs, rt } => {
+                let r1 = self.get_reg(rs) ;
+                let r2 = self.get_reg(rt);
+                self.set_reg(rd,r1.wrapping_add(r2));
+            },          
+
             Instruction::Sub { rd, rs, rt } => {
                 let r1 = self.get_reg(rs) as i32;
                 let r2 = self.get_reg(rt) as i32;
@@ -135,6 +141,10 @@ impl CPU {
                 let r2 = self.get_reg(rt) as u32;
 
                 self.set_reg(rd, r1.wrapping_sub(r2) as u32);
+                let r1 = self.get_reg(rs);
+                let r2 = self.get_reg(rt);
+
+                self.set_reg(rd, r1.wrapping_sub(r2));
             },
             
             Instruction::Lw { rt, rs, imm } => {
@@ -332,6 +342,9 @@ impl CPU {
             Instruction::Move {rd, rs} => {
                 self.set_reg(rd, self.get_reg(rs));
             }
+                self.set_reg(rt, r & (*imm as u32));
+            }
+
 
         }
 
