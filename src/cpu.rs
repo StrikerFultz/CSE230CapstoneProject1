@@ -249,6 +249,88 @@ impl CPU {
                     self.pc = target;
                     is_branch = true;
                 }
+            },
+
+            Instruction::Slt {rd, rs, rt } => {
+                let r1 = self.get_reg(rs) as i32;
+                let r2 = self.get_reg(rt) as i32;
+                self.set_reg(rd, if r1<r2 { 1 } else {0});
+            },
+            
+            Instruction::Slti {rt, rs, imm } => {
+                let r = self.get_reg(rs) as i32;
+                self.set_reg(rt, if r< *imm { 1 } else {0});
+            },
+
+            Instruction::Sltu {rd, rs, rt } => {
+                let r1 = self.get_reg(rs);
+                let r2 = self.get_reg(rt);
+                self.set_reg(rd, if r1<r2 { 1 } else {0});
+            },
+
+            Instruction::Sltiu {rt, rs, imm } => {
+                let r = self.get_reg(rs);
+                self.set_reg(rt, if r< (*imm as u32) { 1 } else {0});
+            }
+
+            Instruction::Blt { rs, rt, label } => {
+                let r1 = self.get_reg(rs) as i32;
+                let r2 = self.get_reg(rt) as i32; 
+
+                if r1 < r2 {
+                    let target = self.program.as_ref()
+                    .unwrap()
+                    .get_label_address(label)
+                    .ok_or(EmuError::UndefinedLabel(label.clone()))?;
+                self.pc = target;
+                is_branch = true;
+                }
+            },
+
+            Instruction::Bgt { rs, rt, label } => {
+                let r1 = self.get_reg(rs) as i32;
+                let r2 = self.get_reg(rt) as i32; 
+
+                if r1 > r2 {
+                    let target = self.program.as_ref()
+                    .unwrap()
+                    .get_label_address(label)
+                    .ok_or(EmuError::UndefinedLabel(label.clone()))?;
+                self.pc = target;
+                is_branch = true;
+                }
+            },
+
+            Instruction::Ble { rs, rt, label } => {
+                let r1 = self.get_reg(rs) as i32;
+                let r2 = self.get_reg(rt) as i32; 
+
+                if r1 <= r2 {
+                    let target = self.program.as_ref()
+                    .unwrap()
+                    .get_label_address(label)
+                    .ok_or(EmuError::UndefinedLabel(label.clone()))?;
+                self.pc = target;
+                is_branch = true;
+                }
+            },
+            
+            Instruction::Bge { rs, rt, label } => {
+                let r1 = self.get_reg(rs) as i32;
+                let r2 = self.get_reg(rt) as i32; 
+
+                if r1 >= r2 {
+                    let target = self.program.as_ref()
+                    .unwrap()
+                    .get_label_address(label)
+                    .ok_or(EmuError::UndefinedLabel(label.clone()))?;
+                self.pc = target;
+                is_branch = true;
+                }
+            },
+
+            Instruction::Move {rd, rs} => {
+                self.set_reg(rd, self.get_reg(rs));
             }
         }
 
