@@ -274,4 +274,41 @@ mod tests {
         // 0b1111 & 0b0110 = 0b0110 = 6
         assert_eq!(cpu.get_reg("$t1"), 6);
     }
+
+    #[test]
+    fn add_test() {
+        let mut cpu = CPU::new();
+        let program = r#"
+            li  $t0, 7
+            li  $t1, 8
+            add $t2, $t0, $t1
+        "#;
+    
+        cpu.run_input(program).unwrap();
+        assert_eq!(cpu.get_reg("$t2"), 15);
+    }
+    
+    #[test]
+    fn sub_test() {
+        let mut cpu = CPU::new();
+        let program = r#"
+            li  $t0, 20
+            li  $t1, 5
+            sub $t2, $t0, $t1
+        "#;
+    
+        cpu.run_input(program).unwrap();
+        assert_eq!(cpu.get_reg("$t2"), 15);
+    }
+    
+    #[test]
+    fn li_test() {
+        let mut cpu = CPU::new();
+        let program = r#"
+            li $t0, 12345
+        "#;
+    
+        cpu.run_input(program).unwrap();
+        assert_eq!(cpu.get_reg("$t0"), 12345);
+    }
 }
