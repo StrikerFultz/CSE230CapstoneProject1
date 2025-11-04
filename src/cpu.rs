@@ -13,7 +13,7 @@ pub struct ExecutionState {
 pub struct CPU { 
     // processor state 
     registers: HashMap<String, u32>,
-    pc: u32,
+    pub pc: u32,
 
     // program + memory
     program: Option<Program>,
@@ -318,5 +318,9 @@ impl CPU {
         Snapshot {
             registers: self.registers.clone(),
         }
+    }
+
+    pub fn get_program(&self) -> Option<&Program> {
+        self.program.as_ref()
     }
 }

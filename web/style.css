@@ -92,7 +92,7 @@ th {
 .workspace {
   display: grid;
   grid-template-columns: minmax(180px, 0.8fr) minmax(350px, 2.5fr) minmax(220px, 1.2fr);
-  grid-template-rows: auto auto;
+  grid-template-rows: 1fr auto;
   gap: 10px;
   padding: 10px 20px 20px;
   max-width: 1200px;
@@ -152,16 +152,23 @@ th {
 }
 
 .assembler textarea {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  border: 0;
+}
+
+.CodeMirror {
   flex-grow: 1;
-  border: none;
   border-top: 1px solid #000;
   font-family: monospace;
   font-size: 13px;
-  padding: 6px;
-  resize: none;
+  height: auto;
   outline: none;
-  background-color: #efefef;
-  min-height: 200px;
 }
 
 /*right side panesl*/
