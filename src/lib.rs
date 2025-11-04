@@ -11,7 +11,7 @@ use program::Program;
 use wasm_bindgen::prelude::*;
 use serde::{Serialize, Deserialize};
 use program::EmuError;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 //https://github.com/insou22/mipsy partial code used since its a rough outline of the code 
 // only li add and sub; shows register history as lineis entered (as changed) 
@@ -69,6 +69,11 @@ impl WasmCPU {
         }
     }
 
+    #[wasm_bindgen]
+    pub fn set_breakpoints(&mut self, lines: Vec<usize>) {
+        self.cpu.set_breakpoints(lines);
+    }
+
     /// emulate a single instruction using the MIPS CPU
     #[wasm_bindgen]
     pub fn step(&mut self) -> JsValue {
@@ -84,6 +89,12 @@ impl WasmCPU {
             Err(EmuError::Termination) => {
                 serde_wasm_bindgen::to_value(&WasmResult {
                     error: "Termination".to_string(),
+                    snapshot: Some(self.cpu.snapshot()),
+                }).unwrap()
+            },
+            Err(EmuError::Breakpoint) => {  
+                serde_wasm_bindgen::to_value(&WasmResult {
+                    error: "Breakpoint".to_string(),
                     snapshot: Some(self.cpu.snapshot()),
                 }).unwrap()
             }
@@ -107,6 +118,12 @@ impl WasmCPU {
                     snapshot: Some(snapshot)
                 }).unwrap()
             },
+            Err(EmuError::Breakpoint) => {
+                serde_wasm_bindgen::to_value(&WasmResult {
+                    error: "Breakpoint".to_string(),
+                    snapshot: Some(self.cpu.snapshot()),
+                }).unwrap()
+            }
             Err(e) => {
                 serde_wasm_bindgen::to_value(&WasmResult {
                     error: format!("Runtime Error -- {:?}", e),

@@ -175,6 +175,16 @@ th {
   outline: none;
 }
 
+.CodeMirror-gutters {
+  border-right: 1px solid #ddd;
+}
+
+.CodeMirror-gutter.breakpoints {
+  width: 20px;
+  text-align: center;
+  background: #f7f7f7;
+}
+
 /*right side panesl*/
 
 .right-panel {

@@ -2,7 +2,7 @@ use crate::instruction::Instruction;
 use crate::memory::*;
 use crate::program::{EmuError, Program};
 use crate::Snapshot;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 /// represents the state of the CPU at an instruction
 pub struct ExecutionState {
@@ -20,7 +20,10 @@ pub struct CPU {
     memory: Memory,     
 
     // log of all executed instructions 
-    state_history: Vec<ExecutionState>
+    state_history: Vec<ExecutionState>,
+
+    // line numbers of instructions containing breakpoints (indicated in the UI)
+    pub breakpoints: HashSet<usize>
 }
 
 impl CPU {
@@ -30,7 +33,8 @@ impl CPU {
             pc: DEFAULT_TEXT_BASE_ADDRESS, 
             program: None, 
             memory: Memory::new(),
-            state_history: Vec::new()
+            state_history: Vec::new(),
+            breakpoints: HashSet::new()
         }
     }
 
@@ -256,7 +260,7 @@ impl CPU {
                 let r2 = self.get_reg(rt) as i32;
                 self.set_reg(rd, if r1<r2 { 1 } else {0});
             },
-            
+
             Instruction::Slti {rt, rs, imm } => {
                 let r = self.get_reg(rs) as i32;
                 self.set_reg(rt, if r< *imm { 1 } else {0});
@@ -371,7 +375,21 @@ impl CPU {
 
                     break;
                 },
+                Err(EmuError::Breakpoint) => return Err(EmuError::Breakpoint),
                 Err(e) => return Err(e)
+            }
+            
+            // check if the current instruction line contains a breakpoint in the set
+            if let Some(program) = self.program.as_ref() {
+                if let Some(index) = program.pc_to_index(self.pc) {
+                    if index < program.line_numbers.len() {
+                        let current_line = program.line_numbers[index] - 1;
+
+                        if self.breakpoints.contains(&current_line) {
+                            return Err(EmuError::Breakpoint);
+                        }
+                    }
+                }
             }
         }   
 
@@ -386,6 +404,10 @@ impl CPU {
         self.run()
     }
 
+    pub fn set_breakpoints(&mut self, lines: Vec<usize>) {
+        self.breakpoints = lines.into_iter().collect();
+    }
+
     // below functions are used for Web Assembly only
     pub fn reset(&mut self) {
         self.registers = Self::create_register_map();
@@ -394,6 +416,7 @@ impl CPU {
         self.program = None;
 
         self.state_history.clear(); 
+        self.breakpoints.clear();
     }
 
     pub fn snapshot(&self) -> Snapshot {

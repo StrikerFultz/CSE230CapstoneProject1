@@ -133,6 +133,37 @@ const cpuEditor = CodeMirror.fromTextArea(codeEl, {
   mode: "mips-custom", 
   theme: "default",
   autoCloseBrackets: true,
+  gutters: ["CodeMirror-linenumbers", "breakpoints"] // add breakpoint gutter
+});
+
+let breakpoints = new Set();
+
+// this click event basically handles adding breakpoints
+cpuEditor.on("gutterClick", (cm, lineIndex, gutter) => {
+  if (gutter !== "breakpoints") {
+    return;
+  }
+
+  const info = cm.lineInfo(lineIndex);
+
+  if (info.gutterMarkers && info.gutterMarkers.breakpoints) {
+    // remove existing breakpoint
+    cm.setGutterMarker(lineIndex, "breakpoints", null);
+    breakpoints.delete(lineIndex);
+
+  } else {
+    // add a breakpoint
+    const marker = document.createElement("div");
+    marker.innerHTML = "●"; // bp dot
+
+    // set color to red 
+    marker.style.color = "#f00";
+    marker.style.cursor = "pointer";
+    marker.style.padding = "0 3px";
+
+    cm.setGutterMarker(lineIndex, "breakpoints", marker);
+    breakpoints.add(lineIndex);
+  }
 });
 
 const cpu = new WasmCPU();
@@ -167,6 +198,9 @@ function resetEmulator() {
   stepBtn.disabled = false;
   runBtn.disabled = false;
 
+  breakpoints.clear();
+  cpuEditor.clearGutter("breakpoints");
+
   clearHighlight();
 }
 
@@ -186,6 +220,10 @@ function loadProgram() {
 
   log("Program loaded successfully.");
   isProgramLoaded = true;
+
+  // set the breakpoints before running
+  cpu.set_breakpoints(Array.from(breakpoints));
+
   highlightCurrentLine();
   return true;
 }
@@ -216,6 +254,13 @@ function handleWasmResult(result, isStep = false) {
       isProgramLoaded = false;
       stepBtn.disabled = true;
       runBtn.disabled = true;
+    } else if (result.error === "Breakpoint") {
+      log("\n--- Hit Breakpoint ---");
+      highlightCurrentLine(); 
+
+      isProgramLoaded = true;
+      stepBtn.disabled = false;
+      runBtn.disabled = false;
     } else {
       log(`\n--- ${result.error} ---`);
       isProgramLoaded = false;
@@ -236,6 +281,8 @@ runBtn.addEventListener("click", async () => {
     if (!loadProgram()) {
       return;
     }
+  } else {
+    cpu.set_breakpoints(Array.from(breakpoints));
   }
 
   log("Running program...");
@@ -253,6 +300,8 @@ stepBtn.addEventListener("click", async () => {
 
     return;
   }
+
+  cpu.set_breakpoints(Array.from(breakpoints));
 
   const nextInsn = cpu.next_instruction();
   log(`\n${nextInsn}`);
