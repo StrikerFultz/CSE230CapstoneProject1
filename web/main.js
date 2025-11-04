@@ -1,9 +1,10 @@
-import init, { WasmEmulator } from "./pkg/mips_emu_wasm.js";
+import init, { WasmCPU } from "./pkg/mips_emu_wasm.js";
+
 
 async function main() {
   await init();
   
-  const emulator = new WasmEmulator(); 
+  const emulator = new WasmCPU(); 
 
   const codeEl = document.getElementById("code");
   const outEl = document.getElementById("out");
