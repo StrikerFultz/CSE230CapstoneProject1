@@ -341,12 +341,11 @@ impl CPU {
 
             Instruction::Move {rd, rs} => {
                 self.set_reg(rd, self.get_reg(rs));
-            }
-                self.set_reg(rt, r & (*imm as u32));
+            },
             }
 
 
-        }
+        
 
         // branch instructions will modify the PC to another address instead of the sequential instruction
         if !is_branch {

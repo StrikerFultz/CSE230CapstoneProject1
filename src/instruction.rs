@@ -12,7 +12,6 @@ pub enum Instruction {
     /// R[rt] = R[rs] + SignExtImm 
     Addi { rt: String, rs: String, imm: i32 },
 
-    Addu { rd: String, rs: String, rt: String },
 
     /// R[rt] = R[rs] + SignExtImm
     Addiu { rt: String, rs: String, imm: u32 },
@@ -85,12 +84,6 @@ pub enum Instruction {
 
     ///
     Move { rd:String, rs:String}
-
-    Ori { rt:String, rs:String, imm: u32},
-
-    And { rd: String, rs: String, rt: String },
-
-    Andi { rt: String, rs: String, imm: u32 },
 
 }
 
