@@ -345,4 +345,44 @@ mod tests {
         cpu.run_input(program).unwrap();
         assert_eq!(cpu.get_reg("$t3"), 3);
     }
+
+    #[test]
+    fn lw_sw_overwrite() {
+        let mut cpu = CPU::new();
+        let program = r#"
+            li $t0, 10
+            li $t1, 1
+            li $t2, 2
+            sw $t1, 0($t0)
+            sw $t2, 0($t0)
+            lw $t3, 0($t0)
+        "#;
+    
+        cpu.run_input(program).unwrap();
+        assert_eq!(cpu.get_reg("$t3"), 2);
+    }
+
+    #[test]
+    fn jr_nested_calls() {
+        let mut cpu = CPU::new();
+        let program = r#"
+            jal func1
+            j end
+    
+            func1:
+            li $t0, 10
+            jal func2
+            jr $ra
+    
+            func2:
+            addi $t0, $t0, 5
+            jr $ra
+    
+            end:
+        "#;
+    
+        cpu.run_input(program).unwrap();
+        // func1 sets $t0=10, func2 adds 5, total = 15
+        assert_eq!(cpu.get_reg("$t0"), 15);
+    }
 }
