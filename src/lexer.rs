@@ -1,7 +1,10 @@
 use serde::{Serialize, Deserialize};
 use std::fmt;
+use crate::instruction::Instruction;
 
 use std::collections::VecDeque;
+
+use wasm_bindgen::prelude::*;
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub enum TokenType {
@@ -9,6 +12,11 @@ pub enum TokenType {
     If it starts with a ".", it's a directive like .data or .text
     */
     Directive,
+    /*
+    A label identifier like "main:" or "loop:"
+    or a data identifier like "myVariable: .word 5"
+    */
+    Identifier,
     /*
     An operator like add, sub, lw, sw, etc.
     */
@@ -18,9 +26,10 @@ pub enum TokenType {
     */
     Comment,
     /*
-    "," or "\n"
+    ",", "\n"
     */
     Delimiter,
+    Colon,
     /*
     a "$t0" register name
     */
@@ -36,6 +45,7 @@ pub enum TokenType {
     LeftParen,
     RightParen,
     Integer,
+    Real_Number,
     /*
     A unknown token type
     */
@@ -124,6 +134,18 @@ impl Lexer {
                     self.tokens.push_back(new_token);
                     tokenFound = true;
                     // // green("Found delimiter token");
+                }
+
+                // : indicates Colon
+                if c == ':' { 
+                    let new_token = Token {
+                        lexeme: c.to_string(),
+                        token_type: TokenType::Colon,
+                        line_number: self.line_number,
+                    };
+                    self.tokens.push_back(new_token);
+                    tokenFound = true;
+                    // // green("Found colon token");
                 }
 
                 // dot indicates possible directive
@@ -217,39 +239,39 @@ impl Lexer {
                     i = integer_end - 1; // Move index to end of integer
                 }
 
-                // alphabetic indicates possible Mnemonic
+                // alphabetic indicates possible Mnemonic or Identifier (label or data)
                 if c.is_ascii_alphabetic() || c == '_' {
                     let mut end = consumeTilPuncAndWs(i + 1, line);
-                    
-                    // check if label
-                    let mut is_label = false;
-                    if let Some(next_char) = line.chars().nth(end) {
-                        if next_char == ':' {
-                            is_label = true;
-                            end += 1; // consume token
-                        }
-                    }
 
+                    
                     let lexeme = &line[i..end];
                     
-                    let new_token = if is_label {
-                        // label 
-                        Token {
-                            lexeme: lexeme.to_string(),
-                            token_type: TokenType::Unknown, 
-                            line_number: self.line_number,
-                        }
-                    } else {
-                        Token {
+                    let mut match_mnemonic = match_mnemonic(&line[i..end]);
+                    let mut is_identifier = isIdentifier(line, end);
+
+                    if match_mnemonic {
+                        alert(format!("Found mnemonic: {}", lexeme).as_str());
+                        let new_token = Token {
                             lexeme: lexeme.to_string(),
                             token_type: TokenType::Mnemonic,
                             line_number: self.line_number,
-                        }
-                    };
-                    
-                    self.tokens.push_back(new_token);
-                    tokenFound = true;
-                    i = end - 1; // Move index to end of the token
+                        };
+                        self.tokens.push_back(new_token);
+                        tokenFound = true;
+                        i = end - 1; // Move index to end of the token
+                    } else if is_identifier {
+                        alert(format!("Found identifier: {}", lexeme).as_str());
+                        let new_token = Token {
+                            lexeme: lexeme.to_string(),
+                            token_type: TokenType::Identifier,
+                            line_number: self.line_number,
+                        };
+                        self.tokens.push_back(new_token);
+                        tokenFound = true;
+                        i = end - 1; // Move index to end of the token
+                    }
+
+                    // alert(format!("Found lexeme: {}", lexeme).as_str());
                 }
 
                 // If no token matched, and not whitespace, it's an unknown token
@@ -330,11 +352,32 @@ fn matchDirective(s: &str) -> bool {
     return false;
 }
 
+fn match_mnemonic(s: &str) -> bool {
+    match s {
+            "add" | "sub" | "or" | "addu" | "subu" | "and" |"j" | "jal" | "jr" |"li" |
+            "addi" | "addiu" | "lw" | "sw" | "ori" | "beq" | "bne" | "andi" => true,
+            _ => false,
+        }
+}
+
+fn isIdentifier(s: &str, end: usize) -> bool {
+    if let Some(next_char) = s.chars().nth(end) {
+        // alert(format!("Next char after identifier: {}", next_char).as_str());
+        if next_char == ':' || next_char.is_whitespace() || next_char == '#' {
+            return true;
+        }
+    } else {
+        // reached end of line
+        return true;
+    }
+    return false;
+}
+
 fn consumeTilPuncAndWs(i: usize, s: &str) -> usize {
     let mut index = i;
     for c in s.chars().skip(i) {
         // skip underscores since those are used by labels
-        if c.is_whitespace() || (c.is_ascii_punctuation() && c != '_') { 
+        if c.is_whitespace() || (c.is_ascii_punctuation() && c != '_' && c != '$') { 
             return index;
         }
         index += 1;
@@ -357,17 +400,25 @@ impl fmt::Display for TokenType {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let s = match self {
             TokenType::Directive => "Directive",
+            TokenType::Identifier => "Identifier",
             TokenType::Mnemonic => "Mnemonic",
             TokenType::Comment => "Comment",
             TokenType::Delimiter => "Delimiter",
+            TokenType::Colon => "Colon",
             TokenType::RegisterName => "RegisterName",
             TokenType::RegisterNumber => "RegisterNumber",
             TokenType::QuotedString => "QuotedString",
             TokenType::LeftParen => "LeftParen",
             TokenType::RightParen => "RightParen",
             TokenType::Integer => "Integer",
+            TokenType::Real_Number => "Real_Number",
             TokenType::Unknown => "Unknown",
         };
         write!(f, "{}", s)
     }
+}
+
+#[wasm_bindgen]
+extern {
+    pub fn alert(s: &str);
 }

@@ -1,13 +1,21 @@
 use crate::lexer::{Lexer, Token, TokenType};
+use crate::lexer::alert;
 use crate::instruction::Instruction;
 use crate::program::EmuError;
 use std::collections::{HashMap, VecDeque};
+
+#[derive(Clone)]
+enum Section {
+    Text,
+    Data,
+}
 
 #[derive(Clone)]
 pub struct Parser {
     lexer: Lexer,
     syntax_error: bool,
     pub syntax_error_message: String,
+    section: Section,
 
     instructions: Vec<Instruction>,
     labels: HashMap<String, u32>,
@@ -29,6 +37,7 @@ impl Parser {
             current_line: 0,
             instruction_index: 0,
             tokens: VecDeque::new(),
+            section: Section::Text,
         }
     }
 
@@ -46,6 +55,17 @@ impl Parser {
         let mut sorted_lines: Vec<_> = tokens_by_line.keys().cloned().collect();
         sorted_lines.sort();
 
+        let mut tokens_strings = String::new();
+        for line_num in &sorted_lines {
+            let line_tokens = tokens_by_line.get(line_num).unwrap();
+            for token in line_tokens {
+                tokens_strings.push_str(&format!("{} ", token.token_type));
+            }
+            tokens_strings.push('\n');
+        }
+
+        alert(format!("Tokens:\n{}", tokens_strings).as_str());
+
         // extract labels 
         for line_num in &sorted_lines {
 
@@ -57,7 +77,7 @@ impl Parser {
             // basically insert the label to the label mapping using a counter for the instruction index
             if let Some(token) = first_token {
                 
-                if (token.token_type == TokenType::Unknown || token.token_type == TokenType::Mnemonic) && token.lexeme.ends_with(':') {
+                if (token.token_type == TokenType::Identifier || token.token_type == TokenType::Mnemonic) && token.lexeme.ends_with(':') {
                     let label = &token.lexeme[..token.lexeme.len() - 1];
                     let address = crate::memory::DEFAULT_TEXT_BASE_ADDRESS + (self.instruction_index * 4);
                     
@@ -70,6 +90,8 @@ impl Parser {
                 }
             }
         }
+
+        // alert(format!("Labels: {:?}", self.labels).as_str());
 
         // parse each line using Paul's code
         for line_num in sorted_lines {
@@ -100,13 +122,97 @@ impl Parser {
     pub fn parse_statement(&mut self) -> Result<(), EmuError> {
         let x = self.peek();
         if let Some(token) = x {
+            if token.token_type == TokenType::Directive && token.lexeme == ".data" {
+                self.section = Section::Data;
+            } else if token.token_type == TokenType::Directive && token.lexeme == ".text" {
+                self.section = Section::Text;
+            } else {
+                match self.section {
+                    Section::Data => self.parse_data()?,
+                    Section::Text => self.parse_text()?,
+                }
+            }
+        }
+        Ok(())
+    }
+
+    pub fn parse_data(&mut self) -> Result<(), EmuError> {
+        alert("Parsing data section");
+
+        let x = self.peek();
+        if let Some(token) = x {
+            let label = self.expect(TokenType::Identifier)?;
+            self.expect(TokenType::Colon)?;
+            let directive = self.expect(TokenType::Directive)?;
+            alert(format!("Label: {}, Directive: {}", label.lexeme, directive.lexeme).as_str());
+
+            self.parse_data_operands(&directive.lexeme)?;
+        }
+        // Implementation for parsing data section goes here
+        Ok(())
+    }
+    pub fn parse_data_operands(&mut self, directive: &str) -> Result<(), EmuError> {
+        // Implementation for parsing data operands goes here
+        let x = self.peek();
+        if let Some(token) = x {
+            match directive {
+                ".word" | ".half" | ".byte" => {
+                    let value = self.expect(TokenType::Integer)?;
+                    alert(format!("Parsed {} value: {}", directive, value.lexeme).as_str());
+                    let x = self.peek();
+                    if let Some(token) = x {
+                        if token.token_type == TokenType::Delimiter {
+                            self.expect(TokenType::Delimiter)?;
+                            self.parse_data_operands(directive)?;
+                        } else {
+                            return Err(self.error(format!("Line {}: Unknown Token", self.current_line)));
+                        }
+                    }
+                },
+                ".double" | ".float" => {
+                    let value = self.expect(TokenType::Real_Number)?;
+                    alert(format!("Parsed {} value: {}", directive, value.lexeme).as_str());
+                    let x = self.peek();
+                    if let Some(token) = x {
+                        if token.token_type == TokenType::Delimiter {
+                            self.expect(TokenType::Delimiter)?;
+                            self.parse_data_operands(directive)?;
+                        } else {
+                            return Err(self.error(format!("Line {}: Unknown Token", self.current_line)));
+                        }
+                    }
+                },
+                ".space" => {
+                    let value = self.expect(TokenType::Integer)?;
+                    alert(format!("Parsed .space value: {}", value.lexeme).as_str());
+                },
+                ".ascii" => {
+                    let value = self.expect(TokenType::QuotedString)?;
+                    alert(format!("Parsed .ascii value: {}", value.lexeme).as_str());
+                },
+                ".asciiz" => {
+                    let value = self.expect(TokenType::QuotedString)?;
+                    alert(format!("Parsed .asciiz value: {}", value.lexeme).as_str());
+                },
+                _ => {
+                    // Handle other directives or return an error
+                }
+            }
+        }
+        Ok(())
+    }
+
+    pub fn parse_text(&mut self) -> Result<(), EmuError> {
+        alert("Parsing text section");
+        let x = self.peek();
+        if let Some(token) = x {
             if token.token_type == TokenType::Mnemonic {
                 let insn = self.parse_instruction()?;
 
                 // return instruction from parsing 
                 self.instructions.push(insn);
                 self.line_numbers.push(self.current_line);
-            } else if (token.token_type == TokenType::Unknown || token.token_type == TokenType::Mnemonic) && token.lexeme.ends_with(':') {
+            } else if (token.token_type == TokenType::Identifier || token.token_type == TokenType::Mnemonic) && token.lexeme.ends_with(':') {
                 // ignore labels
             } else if token.token_type != TokenType::Comment {
                  // nothing recognized
@@ -171,7 +277,7 @@ impl Parser {
     
     fn parse_label(&mut self) -> Result<String, EmuError> {
         let token = self.next_token().ok_or_else(|| self.error("Expected label".to_string()))?;
-        if token.token_type == TokenType::Mnemonic || token.token_type == TokenType::Unknown || token.token_type == TokenType::Directive {
+        if token.token_type == TokenType::Mnemonic || token.token_type == TokenType::Identifier || token.token_type == TokenType::Directive {
             Ok(token.lexeme)
         } else {
             Err(self.error(format!("Line {}: Expected label", self.current_line)))
