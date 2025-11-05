@@ -13,7 +13,11 @@ pub struct ExecutionState {
 pub struct CPU { 
     // processor state 
     registers: HashMap<String, u32>,
+
+    // special registers that can't be directly accessed 
     pub pc: u32,
+    lo: u32,
+    hi: u32, 
 
     // program + memory
     program: Option<Program>,
@@ -31,6 +35,8 @@ impl CPU {
         CPU { 
             registers: Self::create_register_map(), 
             pc: DEFAULT_TEXT_BASE_ADDRESS, 
+            lo: 0,
+            hi: 0,
             program: None, 
             memory: Memory::new(),
             state_history: Vec::new(),
@@ -325,20 +331,41 @@ impl CPU {
 
                 if r1 >= r2 {
                     let target = self.program.as_ref()
-                    .unwrap()
-                    .get_label_address(label)
-                    .ok_or(EmuError::UndefinedLabel(label.clone()))?;
-                self.pc = target;
-                is_branch = true;
+                        .unwrap()
+                        .get_label_address(label)
+                        .ok_or(EmuError::UndefinedLabel(label.clone()))?;
+
+                    self.pc = target;
+                    is_branch = true;
                 }
             },
 
             Instruction::Move {rd, rs} => {
                 self.set_reg(rd, self.get_reg(rs));
+            },
+
+            Instruction::Mult { rs, rt } => {
+                let r1 = self.get_reg(rs) as i32 as i64;
+                let r2 = self.get_reg(rt) as i32 as i64;
+                
+                let result = r1.wrapping_mul(r2);
+
+                // store the low 32 bits in lo and high 32 bits in hi
+                self.lo = (result & 0xFFFFFFFF) as u32;
+                self.hi = ((result >> 32) & 0xFFFFFFFF) as u32;
+            },
+
+            Instruction::Mfhi { rd } => {
+                self.set_reg(rd, self.hi);
+            },
+
+            Instruction::Mflo { rd } => {
+                self.set_reg(rd, self.lo);
             }
         }
 
         // branch instructions will modify the PC to another address instead of the sequential instruction
+        // maybe we have to deal with the one instruction leading to jr $ra due to branch delay
         if !is_branch {
             self.pc += 4;
         }
@@ -413,6 +440,9 @@ impl CPU {
         self.registers = Self::create_register_map();
         self.memory = Memory::new();
         self.pc = DEFAULT_TEXT_BASE_ADDRESS;
+        self.lo = 0;
+        self.hi = 0;
+
         self.program = None;
 
         self.state_history.clear(); 

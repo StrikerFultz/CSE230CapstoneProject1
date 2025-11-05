@@ -62,7 +62,7 @@ function coerceRegs(raw) {
 
 let lastRegs = {};
 const INTERESTING = /^\$(?:s[0-7]|t[0-9]|a[0-3]|v[0-1])$/i; //show in tab
-const SYSTEM      = /^\$(?:zero|gp|sp|fp|ra|at|k0|k1)$/i; //hide unless changed
+const SYSTEM      = /^\$(?:zero|gp|sp|fp|ra|at|k0|k1|lo|hi)$/i; //hide unless changed
 
 function filterForTab(curr, prev) {
   const out = {};
@@ -117,7 +117,7 @@ await init();
 CodeMirror.defineSimpleMode("mips-custom", {
   start: [
     // main instructions that we want to highlight
-    {regex: /(?:add|addu|addi|addiu|sub|subu|li|sw|lw|j|jal|jr|or|ori|and|andi|beq|bne|slt|slti|sltiu|subu|sltu|blt|bgt|ble|bge|move)\b/i, token: "keyword"},
+    {regex: /(?:add|addu|addi|addiu|sub|subu|li|sw|lw|j|jal|jr|or|ori|and|andi|beq|bne|slt|slti|sltiu|subu|sltu|blt|bgt|ble|bge|move|mult|mflo|mfhi)\b/i, token: "keyword"},
 
     {regex: /\$(?:zero|at|v[01]|a[0-3]|t[0-9]|s[0-7]|k[01]|gp|sp|fp|ra)\b/, token: "variable-2"},
     {regex: /#.*/, token: "comment"},

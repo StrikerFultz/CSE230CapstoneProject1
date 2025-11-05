@@ -528,4 +528,42 @@ mod tests {
         assert_eq!(cpu.get_reg("$t1"), 123);
         assert_eq!(cpu.get_reg("$t3"), 50);
     }
+
+    #[test]
+    fn mult_test() {
+        let mut cpu = CPU::new();
+        let program = r#"
+            li $t0, 7
+            li $t1, 6
+
+            mult $t0, $t1  # 7 * 6 = 42
+
+            mflo $s0       # $s0 = lo
+            mfhi $s1       # $s1 = hi
+        "#;
+
+        cpu.run_input(program).unwrap();
+
+        assert_eq!(cpu.get_reg("$s0"), 42);
+        assert_eq!(cpu.get_reg("$s1"), 0);
+    }
+
+    #[test]
+    fn mult_signed_test() {
+        let mut cpu = CPU::new();
+        let program = r#"
+            li $t0, 10
+            li $t1, -5
+
+            mult $t0, $t1  # 10 * -5 = -50
+
+            mflo $s0       # $s0 = lo
+            mfhi $s1       # $s1 = hi
+        "#;
+
+        cpu.run_input(program).unwrap();
+
+        assert_eq!(cpu.get_reg("$s0") as i32, -50);
+        assert_eq!(cpu.get_reg("$s1") as i32, -1);
+    }
 }

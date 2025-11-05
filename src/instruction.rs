@@ -82,5 +82,14 @@ pub enum Instruction {
     Bge { rs: String, rt: String, label:String},
 
     ///
-    Move { rd:String, rs:String}
+    Move { rd:String, rs:String },
+
+    /// {Hi,Lo} = R[rs] * R[rt] 
+    Mult { rs: String, rt: String },
+
+    /// R[rd] = Hi
+    Mfhi { rd: String },
+
+    /// R[rd] = Lo 
+    Mflo { rd: String } 
 }
