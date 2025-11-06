@@ -1,7 +1,9 @@
 use std::collections::HashMap;
 use crate::instruction::{Instruction};
+use crate::instruction::BasicInstruction;
 use crate::memory::*;
 use crate::assembler::Assembler;
+use crate::memory::Memory;
 
 /// enum used to indicate a runtime emulation error (e.g. parsing error)
 #[derive(Debug, Clone)]
@@ -32,24 +34,24 @@ pub enum EmuError {
 #[derive(Debug, Clone)]
 pub struct Program {
     /// list of `Instruction` 
-    pub instructions: Vec<Instruction>,
+    pub instructions: Vec<BasicInstruction>,
 
     /// mapping from label to line number 
-    pub labels: HashMap<String, u32>,
+    pub symbol_table: HashMap<String, u32>,
 
     // list of line numbers 
     pub line_numbers: Vec<usize>
 }  
 
 impl Program {
-    pub fn parse(src: &str) -> Result<Self, EmuError> {
+    pub fn parse(src: &str, memory: &mut Memory) -> Result<Self, EmuError> {
         let mut assembler = Assembler::new();
         
-        match assembler.assemble(src) {
-            Ok((instructions, labels, line_numbers)) => {
+        match assembler.assemble(src, memory) {
+            Ok((instructions, symbol_table, line_numbers)) => {
                 Ok(Program {
                     instructions,
-                    labels,
+                    symbol_table,
                     line_numbers
                 })
             },
@@ -61,7 +63,7 @@ impl Program {
 
     /// get the line number for a label 
     pub fn get_label_address(&self, label: &str) -> Option<u32> {
-        self.labels.get(label).copied()
+        self.symbol_table.get(label).copied()
     }
 
     /// convert $pc to an index to an instruction in the instruction array 

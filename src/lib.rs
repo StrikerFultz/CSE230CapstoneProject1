@@ -45,7 +45,7 @@ impl WasmCPU {
         self.cpu.reset();
 
         // parse the program then run using provided code from HTML
-        match Program::parse(source_code) {
+        match Program::parse(source_code, &mut self.cpu.memory) {
             Ok(program) => {
                 self.cpu.load_program(program);
 

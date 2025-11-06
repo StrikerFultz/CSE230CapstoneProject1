@@ -355,7 +355,7 @@ fn matchDirective(s: &str) -> bool {
 fn match_mnemonic(s: &str) -> bool {
     match s {
             "add" | "sub" | "or" | "addu" | "subu" | "and" |"j" | "jal" | "jr" |"li" |
-            "addi" | "addiu" | "lw" | "sw" | "ori" | "beq" | "bne" | "andi" => true,
+            "addi" | "addiu" | "lb" | "sb" | "lh" | "sh" | "lw" | "sw" | "ori" | "beq" | "bne" | "andi" | "la" => true,
             _ => false,
         }
 }

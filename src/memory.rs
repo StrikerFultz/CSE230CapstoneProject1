@@ -1,6 +1,9 @@
+use crate::lexer::alert;
+
 use std::collections::HashMap;
 
 const WORD_SIZE: usize  = 4;             // 4 bytes for a word
+const HALF_SIZE: usize = 2;             // 2 bytes for a half word
 const PAGE_SIZE: usize  = 512;           // 512 bytes for a page
 const PAGE_POWER: u32   = 9;              // 2^9 = 512
 const PAGE_MASK: u32    = (PAGE_SIZE as u32) - 1;
@@ -42,7 +45,7 @@ impl Memory {
 
         let page_data = self.pages.get_mut(&page).unwrap();     // Get a mutable reference to the page data
 
-        let bytes = value.to_le_bytes();        // Convert the i32 value to bytes (little-endian)
+        let bytes = value.to_be_bytes();        // Convert the i32 value to bytes (big-endian)
         for i in 0..WORD_SIZE {                 // Write each byte to the correct offset
             page_data[offset + i] = bytes[i] as i8;
         }
@@ -63,7 +66,61 @@ impl Memory {
             for i in 0..WORD_SIZE {                         // Read each byte from the correct offset
                 bytes[i] = page_data[offset + i] as u8;
             }
-            i32::from_le_bytes(bytes)             // Convert the bytes (little-endian) back to a i32 value 
+            i32::from_be_bytes(bytes)             // Convert the bytes (big-endian) back to a i32 value 
+        } else {
+            0
+        }
+    }
+
+    pub fn set_halfword(&mut self, address: u32, value: i16) {
+        let page = page_index(address);
+        let offset = page_offset(address);
+
+        if !self.pages.contains_key(&page) {                   // If the page doesn't exist, create it        
+            self.pages.insert(page, Box::new([0; PAGE_SIZE]));
+        }
+
+        let page_data = self.pages.get_mut(&page).unwrap();     // Get a mutable reference to the page data
+
+        let bytes = value.to_be_bytes();        // Convert the i16 value to bytes (big-endian)
+        for i in 0..HALF_SIZE {                 // Write each byte to the correct offset
+            page_data[offset + i] = bytes[i] as i8;
+        }
+    }
+    pub fn load_halfword(&mut self, address: u32) -> i16 {
+        let page = page_index(address);        // Find the page that the address belongs to
+        let offset = page_offset(address);   // Find the offset within the page
+
+        if let Some(page_data) = self.pages.get(&page) {    // Ensure the page exists
+            let mut bytes = [0 as u8; HALF_SIZE];           // Prepare an array to hold the bytes
+            for i in 0..HALF_SIZE {                         // Read each byte from the correct offset
+                bytes[i] = page_data[offset + i] as u8;
+            }
+            i16::from_be_bytes(bytes)             // Convert the bytes (big-endian) back to a i16 value 
+        } else {
+            0
+        }
+    }
+
+    pub fn set_byte(&mut self, address: u32, value: i8) {
+        let page = page_index(address);       // Find the page that the address belongs to
+        let offset = page_offset(address);  // Find the offset within the page
+
+        if !self.pages.contains_key(&page) {                   // If the page doesn't exist, create it        
+            self.pages.insert(page, Box::new([0; PAGE_SIZE]));
+        }
+
+        let page_data = self.pages.get_mut(&page).unwrap();     // Get a mutable reference to the page data
+        page_data[offset] = value;
+    }
+
+    pub fn load_byte(&mut self, address: u32) -> i8 {
+        let page = page_index(address);        // Find the page that the address belongs to
+        let offset = page_offset(address);   // Find the offset within the page
+
+        if let Some(page_data) = self.pages.get(&page) {    // Ensure the page exists
+            alert(format!("Value stored in byte address {:x}: {}", address, page_data[offset]).as_str());
+            page_data[offset]
         } else {
             0
         }

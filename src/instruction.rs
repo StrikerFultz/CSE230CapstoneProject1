@@ -2,7 +2,7 @@ use crate::program::EmuError;
 
 /// enum used to represent each MIPS instruction
 #[derive(Debug, Clone)]
-pub enum Instruction {
+pub enum BasicInstruction {
     /// R[rd] = R[rs] + R[rt] 
     Add { rd: String, rs: String, rt: String },
 
@@ -23,6 +23,21 @@ pub enum Instruction {
 
     /// R[rd] = immediate
     Li { rd: String, imm: u32 },
+
+    /// R[rt] = imm << 16
+    Lui { rt: String, imm: u32 },
+
+    /// R[rt] = M[R[rs]+SignExtImm]
+    Sb { rt: String, rs: String, imm: i32 },
+
+    /// R[rt] = M[R[rs]+SignExtImm]
+    Lb { rt: String, rs: String, imm: i32 },
+
+    /// R[rt] = M[R[rs]+SignExtImm]
+    Sh { rt: String, rs: String, imm: i32 },
+
+    /// R[rt] = M[R[rs]+SignExtImm]
+    Lh { rt: String, rs: String, imm: i32 },
 
     /// M[R[rs]+SignExtImm] = R[rt] 
     Sw { rs: String, imm: i32, rt: String },
@@ -56,4 +71,16 @@ pub enum Instruction {
 
     /// if(R[rs] != R[rt]) PC=JumpAddr
     Bne { rs: String, rt: String, label: String },
+}
+
+#[derive(Debug, Clone)]
+pub enum ExtendedInstruction {
+    Lw { rt: String, label: String },
+    La { rt: String, label: String },
+}
+
+#[derive(Debug, Clone)]
+pub enum Instruction {
+    Basic(BasicInstruction),
+    Extended(ExtendedInstruction),
 }

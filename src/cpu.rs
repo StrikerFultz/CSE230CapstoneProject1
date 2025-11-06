@@ -1,4 +1,4 @@
-use crate::instruction::Instruction;
+use crate::instruction::BasicInstruction;
 use crate::memory::*;
 use crate::program::{EmuError, Program};
 use crate::Snapshot;
@@ -7,7 +7,7 @@ use std::collections::HashMap;
 /// represents the state of the CPU at an instruction
 pub struct ExecutionState {
     pc: u32,
-    instruction: Instruction
+    instruction: BasicInstruction
 }
 
 pub struct CPU { 
@@ -17,7 +17,7 @@ pub struct CPU {
 
     // program + memory
     program: Option<Program>,
-    memory: Memory,     
+    pub memory: Memory,     
 
     // log of all executed instructions 
     state_history: Vec<ExecutionState>
@@ -92,7 +92,7 @@ impl CPU {
         self.pc = DEFAULT_TEXT_BASE_ADDRESS;
     }
 
-    pub fn execute(&mut self, insn: &Instruction) -> Result<(), EmuError> {
+    pub fn execute(&mut self, insn: &BasicInstruction) -> Result<(), EmuError> {
         let mut is_branch = false;
         println!("{:?}", insn);
 
@@ -100,44 +100,44 @@ impl CPU {
         
         // handle instruction based on type
         match insn {
-            Instruction::Add { rd, rs, rt } => {
+            BasicInstruction::Add { rd, rs, rt } => {
                 let r1 = self.get_reg(rs) as i32; 
                 let r2 = self.get_reg(rt) as i32;
                 
                 self.set_reg(rd, r1.wrapping_add(r2) as u32);
             },
 
-            Instruction::Addi { rt, rs, imm } => {
+            BasicInstruction::Addi { rt, rs, imm } => {
                 let r = self.get_reg(rs) as i32;
                 self.set_reg(rt, r.wrapping_add(*imm) as u32);
             },
 
-            Instruction::Addiu { rt, rs, imm } => {
+            BasicInstruction::Addiu { rt, rs, imm } => {
                 let r = self.get_reg(rs) as i32;
                 self.set_reg(rt, r.wrapping_add(*imm as i32) as u32);
             },
-            
-            Instruction::Addu { rd, rs, rt } => {
+
+            BasicInstruction::Addu { rd, rs, rt } => {
                 let r1 = self.get_reg(rs);
                 let r2 = self.get_reg(rt);
                 self.set_reg(rd,r1.wrapping_add(r2));
             },   
 
-            Instruction::Sub { rd, rs, rt } => {
+            BasicInstruction::Sub { rd, rs, rt } => {
                 let r1 = self.get_reg(rs) as i32;
                 let r2 = self.get_reg(rt) as i32;
 
                 self.set_reg(rd, r1.wrapping_sub(r2) as u32);
             },
 
-            Instruction::Subu { rd, rs, rt } => {
+            BasicInstruction::Subu { rd, rs, rt } => {
                 let r1 = self.get_reg(rs) as u32;
                 let r2 = self.get_reg(rt) as u32;
 
                 self.set_reg(rd, r1.wrapping_sub(r2) as u32);
             },
-            
-            Instruction::Lw { rt, rs, imm } => {
+
+            BasicInstruction::Lw { rt, rs, imm } => {
                 let base = self.get_reg(rs);
                 let addr = base.wrapping_add(*imm as u32);
                 let val = self.memory.load_word(addr);
@@ -145,7 +145,7 @@ impl CPU {
                 self.set_reg(rt, val as u32);
             },
 
-            Instruction::Sw { rs, rt, imm } => {
+            BasicInstruction::Sw { rs, rt, imm } => {
                 let base = self.get_reg(rs);
                 let addr = base.wrapping_add(*imm as u32);
                 let val = self.get_reg(rt)as i32;
@@ -153,11 +153,47 @@ impl CPU {
                 self.memory.set_word(addr, val);
             },
 
-            Instruction::Li { rd, imm } => {
+            BasicInstruction::Li { rd, imm } => {
                 self.set_reg(rd, *imm as u32);
             },
 
-            Instruction::J { label } => {
+            BasicInstruction::Lui { rt, imm } => {                
+                self.set_reg(rt, imm << 16);
+            },
+
+            BasicInstruction::Lb { rt, rs, imm } => {
+                let base = self.get_reg(rs);
+                let addr = base.wrapping_add(*imm as u32);
+                let val = self.memory.load_byte(addr);
+                
+                self.set_reg(rt, val as u32);
+            },
+
+            BasicInstruction::Sb { rs, rt, imm } => {
+                let base = self.get_reg(rs);
+                let addr = base.wrapping_add(*imm as u32);
+                let val = self.get_reg(rt)as i8;
+
+                self.memory.set_byte(addr, val);
+            },
+
+            BasicInstruction::Lh { rt, rs, imm } => {
+                let base = self.get_reg(rs);
+                let addr = base.wrapping_add(*imm as u32);
+                let val = self.memory.load_halfword(addr);
+
+                self.set_reg(rt, val as u32);
+            },
+
+            BasicInstruction::Sh { rt, rs, imm } => {
+                let base = self.get_reg(rs);
+                let addr = base.wrapping_add(*imm as u32);
+                let val = self.get_reg(rt)as i16;
+
+                self.memory.set_halfword(addr, val);
+            },
+
+            BasicInstruction::J { label } => {
                 let target = self.program.as_ref()
                     .unwrap()
                     .get_label_address(label)
@@ -167,7 +203,7 @@ impl CPU {
                 is_branch = true;
             },
 
-            Instruction::Jal { label } => {
+            BasicInstruction::Jal { label } => {
                 let return_addr = self.pc + 4;
                 self.set_reg("$ra", return_addr);
 
@@ -180,7 +216,7 @@ impl CPU {
                 is_branch = true;       
             },
 
-            Instruction::Jr { rs } => {
+            BasicInstruction::Jr { rs } => {
                 let target = self.get_reg(rs);
                 
                 // check if 4-byte aligned
@@ -199,29 +235,29 @@ impl CPU {
                 is_branch = true;
             },
 
-            Instruction::Or {rd, rs, rt } => {
+            BasicInstruction::Or {rd, rs, rt } => {
                 let r1 = self.get_reg(rs);
                 let r2 = self.get_reg(rt);
                 self.set_reg(rd, r1 | r2);
             },
 
-            Instruction::Ori {rt, rs, imm} => {
+            BasicInstruction::Ori {rt, rs, imm} => {
                 let r = self.get_reg(rs);
                 self.set_reg(rt, r | *imm);
             },
 
-            Instruction::And { rd, rs, rt } => {
+            BasicInstruction::And { rd, rs, rt } => {
                 let r1 = self.get_reg(rs);
                 let r2 = self.get_reg(rt);
                 self.set_reg(rd, r1 & r2);
             },
 
-            Instruction::Andi { rt, rs, imm } => {
+            BasicInstruction::Andi { rt, rs, imm } => {
                 let r = self.get_reg(rs);
                 self.set_reg(rt, r & *imm);
             },
 
-            Instruction::Beq { rs, rt, label } => {
+            BasicInstruction::Beq { rs, rt, label } => {
                 let r1 = self.get_reg(rs);
                 let r2 = self.get_reg(rt);
 
@@ -236,7 +272,7 @@ impl CPU {
                 }
             },
 
-            Instruction::Bne { rs, rt, label } => {
+            BasicInstruction::Bne { rs, rt, label } => {
                 let r1 = self.get_reg(rs);
                 let r2 = self.get_reg(rt);
 
@@ -298,7 +334,7 @@ impl CPU {
 
     /// used to run a multiline string directly 
     pub fn run_input(&mut self, source: &str) -> Result<(), EmuError> {
-        let program = Program::parse(source)?;
+        let program = Program::parse(source, &mut self.memory)?;
 
         self.load_program(program);
         self.run()
