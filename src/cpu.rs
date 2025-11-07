@@ -226,6 +226,18 @@ impl CPU {
                 self.set_reg(rd, r1 & r2);
             },
 
+            Instruction::Xor { rd, rs, rt } => {
+                let val = self.get_reg(rs) ^ self.get_reg(rt);
+   //             println!("XOR {} = {} ^ {} -> {}", rd, self.get_reg(rs), self.get_reg(rt), val);
+                self.set_reg(rd, val)
+            },
+
+            Instruction::Xori { rt, rs, imm } => {
+              let val = self.get_reg(rs) ^ imm;
+    //          println!("XORI {} = {} ^ {} -> {}", rt, self.get_reg(rs), imm, val);
+              self.set_reg(rt, val)
+            },
+
             Instruction::Andi { rt, rs, imm } => {
                 let r = self.get_reg(rs);
                 self.set_reg(rt, r & *imm);

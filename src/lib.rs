@@ -576,6 +576,48 @@ mod tests {
         assert_eq!(cpu.get_reg("$t3"), 50);
     }
 
+
+    #[test]
+    fn xor_test() {
+        let mut cpu = CPU::new();
+        let program = r#"
+            li  $t0, 12   # 12 decimal
+            li  $t1, 10   # 10 decimal
+            xor $t2, $t0, $t1 # 12 ^ 10 = 6
+        "#;
+
+        cpu.run_input(program).unwrap();
+        assert_eq!(cpu.get_reg("$t2"), 6);
+    }
+
+    #[test]
+    fn xori_test() {
+        let mut cpu = CPU::new();
+        let program = r#"
+            li   $t0, 15   # 15 decimal
+            xori $t1, $t0, 10  # 15 ^ 10 = 5
+        "#;
+
+        cpu.run_input(program).unwrap();
+        assert_eq!(cpu.get_reg("$t1"), 5);
+    }
+
+    #[test]
+    fn xor_chain_test() {
+        let mut cpu = CPU::new();
+        let program = r#"
+            li  $t0, 10   # 10 decimal
+            li  $t1, 10   # 10 decimal
+            xor $t2, $t0, $t1    # 10 ^ 10 = 0
+            xor $t3, $t2, $t1    # 0 ^ 10 = 10
+        "#;
+
+        cpu.run_input(program).unwrap();
+        assert_eq!(cpu.get_reg("$t2"), 0);
+        assert_eq!(cpu.get_reg("$t3"), 10);
+    }
+
+
     #[test]
     fn mult_test() {
         let mut cpu = CPU::new();
@@ -612,5 +654,19 @@ mod tests {
 
         assert_eq!(cpu.get_reg("$s0") as i32, -50);
         assert_eq!(cpu.get_reg("$s1") as i32, -1);
+    }
+
+    #[test]
+    fn li_test() {
+        let mut cpu = CPU::new();
+        let program = r#"
+            li $t0, 10
+            li $t1, -5
+        "#;
+
+        cpu.run_input(program).unwrap();
+
+        assert_eq!(cpu.get_reg("$t0") as i32, 10);
+        assert_eq!(cpu.get_reg("$t1") as i32, -5);
     }
 }

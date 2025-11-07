@@ -128,11 +128,11 @@ impl Parser {
 
             // match the instruction by lexeme to the right parsing fn
             match lexeme.as_str() {
-                "add" | "sub" | "or" | "addu" | "subu" | "and" | "slt" | "sltu" | "mult" | "mflo" | "mfhi" => self.parse_r_type(&lexeme),
+                "add" | "sub" | "or" | "addu" | "subu" | "and" | "xor" | "slt" | "sltu" | "mult" | "mflo" | "mfhi" => self.parse_r_type(&lexeme),
                 "j" | "jal" | "jr" => self.parse_j_type(&lexeme),
                 "li" => self.parse_li(),
                 "move"| "blt" | "bgt" | "ble" | "bge"  => self.parse_pseudo_type(&lexeme),
-                "addi" | "addiu" | "lw" | "sw" | "ori" | "beq" | "bne" | "andi"| "slti" | "sltiu" => self.parse_i_type(&lexeme),
+                "addi" | "addiu" | "lw" | "sw" | "ori" | "beq" | "bne" | "andi"| "xori" | "slti" | "sltiu" => self.parse_i_type(&lexeme),
                 _ => Err(self.error(format!("Line {}: Unknown instruction {}", self.current_line, lexeme)))
             }
         } else {
@@ -187,7 +187,7 @@ impl Parser {
         self.expect(TokenType::Mnemonic)?;
 
         match mnemonic {
-            "add" | "sub" | "or" | "addu" | "subu" | "and" | "slt" | "sltu" => {
+            "add" | "sub" | "or" | "addu" | "subu" | "and" | "xor" | "slt" | "sltu" => {
                 let rd = self.parse_register()?;
                 self.expect(TokenType::Delimiter)?;
                 let rs = self.parse_register()?;
@@ -201,6 +201,7 @@ impl Parser {
                     "addu" => Ok(Instruction::Addu { rd, rs, rt }),
                     "subu" => Ok(Instruction::Subu { rd, rs, rt }),
                     "and"  => Ok(Instruction::And { rd, rs, rt }),
+                    "xor"  =>Ok(Instruction::Xor {rd, rs, rt}),
                     "slt" => Ok(Instruction::Slt {rd, rs, rt}),
                     "sltu" => Ok(Instruction::Sltu {rd, rs, rt}),
                     _ => unreachable!()
@@ -267,6 +268,7 @@ impl Parser {
                 "addiu" => Ok(Instruction::Addiu { rt, rs, imm: self.parse_immediate::<u32>()? }),
                 "ori" => Ok(Instruction::Ori { rt, rs, imm: self.parse_immediate::<u32>()? }),
                 "andi" => Ok(Instruction::Andi { rt, rs, imm: self.parse_immediate::<u32>()? }),
+                "xori" => Ok(Instruction::Xori {rt, rs, imm: self.parse_immediate::<u32>()? }),
                 "slti" => Ok(Instruction::Slti {rt, rs, imm: self.parse_immediate::<i32>()? }),
                 "sltiu" => Ok(Instruction::Sltiu {rt, rs, imm: self.parse_immediate::<u32>()? }),
 

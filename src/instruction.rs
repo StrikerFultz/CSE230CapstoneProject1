@@ -84,6 +84,12 @@ pub enum Instruction {
     ///
     Move { rd:String, rs:String },
 
+    /// 
+    Xor { rd: String, rs: String, rt: String },
+
+    ///
+    Xori { rt: String, rs: String, imm: u32 },
+
     /// {Hi,Lo} = R[rs] * R[rt] 
     Mult { rs: String, rt: String },
 
