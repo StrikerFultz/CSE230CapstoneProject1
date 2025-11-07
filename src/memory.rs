@@ -2,10 +2,12 @@ use crate::lexer::alert;
 
 use std::collections::HashMap;
 
-const WORD_SIZE: usize  = 4;             // 4 bytes for a word
-const HALF_SIZE: usize = 2;             // 2 bytes for a half word
-const PAGE_SIZE: usize  = 512;           // 512 bytes for a page
-const PAGE_POWER: u32   = 9;              // 2^9 = 512
+const DOUBLE_SIZE: usize = 8;          // 8 bytes for a double word
+const FLOAT_SIZE: usize = 4;           // 4 bytes for a float word
+const WORD_SIZE: usize  = 4;           // 4 bytes for a word
+const HALF_SIZE: usize = 2;            // 2 bytes for a half word
+const PAGE_SIZE: usize  = 512;         // 512 bytes for a page
+const PAGE_POWER: u32   = 9;           // 2^9 = 512
 const PAGE_MASK: u32    = (PAGE_SIZE as u32) - 1;
 
 // Memory Configurations
@@ -123,6 +125,66 @@ impl Memory {
             page_data[offset]
         } else {
             0
+        }
+    }
+
+    pub fn set_double(&mut self, address: u32, value: f64) {
+        let page = page_index(address);       // Find the page that the address belongs to
+        let offset = page_offset(address);   // Find the offset within the page
+
+        if !self.pages.contains_key(&page) {                   // If the page doesn't exist, create it
+            self.pages.insert(page, Box::new([0; PAGE_SIZE]));
+        }
+
+        let page_data = self.pages.get_mut(&page).unwrap();     // Get a mutable reference to the page data
+        let bytes = value.to_be_bytes();
+        for i in 0..DOUBLE_SIZE {
+            page_data[offset + i] = bytes[i] as i8;
+        }
+    }
+
+    pub fn load_double(&mut self, address: u32) -> f64 {
+        let page = page_index(address);
+        let offset = page_offset(address);
+
+        if let Some(page_data) = self.pages.get(&page) {    // Ensure the page exists
+            let mut bytes = [0 as u8; DOUBLE_SIZE];
+            for i in 0..DOUBLE_SIZE {
+                bytes[i] = page_data[offset + i] as u8;
+            }
+            f64::from_be_bytes(bytes)
+        } else {
+            0.0
+        }
+    }
+
+    pub fn set_float(&mut self, address: u32, value: f32) {
+        let page = page_index(address);       // Find the page that the address belongs to
+        let offset = page_offset(address);   // Find the offset within the page
+
+        if !self.pages.contains_key(&page) {                   // If the page doesn't exist, create it
+            self.pages.insert(page, Box::new([0; PAGE_SIZE]));
+        }
+
+        let page_data = self.pages.get_mut(&page).unwrap();     // Get a mutable reference to the page data
+        let bytes = value.to_be_bytes();
+        for i in 0..FLOAT_SIZE {
+            page_data[offset + i] = bytes[i] as i8;
+        }
+    }
+
+    pub fn load_float(&mut self, address: u32) -> f32 {
+        let page = page_index(address);       // Find the page that the address belongs to
+        let offset = page_offset(address);   // Find the offset within the page
+
+        if let Some(page_data) = self.pages.get(&page) {    // Ensure the page exists
+            let mut bytes = [0 as u8; FLOAT_SIZE];
+            for i in 0..FLOAT_SIZE {
+                bytes[i] = page_data[offset + i] as u8;
+            }
+            f32::from_be_bytes(bytes)
+        } else {
+            0.0
         }
     }
 

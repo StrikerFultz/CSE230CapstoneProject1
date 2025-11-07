@@ -25,7 +25,7 @@ impl Assembler {
         let result = self.parser.parse_program(code, memory);
 
         match result {
-            Ok((instructions, labels, errors)) => {
+            Ok((instructions, symbol_table, errors)) => {
                 let mut core_instructions: Vec<CoreInstruction> = Vec::new();
                 for instruction in &instructions {
                     match instruction {
@@ -79,7 +79,7 @@ impl Assembler {
                     }
                     // Process each instruction as needed
                 }
-                Ok((core_instructions, labels, errors))
+                Ok((core_instructions, symbol_table, errors))
             }
             Err(e) => return Err(e),
         }

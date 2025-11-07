@@ -202,6 +202,14 @@ impl Parser {
                     let alignment = 4;
                     address = (self.data_section_pointer + alignment - 1) & !(alignment - 1);
                 },
+                ".double" => {
+                    let alignment = 8;
+                    address = (self.data_section_pointer + alignment - 1) & !(alignment - 1);
+                },
+                ".float" => {
+                    let alignment = 4;
+                    address = (self.data_section_pointer + alignment - 1) & !(alignment - 1);
+                },
                 _ => {}
             }
             
@@ -265,15 +273,53 @@ impl Parser {
                     }
                 },
                 ".double" | ".float" => {
-                    let value = self.expect(TokenType::Real_Number)?;
-                    alert(format!("Parsed {} value: {}", directive, value.lexeme).as_str());
-                    let x = self.peek(0);
-                    if let Some(token) = x {
-                        if token.token_type == TokenType::Delimiter {
-                            self.expect(TokenType::Delimiter)?;
-                            self.parse_data_operands(label_token, directive, memory)?;
+                    let value = self.peek(0);
+
+                    if let Some(token) = value {
+                        if token.token_type == TokenType::RealNumber || token.token_type == TokenType::Integer {
+                            alert(format!("Parsed {} value: {}", directive, token.lexeme).as_str());
+                            
+                            let address = self.data_section_pointer;
+                            let line_num = token.line_number;
+                            let lexeme = token.lexeme.clone();
+
+                            if token.token_type == TokenType::RealNumber {
+                                self.expect(TokenType::RealNumber)?;
+                            } else if token.token_type == TokenType::Integer {
+                                self.expect(TokenType::Integer)?;
+                            }
+
+                            match directive {
+                                ".double" => {
+                                    if lexeme.parse::<f64>().is_err() {
+                                        return Err(self.error(format!("At line {}: Value {} is out of range for .double", line_num, lexeme)));
+                                    }
+                                    memory.set_double(address, lexeme.parse::<f64>().unwrap());
+
+                                    self.data_section_pointer += 8;
+                                },
+                                ".float" => {
+                                    if lexeme.parse::<f32>().is_err() {
+                                        return Err(self.error(format!("At line {}: Value {} is out of range for .float", line_num, lexeme)));
+                                    }
+                                    memory.set_float(address, lexeme.parse::<f32>().unwrap());
+
+                                    self.data_section_pointer += 4;
+                                },
+                                _ => {}
+                            }
+
+                            let x = self.peek(0);
+                            if let Some(token) = x {
+                                if token.token_type == TokenType::Delimiter {
+                                    self.expect(TokenType::Delimiter)?;
+                                    self.parse_data_operands(label_token, directive, memory)?;
+                                } else {
+                                    return Err(self.error(format!("At line {}: Unexpected token {:?}", self.current_line, token.lexeme)));
+                                }
+                            }
                         } else {
-                            return Err(self.error(format!("At line {}: Unexpected token {:?}", self.current_line, token.lexeme)));
+                            alert(format!("Error: Expected real number or integer for {}, found {:?}", directive, token.lexeme).as_str());
                         }
                     }
                 },
@@ -331,7 +377,7 @@ impl Parser {
                 self.line_numbers.push(self.current_line);
                 self.instruction_index += 1;
 
-            } else if (token.token_type == TokenType::Identifier || token.token_type == TokenType::Mnemonic) 
+            } else if token.token_type == TokenType::Identifier 
                 && let Some(second) = second_token && second.token_type == TokenType::Colon {
 
                 let label = token.lexeme.clone();

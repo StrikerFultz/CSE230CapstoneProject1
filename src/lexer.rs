@@ -45,7 +45,7 @@ pub enum TokenType {
     LeftParen,
     RightParen,
     Integer,
-    Real_Number,
+    RealNumber,
     /*
     A unknown token type
     */
@@ -115,7 +115,7 @@ impl Lexer {
                             line_number: self.line_number,
                         };
                         self.tokens.push_back(new_token);
-                        i = closing_quote_index + 1; // Move index to character after closing quote
+                        i = closing_quote_index; // Move index to character after closing quote
                         tokenFound = true;
                         // // green(format!("next i value: {}", line.chars().nth(i).unwrap()).as_str());
                     } else {
@@ -208,35 +208,60 @@ impl Lexer {
                 if c == '-' {
                     if let Some(next_char) = line.chars().nth(i + 1) {
                         if next_char.is_ascii_digit() {
-                            let integer_end = consumeInteger(i + 1, line); 
+                            let (token_type, number_end) = classify_number(i + 1, line);
+                            let possible_number = &line[i..number_end];
 
-                            // get entire integer 
-                            let possible_integer = &line[i..integer_end]; 
-                            let new_token = Token {
-                                lexeme: possible_integer.to_string(),
-                                token_type: TokenType::Integer,
-                                line_number: self.line_number,
-                            };
-                            self.tokens.push_back(new_token);
-                            tokenFound = true;
-                            i = integer_end - 1; 
+                            if token_type == Some(TokenType::Integer) {
+                                let new_token = Token {
+                                    lexeme: possible_number.to_string(),
+                                    token_type: token_type.unwrap(),
+                                    line_number: self.line_number,
+                                };
+                                self.tokens.push_back(new_token);
+                                // // green(format!("Found integer token: {}", possible_number).as_str());
+                                tokenFound = true;
+                                i = number_end - 1; // Move index to end of number
+                            } else if token_type == Some(TokenType::RealNumber) {
+                                let new_token = Token {
+                                    lexeme: possible_number.to_string(),
+                                    token_type: token_type.unwrap(),
+                                    line_number: self.line_number,
+                                };
+                                self.tokens.push_back(new_token);
+                                // // green(format!("Found real number token: {}", possible_number).as_str());
+                                tokenFound = true;
+                                i = number_end - 1; // Move index to end of number
+                            }
                         }
                     }
                 }
 
-                // digit indicates possible integer
+                // digit indicates possible integer or real number
                 if !tokenFound && c.is_ascii_digit() {
-                    let mut integer_end = consumeInteger(i + 1, line);
-                    let possible_integer = &line[i..integer_end];
-                    let new_token = Token {
-                        lexeme: possible_integer.to_string(),
-                        token_type: TokenType::Integer,
-                        line_number: self.line_number,
-                    };
-                    self.tokens.push_back(new_token);
-                    // // green(format!("Found integer token: {}", possible_integer).as_str());
-                    tokenFound = true;
-                    i = integer_end - 1; // Move index to end of integer
+                    let (token_type, number_end) = classify_number(i, line);
+                    let possible_number = &line[i..number_end];
+
+                    if token_type == Some(TokenType::Integer) {
+                        let new_token = Token {
+                            lexeme: possible_number.to_string(),
+                            token_type: token_type.unwrap(),
+                            line_number: self.line_number,
+                        };
+                        self.tokens.push_back(new_token);
+                        // // green(format!("Found integer token: {}", possible_number).as_str());
+                        tokenFound = true;
+                        i = number_end - 1; // Move index to end of number
+                    } else if token_type == Some(TokenType::RealNumber) {
+                        let new_token = Token {
+                            lexeme: possible_number.to_string(),
+                            token_type: token_type.unwrap(),
+                            line_number: self.line_number,
+                        };
+                        self.tokens.push_back(new_token);
+                        // // green(format!("Found real number token: {}", possible_number).as_str());
+                        tokenFound = true;
+                        i = number_end - 1; // Move index to end of number
+                    }
                 }
 
                 // alphabetic indicates possible Mnemonic or Identifier (label or data)
@@ -339,6 +364,8 @@ fn matchDirective(s: &str) -> bool {
         ".globl",
         ".ascii",
         ".asciiz",
+        ".double",
+        ".float",
         ".word",
         ".byte",
         ".half",
@@ -386,15 +413,42 @@ fn consumeTilPuncAndWs(i: usize, s: &str) -> usize {
     return index;
 }
 
-fn consumeInteger(i: usize, s: &str) -> usize {
+// fn consumeInteger(i: usize, s: &str) -> usize {
+//     let mut index = i;
+//     for c in s.chars().skip(i) {
+//         if !c.is_ascii_digit() {
+//             return index;
+//         }
+//         index += 1;
+//     }
+//     return index;
+// }
+
+fn classify_number(i: usize, s: &str) -> (Option<TokenType>, usize)  {
     let mut index = i;
+    let mut is_integer = true;
+    let mut is_real = true;
+    let mut decimal_seen = false;
+
     for c in s.chars().skip(i) {
-        if !c.is_ascii_digit() {
-            return index;
+        if c.is_ascii_digit() {
+            index += 1;
+        } else if c == '.' && !decimal_seen {
+            is_integer = false;
+            decimal_seen = true;
+            index += 1;
+        } else {
+            break;
         }
-        index += 1;
     }
-    return index;
+
+    if is_integer && s[i..index].parse::<i64>().is_ok() {
+        (Some(TokenType::Integer), index)
+    } else if is_real && s[i..index].parse::<f64>().is_ok() {
+        (Some(TokenType::RealNumber), index)
+    } else {
+        (None, index)
+    }
 }
 
 impl fmt::Display for TokenType {
@@ -412,7 +466,7 @@ impl fmt::Display for TokenType {
             TokenType::LeftParen => "LeftParen",
             TokenType::RightParen => "RightParen",
             TokenType::Integer => "Integer",
-            TokenType::Real_Number => "Real_Number",
+            TokenType::RealNumber => "RealNumber",
             TokenType::Unknown => "Unknown",
         };
         write!(f, "{}", s)
