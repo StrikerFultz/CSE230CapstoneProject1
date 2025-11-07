@@ -1,5 +1,5 @@
 use crate::lexer::{Lexer, Token, TokenType};
-use crate::lexer::alert;
+// use crate::lexer::alert;
 use crate::instruction::Instruction;
 use crate::instruction::CoreInstruction;
 use crate::instruction::PseudoInstruction;
@@ -72,16 +72,16 @@ impl Parser {
         let mut sorted_lines: Vec<_> = tokens_by_line.keys().cloned().collect();
         sorted_lines.sort();
 
-        let mut tokens_strings = String::new();
-        for line_num in &sorted_lines {
-            let line_tokens = tokens_by_line.get(line_num).unwrap();
-            for token in line_tokens {
-                tokens_strings.push_str(&format!("{} ", token.token_type));
-            }
-            tokens_strings.push('\n');
-        }
+        // let mut tokens_strings = String::new();
+        // for line_num in &sorted_lines {
+        //     let line_tokens = tokens_by_line.get(line_num).unwrap();
+        //     for token in line_tokens {
+        //         tokens_strings.push_str(&format!("{} ", token.token_type));
+        //     }
+        //     tokens_strings.push('\n');
+        // }
 
-        alert(format!("Tokens:\n{}", tokens_strings).as_str());
+        // alert(format!("Tokens:\n{}", tokens_strings).as_str());
 
         // extract labels 
         // for line_num in &sorted_lines {
@@ -124,22 +124,22 @@ impl Parser {
             self.parse_statement(memory)?; 
         }
         // alert(format!("identifiers: {:?}", self.symbol_table).as_str());
-        let mut string = String::from("Identifiers:\n");
-        for label in self.symbol_table.keys() {
-            string.push_str(&format!("{}: {:x}\n", label, self.symbol_table.get(label).unwrap()));
-            if memory.load_byte(*self.symbol_table.get(label).unwrap()) != 0 {
-                string.push_str(&format!("Value: {}\n", memory.load_byte(*self.symbol_table.get(label).unwrap())));
-            }
-        }
-        alert(string.as_str());
+        // let mut string = String::from("Identifiers:\n");
+        // for label in self.symbol_table.keys() {
+        //     string.push_str(&format!("{}: {:x}\n", label, self.symbol_table.get(label).unwrap()));
+        //     if memory.load_byte(*self.symbol_table.get(label).unwrap()) != 0 {
+        //         string.push_str(&format!("Value: {}\n", memory.load_byte(*self.symbol_table.get(label).unwrap())));
+        //     }
+        // }
+        // alert(string.as_str());
 
-        let mut memory_string = String::from("Data Segment Memory in bytes:\n");
-        let num_of_bytes_in_memory = 16;
-        for i in 0..num_of_bytes_in_memory {
-            let byte = memory.load_byte(crate::memory::DEFAULT_STATIC_DATA_BASE_ADDRESS + i);
-            memory_string.push_str(&format!("Memory[0x{:x}]: {:02}\n", crate::memory::DEFAULT_STATIC_DATA_BASE_ADDRESS + i, byte));
-        }
-        alert(memory_string.as_str());
+        // let mut memory_string = String::from("Data Segment Memory in bytes:\n");
+        // let num_of_bytes_in_memory = 16;
+        // for i in 0..num_of_bytes_in_memory {
+        //     let byte = memory.load_byte(crate::memory::DEFAULT_STATIC_DATA_BASE_ADDRESS + i);
+        //     memory_string.push_str(&format!("Memory[0x{:x}]: {:02}\n", crate::memory::DEFAULT_STATIC_DATA_BASE_ADDRESS + i, byte));
+        // }
+        // alert(memory_string.as_str());
 
         // validate labels
         for insn in &self.instructions {
@@ -177,14 +177,14 @@ impl Parser {
     }
 
     pub fn parse_data(&mut self, memory: &mut Memory) -> Result<(), EmuError> {
-        alert("Parsing data section");
+        // alert("Parsing data section");
 
         let x = self.peek(0);
         if let Some(token) = x {
             let label = self.expect(TokenType::Identifier)?;
             self.expect(TokenType::Colon)?;
             let directive = self.expect(TokenType::Directive)?;
-            alert(format!("Label: {}, Directive: {}", label.lexeme, directive.lexeme).as_str());
+            // alert(format!("Label: {}, Directive: {}", label.lexeme, directive.lexeme).as_str());
 
             if self.symbol_table.contains_key(&label.lexeme) {
                 return Err(self.error(format!("Line {}: Duplicate label {}", label.line_number, label.lexeme)));
@@ -228,7 +228,7 @@ impl Parser {
             match directive {
                 ".word" | ".half" | ".byte" => {
                     let value = self.expect(TokenType::Integer)?;
-                    alert(format!("Parsed {} value: {}", directive, value.lexeme).as_str());
+                    // alert(format!("Parsed {} value: {}", directive, value.lexeme).as_str());
 
                     let label = label_token.lexeme.clone();
                     let line_num = label_token.line_number;
@@ -277,7 +277,7 @@ impl Parser {
 
                     if let Some(token) = value {
                         if token.token_type == TokenType::RealNumber || token.token_type == TokenType::Integer {
-                            alert(format!("Parsed {} value: {}", directive, token.lexeme).as_str());
+                            // alert(format!("Parsed {} value: {}", directive, token.lexeme).as_str());
                             
                             let address = self.data_section_pointer;
                             let line_num = token.line_number;
@@ -319,13 +319,13 @@ impl Parser {
                                 }
                             }
                         } else {
-                            alert(format!("Error: Expected real number or integer for {}, found {:?}", directive, token.lexeme).as_str());
+                            return Err(self.error(format!("At line {}: Expected real number or integer for {}, found {:?}", self.current_line, directive, token.lexeme)));
                         }
                     }
                 },
                 ".space" => {
                     let value = self.expect(TokenType::Integer)?;
-                    alert(format!("Parsed .space value: {}", value.lexeme).as_str());
+                    // alert(format!("Parsed .space value: {}", value.lexeme).as_str());
 
                     let line_num = label_token.line_number;
 
@@ -337,7 +337,7 @@ impl Parser {
                 },
                 ".ascii" => {
                     let value = self.expect(TokenType::QuotedString)?;
-                    alert(format!("Parsed .ascii value: {}", value.lexeme).as_str());
+                    // alert(format!("Parsed .ascii value: {}", value.lexeme).as_str());
 
                     let address = self.data_section_pointer;
 
@@ -347,7 +347,7 @@ impl Parser {
                 },
                 ".asciiz" => {
                     let value = self.expect(TokenType::QuotedString)?;
-                    alert(format!("Parsed .asciiz value: {}", value.lexeme).as_str());
+                    // alert(format!("Parsed .asciiz value: {}", value.lexeme).as_str());
 
                     let mut lexeme = value.lexeme.clone();
                     let address = self.data_section_pointer;
@@ -366,7 +366,7 @@ impl Parser {
     }
 
     pub fn parse_text(&mut self) -> Result<(), EmuError> {
-        alert("Parsing text section");
+        // alert("Parsing text section");
         let x = self.peek(0);
         let second_token = self.peek(1);
         if let Some(token) = x {

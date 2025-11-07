@@ -6,7 +6,7 @@ use crate::instruction::PseudoInstruction;
 use crate::program::EmuError; 
 use crate::memory::Memory;
 
-use crate::lexer::alert;
+// use crate::lexer::alert;
 
 use std::collections::{VecDeque, HashMap};
 
@@ -31,7 +31,7 @@ impl Assembler {
                     match instruction {
                         Instruction::Core(core) => {
                             core_instructions.push(core.clone());
-                            alert(format!("Core instruction: {:?}", core).as_str());
+                            // alert(format!("Core instruction: {:?}", core).as_str());
                         },
                         Instruction::Pseudo(pseudo) => {
                             match pseudo {
@@ -69,11 +69,11 @@ impl Assembler {
                                     core_instructions.push(inst_1);
                                     core_instructions.push(inst_2);
 
-                                    alert(format!("Pseudo instruction: La with rt: {} and label: {} and address: 0x{:x} and imm: 0x{:x} and offset: 0x{:x}", rt, label, address, address >> 16, address & 0xFFFF).as_str());
+                                    // alert(format!("Pseudo instruction: La with rt: {} and label: {} and address: 0x{:x} and imm: 0x{:x} and offset: 0x{:x}", rt, label, address, address >> 16, address & 0xFFFF).as_str());
                                 }
                                 _ => {}
                             }
-                            alert(format!("Pseudo instruction: {:?}", pseudo).as_str());
+                            // alert(format!("Pseudo instruction: {:?}", pseudo).as_str());
                         }
                         _ => {}
                     }

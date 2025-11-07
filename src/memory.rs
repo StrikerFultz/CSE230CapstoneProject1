@@ -1,4 +1,4 @@
-use crate::lexer::alert;
+// use crate::lexer::alert;
 
 use std::collections::HashMap;
 
@@ -199,11 +199,11 @@ impl Memory {
         let string_bytes = value.as_bytes();
         for (i, &byte) in string_bytes.iter().enumerate() {
             self.set_byte(address + i as u32, byte as i8);
-            alert(format!("Byte stored at address {:x}: {}", address + i as u32, byte).as_str());
+            // alert(format!("Byte stored at address {:x}: {}", address + i as u32, byte).as_str());
             let byte_value = self.load_byte(address + i as u32);
-            alert(format!("Byte loaded from address {:x}: {}", address + i as u32, byte_value).as_str());
+            // alert(format!("Byte loaded from address {:x}: {}", address + i as u32, byte_value).as_str());
         }
-        alert(format!("String stored at address {:x}: {}", address, value).as_str());
+        // alert(format!("String stored at address {:x}: {}", address, value).as_str());
     }
 
     pub fn new() -> Self {

@@ -275,7 +275,7 @@ impl Lexer {
                     let mut is_identifier = isIdentifier(line, end);
 
                     if match_mnemonic {
-                        alert(format!("Found mnemonic: {}", lexeme).as_str());
+                        // alert(format!("Found mnemonic: {}", lexeme).as_str());
                         let new_token = Token {
                             lexeme: lexeme.to_string(),
                             token_type: TokenType::Mnemonic,
@@ -285,7 +285,7 @@ impl Lexer {
                         tokenFound = true;
                         i = end - 1; // Move index to end of the token
                     } else if is_identifier {
-                        alert(format!("Found identifier: {}", lexeme).as_str());
+                        // alert(format!("Found identifier: {}", lexeme).as_str());
                         let new_token = Token {
                             lexeme: lexeme.to_string(),
                             token_type: TokenType::Identifier,
@@ -473,7 +473,7 @@ impl fmt::Display for TokenType {
     }
 }
 
-#[wasm_bindgen]
-extern {
-    pub fn alert(s: &str);
-}
+// #[wasm_bindgen]
+// extern {
+//     pub fn alert(s: &str);
+// }
