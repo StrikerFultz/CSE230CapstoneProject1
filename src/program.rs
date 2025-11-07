@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use crate::instruction::{Instruction};
-use crate::instruction::BasicInstruction;
+use crate::instruction::CoreInstruction;
 use crate::memory::*;
 use crate::assembler::Assembler;
 use crate::memory::Memory;
@@ -33,8 +33,8 @@ pub enum EmuError {
 /// structure used to hold a list of Instructions
 #[derive(Debug, Clone)]
 pub struct Program {
-    /// list of `Instruction` 
-    pub instructions: Vec<BasicInstruction>,
+    /// list of `CoreInstruction` 
+    pub core_instructions: Vec<CoreInstruction>,
 
     /// mapping from label to line number 
     pub symbol_table: HashMap<String, u32>,
@@ -48,9 +48,9 @@ impl Program {
         let mut assembler = Assembler::new();
         
         match assembler.assemble(src, memory) {
-            Ok((instructions, symbol_table, line_numbers)) => {
+            Ok((core_instructions, symbol_table, line_numbers)) => {
                 Ok(Program {
-                    instructions,
+                    core_instructions,
                     symbol_table,
                     line_numbers
                 })
@@ -79,7 +79,7 @@ impl Program {
         }
 
         let index: usize = (offset / 4) as usize;
-        if index < self.instructions.len() {
+        if index < self.core_instructions.len() {
             Some(index)
         } else {
             None

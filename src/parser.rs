@@ -1,8 +1,8 @@
 use crate::lexer::{Lexer, Token, TokenType};
 use crate::lexer::alert;
 use crate::instruction::Instruction;
-use crate::instruction::BasicInstruction;
-use crate::instruction::ExtendedInstruction;
+use crate::instruction::CoreInstruction;
+use crate::instruction::PseudoInstruction;
 use crate::program::EmuError;
 use crate::memory::Memory;
 use std::collections::{HashMap, VecDeque};
@@ -144,10 +144,10 @@ impl Parser {
         // validate labels
         for insn in &self.instructions {
              match insn {
-                Instruction::Basic(BasicInstruction::J { label }) |
-                Instruction::Basic(BasicInstruction::Jal { label }) |
-                Instruction::Basic(BasicInstruction::Beq { label, .. }) |
-                Instruction::Basic(BasicInstruction::Bne { label, .. }) => {
+                Instruction::Core(CoreInstruction::J { label }) |
+                Instruction::Core(CoreInstruction::Jal { label }) |
+                Instruction::Core(CoreInstruction::Beq { label, .. }) |
+                Instruction::Core(CoreInstruction::Bne { label, .. }) => {
                     if !self.symbol_table.contains_key(label) {
                         return Err(EmuError::UndefinedLabel(label.clone()));
                     }
@@ -190,25 +190,23 @@ impl Parser {
                 return Err(self.error(format!("Line {}: Duplicate label {}", label.line_number, label.lexeme)));
             }
 
+            let mut address = self.data_section_pointer;
+
+            // Handle address alignment for data types that require it.
             match directive.lexeme.as_str() {
-                ".byte" => {
-                    let address = self.data_section_pointer;
-                    self.symbol_table.insert(label.lexeme.clone(), address);
-                },
                 ".half" => {
                     let alignment = 2;
-                    let address = (self.data_section_pointer + alignment - 1) & !(alignment - 1);
-                    self.symbol_table.insert(label.lexeme.clone(), address);
-                    self.data_section_pointer = address;
+                    address = (self.data_section_pointer + alignment - 1) & !(alignment - 1);
                 },
                 ".word" => {
                     let alignment = 4;
-                    let address = (self.data_section_pointer + alignment - 1) & !(alignment - 1);
-                    self.symbol_table.insert(label.lexeme.clone(), address);
-                    self.data_section_pointer = address;
+                    address = (self.data_section_pointer + alignment - 1) & !(alignment - 1);
                 },
                 _ => {}
             }
+            
+            self.symbol_table.insert(label.lexeme.clone(), address);
+            self.data_section_pointer = address;
 
             self.parse_data_operands(&label, &directive.lexeme, memory)?;
         }
@@ -230,16 +228,25 @@ impl Parser {
 
                     match directive {
                         ".byte" => {
+                            if value.lexeme.parse::<i8>().is_err() {
+                                return Err(self.error(format!("At line {}: Value {} is out of range for .byte", line_num, value.lexeme)));
+                            }
                             memory.set_byte(address, value.lexeme.parse::<i8>().unwrap());
 
                             self.data_section_pointer += 1;
                         },
                         ".half" => {
+                            if value.lexeme.parse::<i16>().is_err() {
+                                return Err(self.error(format!("At line {}: Value {} is out of range for .half", line_num, value.lexeme)));
+                            }
                             memory.set_halfword(address, value.lexeme.parse::<i16>().unwrap());
 
                             self.data_section_pointer += 2;
                         },
                         ".word" => {
+                            if value.lexeme.parse::<i32>().is_err() {
+                                return Err(self.error(format!("At line {}: Value {} is out of range for .word", line_num, value.lexeme)));
+                            }
                             memory.set_word(address, value.lexeme.parse::<i32>().unwrap());
 
                             self.data_section_pointer += 4;
@@ -273,14 +280,36 @@ impl Parser {
                 ".space" => {
                     let value = self.expect(TokenType::Integer)?;
                     alert(format!("Parsed .space value: {}", value.lexeme).as_str());
+
+                    let line_num = label_token.line_number;
+
+                    if value.lexeme.parse::<u32>().is_err() {
+                        return Err(self.error(format!("At line {}: Value {} is out of range for .space", line_num, value.lexeme)));
+                    }
+
+                    self.data_section_pointer += value.lexeme.parse::<u32>().unwrap();
                 },
                 ".ascii" => {
                     let value = self.expect(TokenType::QuotedString)?;
                     alert(format!("Parsed .ascii value: {}", value.lexeme).as_str());
+
+                    let address = self.data_section_pointer;
+
+                    memory.set_string(address, value.lexeme.as_str());
+
+                    self.data_section_pointer += value.lexeme.len() as u32;
                 },
                 ".asciiz" => {
                     let value = self.expect(TokenType::QuotedString)?;
                     alert(format!("Parsed .asciiz value: {}", value.lexeme).as_str());
+
+                    let mut lexeme = value.lexeme.clone();
+                    let address = self.data_section_pointer;
+
+                    lexeme.push('\0');
+                    memory.set_string(address, lexeme.as_str());
+
+                    self.data_section_pointer += lexeme.len() as u32;
                 },
                 _ => {
                     // Handle other directives or return an error
@@ -392,12 +421,12 @@ impl Parser {
         let rt = self.parse_register()?;
 
         match mnemonic {
-            "add" => Ok(Instruction::Basic(BasicInstruction::Add { rd, rs, rt })),
-            "sub" => Ok(Instruction::Basic(BasicInstruction::Sub { rd, rs, rt })),
-            "or"  => Ok(Instruction::Basic(BasicInstruction::Or { rd, rs, rt })),
-            "addu" => Ok(Instruction::Basic(BasicInstruction::Addu { rd, rs, rt })),
-            "subu" => Ok(Instruction::Basic(BasicInstruction::Subu { rd, rs, rt })),
-            "and"  => Ok(Instruction::Basic(BasicInstruction::And { rd, rs, rt })),
+            "add" => Ok(Instruction::Core(CoreInstruction::Add { rd, rs, rt })),
+            "sub" => Ok(Instruction::Core(CoreInstruction::Sub { rd, rs, rt })),
+            "or"  => Ok(Instruction::Core(CoreInstruction::Or { rd, rs, rt })),
+            "addu" => Ok(Instruction::Core(CoreInstruction::Addu { rd, rs, rt })),
+            "subu" => Ok(Instruction::Core(CoreInstruction::Subu { rd, rs, rt })),
+            "and"  => Ok(Instruction::Core(CoreInstruction::And { rd, rs, rt })),
             _ => Err(self.error(format!("Line {}: Unknown R-Type", self.current_line)))
         }
     }
@@ -418,20 +447,20 @@ impl Parser {
                     let rs = self.parse_register()?;
                     self.expect(TokenType::RightParen)?;
                     match mnemonic {
-                        "lw" => Ok(Instruction::Basic(BasicInstruction::Lw { rt, rs, imm })),
-                        "sw" => Ok(Instruction::Basic(BasicInstruction::Sw { rt, rs, imm })),
-                        "lb" => Ok(Instruction::Basic(BasicInstruction::Lb { rt, rs, imm })),
-                        "sb" => Ok(Instruction::Basic(BasicInstruction::Sb { rt, rs, imm })),
-                        "lh" => Ok(Instruction::Basic(BasicInstruction::Lh { rt, rs, imm })),
-                        "sh" => Ok(Instruction::Basic(BasicInstruction::Sh { rt, rs, imm })),
+                        "lw" => Ok(Instruction::Core(CoreInstruction::Lw { rt, rs, imm })),
+                        "sw" => Ok(Instruction::Core(CoreInstruction::Sw { rt, rs, imm })),
+                        "lb" => Ok(Instruction::Core(CoreInstruction::Lb { rt, rs, imm })),
+                        "sb" => Ok(Instruction::Core(CoreInstruction::Sb { rt, rs, imm })),
+                        "lh" => Ok(Instruction::Core(CoreInstruction::Lh { rt, rs, imm })),
+                        "sh" => Ok(Instruction::Core(CoreInstruction::Sh { rt, rs, imm })),
                         _ => Err(self.error(format!("At line {}: Unexpected token {:?}", self.current_line, mnemonic))),
                     }
                 } else if token.token_type == TokenType::Identifier {
                     let label = self.expect(TokenType::Identifier)?;
                     if mnemonic == "lw" {
-                        Ok(Instruction::Extended(ExtendedInstruction::Lw { rt, label: label.lexeme }))
+                        Ok(Instruction::Pseudo(PseudoInstruction::Lw { rt, label: label.lexeme }))
                     } else {
-                        Err(self.error(format!("At line {}: Unsupported extended instruction", self.current_line)))
+                        Err(self.error(format!("At line {}: Unsupported pseudo instruction", self.current_line)))
                     }
                 } else {
                     return Err(self.error(format!("At line {}: Unexpected token {:?}", self.current_line, token.lexeme)));
@@ -447,9 +476,9 @@ impl Parser {
             let label = self.parse_label()?;
 
             if mnemonic == "beq" {
-                Ok(Instruction::Basic(BasicInstruction::Beq { rs, rt, label }))
+                Ok(Instruction::Core(CoreInstruction::Beq { rs, rt, label }))
             } else {
-                Ok(Instruction::Basic(BasicInstruction::Bne { rs, rt, label }))
+                Ok(Instruction::Core(CoreInstruction::Bne { rs, rt, label }))
             }
         } else {
             let rt = self.parse_register()?;
@@ -458,10 +487,10 @@ impl Parser {
             self.expect(TokenType::Delimiter)?;
             
             match mnemonic {
-                "addi" => Ok(Instruction::Basic(BasicInstruction::Addi { rt, rs, imm: self.parse_immediate::<i32>()? })),
-                "addiu" => Ok(Instruction::Basic(BasicInstruction::Addiu { rt, rs, imm: self.parse_immediate::<u32>()? })),
-                "ori" => Ok(Instruction::Basic(BasicInstruction::Ori { rt, rs, imm: self.parse_immediate::<u32>()? })),
-                "andi" => Ok(Instruction::Basic(BasicInstruction::Andi { rt, rs, imm: self.parse_immediate::<u32>()? })),
+                "addi" => Ok(Instruction::Core(CoreInstruction::Addi { rt, rs, imm: self.parse_immediate::<i32>()? })),
+                "addiu" => Ok(Instruction::Core(CoreInstruction::Addiu { rt, rs, imm: self.parse_immediate::<u32>()? })),
+                "ori" => Ok(Instruction::Core(CoreInstruction::Ori { rt, rs, imm: self.parse_immediate::<u32>()? })),
+                "andi" => Ok(Instruction::Core(CoreInstruction::Andi { rt, rs, imm: self.parse_immediate::<u32>()? })),
                  _ => Err(self.error(format!("Line {}: Unhandled I-Type", self.current_line)))
             }
         }
@@ -476,9 +505,9 @@ impl Parser {
 
         // parse as i32 first (for negative number support like -1 as signed)
         if let Ok(imm) = imm_token.lexeme.parse::<i32>() {
-            Ok(Instruction::Basic(BasicInstruction::Li { rd, imm: imm as u32 }))
+            Ok(Instruction::Core(CoreInstruction::Li { rd, imm: imm as u32 }))
         } else if let Ok(imm) = imm_token.lexeme.parse::<u32>() {
-            Ok(Instruction::Basic(BasicInstruction::Li { rd, imm: imm }))
+            Ok(Instruction::Core(CoreInstruction::Li { rd, imm: imm }))
         } else {
             Err(self.error(format!("Line {}: Invalid immediate value {}", self.current_line, imm_token.lexeme)))
         }
@@ -488,9 +517,9 @@ impl Parser {
         self.expect(TokenType::Mnemonic)?;
 
         match mnemonic {
-            "j" => Ok(Instruction::Basic(BasicInstruction::J { label: self.parse_label()? })),
-            "jal" => Ok(Instruction::Basic(BasicInstruction::Jal { label: self.parse_label()? })),
-            "jr" => Ok(Instruction::Basic(BasicInstruction::Jr { rs: self.parse_register()? })),
+            "j" => Ok(Instruction::Core(CoreInstruction::J { label: self.parse_label()? })),
+            "jal" => Ok(Instruction::Core(CoreInstruction::Jal { label: self.parse_label()? })),
+            "jr" => Ok(Instruction::Core(CoreInstruction::Jr { rs: self.parse_register()? })),
             _ => Err(self.error(format!("Line {}: Unknown J-Type", self.current_line)))
         }
     }
@@ -503,7 +532,7 @@ impl Parser {
                 let rt = self.parse_register()?;
                 self.expect(TokenType::Delimiter)?;
                 let label = self.parse_label()?;
-                Ok(Instruction::Extended(ExtendedInstruction::La { rt, label }))
+                Ok(Instruction::Pseudo(PseudoInstruction::La { rt, label }))
             },
             _ => Err(self.error(format!("Line {}: Unknown pseudo-instruction", self.current_line)))
         }

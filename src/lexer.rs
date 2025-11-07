@@ -106,16 +106,16 @@ impl Lexer {
 
                 // Start of quoted string
                 if c == '"' {   
-                    let closing_index_option = findClosingQuoteString(&line[i + 1..]);
+                    let closing_quote_index_option = findClosingQuoteString(i + 1, line);
                     // // green(format!("Closing index option: {:?}", closing_index_option).as_str());
-                    if let Some(closing_index) = closing_index_option {
+                    if let Some(closing_quote_index) = closing_quote_index_option {
                         let new_token = Token {
-                            lexeme: line[i..i + 1 + closing_index + 1].to_string(),
+                            lexeme: line[i+1..closing_quote_index].to_string(),
                             token_type: TokenType::QuotedString,
                             line_number: self.line_number,
                         };
                         self.tokens.push_back(new_token);
-                        i += closing_index + 1; // Move index to character after closing quote
+                        i = closing_quote_index + 1; // Move index to character after closing quote
                         tokenFound = true;
                         // // green(format!("next i value: {}", line.chars().nth(i).unwrap()).as_str());
                     } else {
@@ -316,10 +316,10 @@ impl Lexer {
     }
 }
 
-fn findClosingQuoteString(s: &str) -> Option<usize> {
-    let mut index = 0;
+fn findClosingQuoteString(i: usize, s: &str) -> Option<usize> {
+    let mut index = i;
     let mut prev_char = '\0';
-    for c in s.chars() {
+    for c in s.chars().skip(i) {
         if c == '"' && prev_char != '\\' {
             // // green("Found closing quote string");
             return Some(index);
@@ -337,6 +337,7 @@ fn matchDirective(s: &str) -> bool {
         ".data",
         ".text",
         ".globl",
+        ".ascii",
         ".asciiz",
         ".word",
         ".byte",

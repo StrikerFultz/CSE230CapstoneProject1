@@ -2,7 +2,7 @@ use crate::program::EmuError;
 
 /// enum used to represent each MIPS instruction
 #[derive(Debug, Clone)]
-pub enum BasicInstruction {
+pub enum CoreInstruction {
     /// R[rd] = R[rs] + R[rt] 
     Add { rd: String, rs: String, rt: String },
 
@@ -74,13 +74,13 @@ pub enum BasicInstruction {
 }
 
 #[derive(Debug, Clone)]
-pub enum ExtendedInstruction {
+pub enum PseudoInstruction {
     Lw { rt: String, label: String },
     La { rt: String, label: String },
 }
 
 #[derive(Debug, Clone)]
 pub enum Instruction {
-    Basic(BasicInstruction),
-    Extended(ExtendedInstruction),
+    Core(CoreInstruction),
+    Pseudo(PseudoInstruction),
 }

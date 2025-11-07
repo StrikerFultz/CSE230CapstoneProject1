@@ -119,11 +119,29 @@ impl Memory {
         let offset = page_offset(address);   // Find the offset within the page
 
         if let Some(page_data) = self.pages.get(&page) {    // Ensure the page exists
-            alert(format!("Value stored in byte address {:x}: {}", address, page_data[offset]).as_str());
+            //alert(format!("Value stored in byte address {:x}: {}", address, page_data[offset]).as_str());
             page_data[offset]
         } else {
             0
         }
+    }
+
+    pub fn set_string(&mut self, address: u32, value: &str) {
+        let page = page_index(address);        // Find the page that the address belongs to
+        let offset = page_offset(address);   // Find the offset within the page
+    
+        if !self.pages.contains_key(&page) {                   // If the page doesn't exist, create it        
+            self.pages.insert(page, Box::new([0; PAGE_SIZE]));
+        }
+
+        let string_bytes = value.as_bytes();
+        for (i, &byte) in string_bytes.iter().enumerate() {
+            self.set_byte(address + i as u32, byte as i8);
+            alert(format!("Byte stored at address {:x}: {}", address + i as u32, byte).as_str());
+            let byte_value = self.load_byte(address + i as u32);
+            alert(format!("Byte loaded from address {:x}: {}", address + i as u32, byte_value).as_str());
+        }
+        alert(format!("String stored at address {:x}: {}", address, value).as_str());
     }
 
     pub fn new() -> Self {
