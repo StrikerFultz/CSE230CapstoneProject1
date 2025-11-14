@@ -31,6 +31,8 @@ pub struct CPU {
 }
 
 impl CPU {
+    pub fn get_lo(&self) -> u32 { self.lo}
+    pub fn get_hi(&self) -> u32 { self.hi}
     pub fn new() -> Self {
         CPU { 
             registers: Self::create_register_map(), 
@@ -133,6 +135,8 @@ impl CPU {
                 self.set_reg(rd,r1.wrapping_add(r2));
             },   
 
+         
+
             Instruction::Sub { rd, rs, rt } => {
                 let r1 = self.get_reg(rs) as i32;
                 let r2 = self.get_reg(rt) as i32;
@@ -145,6 +149,10 @@ impl CPU {
                 let r2 = self.get_reg(rt) as u32;
 
                 self.set_reg(rd, r1.wrapping_sub(r2) as u32);
+                let r1 = self.get_reg(rs);
+                let r2 = self.get_reg(rt);
+
+                self.set_reg(rd, r1.wrapping_sub(r2));
             },
             
             Instruction::Lw { rt, rs, imm } => {
@@ -293,7 +301,7 @@ impl CPU {
             Instruction::Sltiu {rt, rs, imm } => {
                 let r = self.get_reg(rs);
                 self.set_reg(rt, if r< (*imm as u32) { 1 } else {0});
-            }
+            },
 
             Instruction::Blt { rs, rt, label } => { // blt $s0, $s1, label -> slt  $at, $s0, $s1
                 let r1 = self.get_reg(rs) as i32;
@@ -373,8 +381,22 @@ impl CPU {
 
             Instruction::Mflo { rd } => {
                 self.set_reg(rd, self.lo);
+            },
+            Instruction::Div {rs, rt} => {
+                let dividend = self.get_reg(rs) as i32;
+                let divisor = self.get_reg(rt) as i32;
+
+                if divisor ==0 {
+                    return Err(EmuError::DivideByZero); // add error to emuerro
+                }
+
+                self.lo = (dividend / divisor) as u32;
+                self.hi = (dividend % divisor) as u32;
+            },
             }
-        }
+
+
+        
 
         // branch instructions will modify the PC to another address instead of the sequential instruction
         // maybe we have to deal with the one instruction leading to jr $ra due to branch delay

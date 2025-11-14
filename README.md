@@ -66,7 +66,7 @@ curl https://sh.rustup.rs -sSf | sh
 ```sh
 source $HOME/.cargo/env
 ```
-    **installing rust ^^, only once needed**
+**installing rust ^^, only once needed**
 ```sh
 rustup update
 ```

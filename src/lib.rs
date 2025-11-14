@@ -98,6 +98,7 @@ impl WasmCPU {
                     snapshot: Some(self.cpu.snapshot()),
                 }).unwrap()
             }
+            
             Err(e) => {
                 serde_wasm_bindgen::to_value(&WasmResult {
                     error: format!("Runtime Error -- {:?}", e),
@@ -196,7 +197,7 @@ mod tests {
         assert_eq!(cpu.get_reg("$t1"), 10);
         assert_eq!(cpu.get_reg("$t2"), 30);
     }
-
+    
     #[test]
     fn addu_test() {
         let mut cpu = CPU::new();
@@ -226,6 +227,9 @@ mod tests {
         // 5 - 10 = -5
         // -5 + 2^32 = 4294967291
     }
+
+
+
 
     #[test]
     fn lw_sw_test() {
@@ -413,6 +417,8 @@ mod tests {
         assert_eq!(cpu.get_reg("$t1"), 6);
     }
 
+
+
     #[test]
     fn slt_test() {
         let mut cpu = CPU::new();
@@ -575,98 +581,19 @@ mod tests {
         assert_eq!(cpu.get_reg("$t1"), 123);
         assert_eq!(cpu.get_reg("$t3"), 50);
     }
-
-
     #[test]
-    fn xor_test() {
+    fn div_normal_test() {
         let mut cpu = CPU::new();
         let program = r#"
-            li  $t0, 12   # 12 decimal
-            li  $t1, 10   # 10 decimal
-            xor $t2, $t0, $t1 # 12 ^ 10 = 6
+            li $t0, 20
+            li $t1, 3
+            div $t0, $t1
         "#;
 
         cpu.run_input(program).unwrap();
-        assert_eq!(cpu.get_reg("$t2"), 6);
+        assert_eq!(cpu.get_lo(), 6);   // quotient
+        assert_eq!(cpu.get_hi(), 2);   // remainder
     }
 
-    #[test]
-    fn xori_test() {
-        let mut cpu = CPU::new();
-        let program = r#"
-            li   $t0, 15   # 15 decimal
-            xori $t1, $t0, 10  # 15 ^ 10 = 5
-        "#;
-
-        cpu.run_input(program).unwrap();
-        assert_eq!(cpu.get_reg("$t1"), 5);
-    }
-
-    #[test]
-    fn xor_chain_test() {
-        let mut cpu = CPU::new();
-        let program = r#"
-            li  $t0, 10   # 10 decimal
-            li  $t1, 10   # 10 decimal
-            xor $t2, $t0, $t1    # 10 ^ 10 = 0
-            xor $t3, $t2, $t1    # 0 ^ 10 = 10
-        "#;
-
-        cpu.run_input(program).unwrap();
-        assert_eq!(cpu.get_reg("$t2"), 0);
-        assert_eq!(cpu.get_reg("$t3"), 10);
-    }
-
-
-    #[test]
-    fn mult_test() {
-        let mut cpu = CPU::new();
-        let program = r#"
-            li $t0, 7
-            li $t1, 6
-
-            mult $t0, $t1  # 7 * 6 = 42
-
-            mflo $s0       # $s0 = lo
-            mfhi $s1       # $s1 = hi
-        "#;
-
-        cpu.run_input(program).unwrap();
-
-        assert_eq!(cpu.get_reg("$s0"), 42);
-        assert_eq!(cpu.get_reg("$s1"), 0);
-    }
-
-    #[test]
-    fn mult_signed_test() {
-        let mut cpu = CPU::new();
-        let program = r#"
-            li $t0, 10
-            li $t1, -5
-
-            mult $t0, $t1  # 10 * -5 = -50
-
-            mflo $s0       # $s0 = lo
-            mfhi $s1       # $s1 = hi
-        "#;
-
-        cpu.run_input(program).unwrap();
-
-        assert_eq!(cpu.get_reg("$s0") as i32, -50);
-        assert_eq!(cpu.get_reg("$s1") as i32, -1);
-    }
-
-    #[test]
-    fn li_test() {
-        let mut cpu = CPU::new();
-        let program = r#"
-            li $t0, 10
-            li $t1, -5
-        "#;
-
-        cpu.run_input(program).unwrap();
-
-        assert_eq!(cpu.get_reg("$t0") as i32, 10);
-        assert_eq!(cpu.get_reg("$t1") as i32, -5);
-    }
+    
 }

@@ -128,7 +128,7 @@ impl Parser {
 
             // match the instruction by lexeme to the right parsing fn
             match lexeme.as_str() {
-                "add" | "sub" | "or" | "addu" | "subu" | "and" | "xor" | "slt" | "sltu" | "mult" | "mflo" | "mfhi" => self.parse_r_type(&lexeme),
+                "add" | "sub" | "or" | "addu" | "subu" | "and" | "xor" | "slt" | "sltu" | "mult" | "mflo" | "mfhi" | "div" => self.parse_r_type(&lexeme),
                 "j" | "jal" | "jr" => self.parse_j_type(&lexeme),
                 "li" => self.parse_li(),
                 "move"| "blt" | "bgt" | "ble" | "bge"  => self.parse_pseudo_type(&lexeme),
@@ -187,7 +187,7 @@ impl Parser {
         self.expect(TokenType::Mnemonic)?;
 
         match mnemonic {
-            "add" | "sub" | "or" | "addu" | "subu" | "and" | "xor" | "slt" | "sltu" => {
+            "add" | "sub" | "or" | "addu" | "subu" | "and" | "xor" | "slt" | "sltu"  => {
                 let rd = self.parse_register()?;
                 self.expect(TokenType::Delimiter)?;
                 let rs = self.parse_register()?;
@@ -221,6 +221,17 @@ impl Parser {
                 match mnemonic {
                     "mflo" => Ok(Instruction::Mflo { rd }),
                     "mfhi" => Ok(Instruction::Mfhi { rd }),
+                    _ => unreachable!()
+                }
+            },
+
+            "div" => {
+                let rs = self.parse_register()?;
+                self.expect(TokenType::Delimiter)?;
+                let rt = self.parse_register()?;
+
+                match mnemonic {
+                    "div" => Ok(Instruction::Div {rs, rt}),
                     _ => unreachable!()
                 }
             },
