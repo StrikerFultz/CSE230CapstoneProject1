@@ -581,6 +581,8 @@ mod tests {
         assert_eq!(cpu.get_reg("$t1"), 123);
         assert_eq!(cpu.get_reg("$t3"), 50);
     }
+
+    
     #[test]
     fn div_normal_test() {
         let mut cpu = CPU::new();
