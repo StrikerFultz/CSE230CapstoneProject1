@@ -295,7 +295,7 @@ impl CPU {
                 self.set_reg(rt, if r< (*imm as u32) { 1 } else {0});
             }
 
-            Instruction::Blt { rs, rt, label } => {
+            Instruction::Blt { rs, rt, label } => { // blt $s0, $s1, label -> slt  $at, $s0, $s1
                 let r1 = self.get_reg(rs) as i32;
                 let r2 = self.get_reg(rt) as i32; 
 
@@ -305,11 +305,11 @@ impl CPU {
                     .get_label_address(label)
                     .ok_or(EmuError::UndefinedLabel(label.clone()))?;
                 self.pc = target;
-                is_branch = true;
+                is_branch = true; // slt to be shown then beq or bne 
                 }
             },
 
-            Instruction::Bgt { rs, rt, label } => {
+            Instruction::Bgt { rs, rt, label } => { // assembler temporary ($at) inbetween showing comparision between 2 registelrs; slt $at, $t0, $t1; is $t0 less than 1 $at becomes one otherwise 0; tmepreary reigtervalue to be displayed. 
                 let r1 = self.get_reg(rs) as i32;
                 let r2 = self.get_reg(rt) as i32; 
 
