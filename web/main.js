@@ -422,8 +422,6 @@ function handleWasmResult(result, { fromRun = false } = {}) {
       if (runBtn) runBtn.disabled = true;
     }
   } else if (fromRun) {
-    // No error string but we came from cpu.run():
-    // treat as “program finished normally”
     clearHighlight();
     if (Object.keys(allRegs).length) {
       log("All Registers (decimal + hex):");
@@ -523,3 +521,4 @@ init()
     console.error("Error initializing WASM:", err);
     log("Error initializing WASM: " + err);
   });
+
