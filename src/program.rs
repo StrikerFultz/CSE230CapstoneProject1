@@ -25,7 +25,10 @@ pub enum EmuError {
     UndefinedLabel(String),
 
     /// indicates emulation termination
-    Termination
+    Termination,
+
+    /// indicates instruction breakpoint
+    Breakpoint
 }
 
 /// structure used to hold a list of Instructions

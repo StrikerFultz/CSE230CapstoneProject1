@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>MIPS Emulator · Teacher View</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+  <!--professor login overlay -->
+  <div id="login-overlay" class="login-overlay">
+    <div class="login-modal">
+      <h2>Professor Login</h2>
+
+      <label>
+        Username
+        <input id="login-username" type="text" autocomplete="off" />
+      </label>
+
+      <label>
+        Password
+        <input id="login-password" type="password" />
+      </label>
+
+      <button id="login-submit">Log in</button>
+      <p id="login-error" class="login-error"></p>
+    </div>
+  </div>
+
+  <header class="topbar">
+    <div class="brand">MIPS Emulator</div>
+    <nav class="nav">
+      <a href="index.html">Labs</a>
+      <a href="teacher.html" class="active">Professor View</a>
+      <!--the button to logout-->
+      <button id="logout-prof">Log out</button>
+    </nav>
+  </header>
+
+  <main class="two-pane teacher-two-pane">
+    <!--left side the lib-->
+    <aside class="pane left-pane">
+      <div class="library-header">
+        <div>
+          <div>Lesson Library</div>
+          <small id="doc-count"></small>
+        </div>
+        <button class="btn-ghost" id="btn-collapse-library">Hide</button>
+      </div>
+
+      <div id="library">
+        <div class="doc-chip">
+          <div class="doc-chip-title">
+            <span id="doc-title">No lesson selected</span>
+            <small id="doc-time"></small>
+          </div>
+          <div class="doc-chip-actions">
+            <button id="btn-new">New</button>
+            <button id="btn-delete">Delete</button>
+            <button id="btn-open">Open in Labs</button>
+            <button id="btn-export">Export</button>
+            <label class="btn-ghost">
+              Import
+              <input id="file-import" type="file" accept="application/json" style="display:none" />
+            </label>
+          </div>
+        </div>
+
+        <div class="lesson-list" id="lesson-list">
+        </div>
+      </div>
+    </aside>
+
+    <!-- right editor  and the preview -->
+    <section class="pane editor-pane">
+      <div class="toolbar">
+        <input id="lesson-id" class="input" placeholder="lesson-id" />
+        <input id="lesson-title" class="input" placeholder="Lesson title" />
+        <button id="btn-save">Save</button>
+      </div>
+
+      <div class="formatbar">
+        <span>Type HTML in the editor. Preview updates live.</span>
+      </div>
+
+      <div class="editor-preview-wrap">
+        <div class="editable-wrap">
+          <div id="editor" class="editable" contenteditable="true"></div>
+          <div class="footer-note" id="save-status">Unsaved</div>
+        </div>
+
+        <div class="preview-wrap">
+          <div id="preview" class="preview-surface"></div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script type="module" src="teacher.js"></script>
+</body>
+</html>

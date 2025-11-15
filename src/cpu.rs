@@ -2,7 +2,7 @@ use crate::instruction::Instruction;
 use crate::memory::*;
 use crate::program::{EmuError, Program};
 use crate::Snapshot;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 /// represents the state of the CPU at an instruction
 pub struct ExecutionState {
@@ -13,14 +13,21 @@ pub struct ExecutionState {
 pub struct CPU { 
     // processor state 
     registers: HashMap<String, u32>,
-    pc: u32,
+
+    // special registers that can't be directly accessed 
+    pub pc: u32,
+    lo: u32,
+    hi: u32, 
 
     // program + memory
     program: Option<Program>,
     memory: Memory,     
 
     // log of all executed instructions 
-    state_history: Vec<ExecutionState>
+    state_history: Vec<ExecutionState>,
+
+    // line numbers of instructions containing breakpoints (indicated in the UI)
+    pub breakpoints: HashSet<usize>
 }
 
 impl CPU {
@@ -28,9 +35,12 @@ impl CPU {
         CPU { 
             registers: Self::create_register_map(), 
             pc: DEFAULT_TEXT_BASE_ADDRESS, 
+            lo: 0,
+            hi: 0,
             program: None, 
             memory: Memory::new(),
-            state_history: Vec::new()
+            state_history: Vec::new(),
+            breakpoints: HashSet::new()
         }
     }
 
@@ -249,10 +259,113 @@ impl CPU {
                     self.pc = target;
                     is_branch = true;
                 }
+            },
+
+            Instruction::Slt {rd, rs, rt } => {
+                let r1 = self.get_reg(rs) as i32;
+                let r2 = self.get_reg(rt) as i32;
+                self.set_reg(rd, if r1<r2 { 1 } else {0});
+            },
+
+            Instruction::Slti {rt, rs, imm } => {
+                let r = self.get_reg(rs) as i32;
+                self.set_reg(rt, if r< *imm { 1 } else {0});
+            },
+
+            Instruction::Sltu {rd, rs, rt } => {
+                let r1 = self.get_reg(rs);
+                let r2 = self.get_reg(rt);
+                self.set_reg(rd, if r1<r2 { 1 } else {0});
+            },
+
+            Instruction::Sltiu {rt, rs, imm } => {
+                let r = self.get_reg(rs);
+                self.set_reg(rt, if r< (*imm as u32) { 1 } else {0});
+            }
+
+            Instruction::Blt { rs, rt, label } => {
+                let r1 = self.get_reg(rs) as i32;
+                let r2 = self.get_reg(rt) as i32; 
+
+                if r1 < r2 {
+                    let target = self.program.as_ref()
+                    .unwrap()
+                    .get_label_address(label)
+                    .ok_or(EmuError::UndefinedLabel(label.clone()))?;
+                self.pc = target;
+                is_branch = true;
+                }
+            },
+
+            Instruction::Bgt { rs, rt, label } => {
+                let r1 = self.get_reg(rs) as i32;
+                let r2 = self.get_reg(rt) as i32; 
+
+                if r1 > r2 {
+                    let target = self.program.as_ref()
+                    .unwrap()
+                    .get_label_address(label)
+                    .ok_or(EmuError::UndefinedLabel(label.clone()))?;
+                self.pc = target;
+                is_branch = true;
+                }
+            },
+
+            Instruction::Ble { rs, rt, label } => {
+                let r1 = self.get_reg(rs) as i32;
+                let r2 = self.get_reg(rt) as i32; 
+
+                if r1 <= r2 {
+                    let target = self.program.as_ref()
+                    .unwrap()
+                    .get_label_address(label)
+                    .ok_or(EmuError::UndefinedLabel(label.clone()))?;
+                self.pc = target;
+                is_branch = true;
+                }
+            },
+            
+            Instruction::Bge { rs, rt, label } => {
+                let r1 = self.get_reg(rs) as i32;
+                let r2 = self.get_reg(rt) as i32; 
+
+                if r1 >= r2 {
+                    let target = self.program.as_ref()
+                        .unwrap()
+                        .get_label_address(label)
+                        .ok_or(EmuError::UndefinedLabel(label.clone()))?;
+
+                    self.pc = target;
+                    is_branch = true;
+                }
+            },
+
+            Instruction::Move {rd, rs} => {
+                self.set_reg(rd, self.get_reg(rs));
+            },
+
+            Instruction::Mult { rs, rt } => {
+                let r1 = self.get_reg(rs) as i32 as i64;
+                let r2 = self.get_reg(rt) as i32 as i64;
+                
+                let result = r1.wrapping_mul(r2);
+
+                // store the low 32 bits in lo and high 32 bits in hi
+                self.lo = (result & 0xFFFFFFFF) as u32;
+                self.hi = ((result >> 32) & 0xFFFFFFFF) as u32;
+            },
+
+            Instruction::Mfhi { rd } => {
+                self.set_reg(rd, self.hi);
+            },
+
+            Instruction::Mflo { rd } => {
+                self.set_reg(rd, self.lo);
             }
         }
 
         // branch instructions will modify the PC to another address instead of the sequential instruction
+        // maybe we have to deal with the one instruction leading to jr $ra due to branch delay
         if !is_branch {
             self.pc += 4;
         }
@@ -289,7 +402,21 @@ impl CPU {
 
                     break;
                 },
+                Err(EmuError::Breakpoint) => return Err(EmuError::Breakpoint),
                 Err(e) => return Err(e)
+            }
+            
+            // check if the current instruction line contains a breakpoint in the set
+            if let Some(program) = self.program.as_ref() {
+                if let Some(index) = program.pc_to_index(self.pc) {
+                    if index < program.line_numbers.len() {
+                        let current_line = program.line_numbers[index] - 1;
+
+                        if self.breakpoints.contains(&current_line) {
+                            return Err(EmuError::Breakpoint);
+                        }
+                    }
+                }
             }
         }   
 
@@ -304,19 +431,31 @@ impl CPU {
         self.run()
     }
 
+    pub fn set_breakpoints(&mut self, lines: Vec<usize>) {
+        self.breakpoints = lines.into_iter().collect();
+    }
+
     // below functions are used for Web Assembly only
     pub fn reset(&mut self) {
         self.registers = Self::create_register_map();
         self.memory = Memory::new();
         self.pc = DEFAULT_TEXT_BASE_ADDRESS;
+        self.lo = 0;
+        self.hi = 0;
+
         self.program = None;
 
         self.state_history.clear(); 
+        self.breakpoints.clear();
     }
 
     pub fn snapshot(&self) -> Snapshot {
         Snapshot {
             registers: self.registers.clone(),
         }
+    }
+
+    pub fn get_program(&self) -> Option<&Program> {
+        self.program.as_ref()
     }
 }

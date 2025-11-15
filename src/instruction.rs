@@ -56,4 +56,40 @@ pub enum Instruction {
 
     /// if(R[rs] != R[rt]) PC=JumpAddr
     Bne { rs: String, rt: String, label: String },
+
+    /// 
+    Slt { rd: String, rs: String, rt: String},
+
+    ///
+    Slti { rt: String, rs: String, imm: i32 },
+
+    ///
+    Sltiu { rt: String, rs:String,imm:u32 },
+
+    ///
+    Sltu{ rd:String, rs:String, rt:String},
+
+    ///
+    Blt { rs: String, rt: String, label:String},
+
+    ///
+    Bgt { rs: String, rt: String, label:String},
+
+    ///
+    Ble { rs: String, rt: String, label:String},
+
+    ///
+    Bge { rs: String, rt: String, label:String},
+
+    ///
+    Move { rd:String, rs:String },
+
+    /// {Hi,Lo} = R[rs] * R[rt] 
+    Mult { rs: String, rt: String },
+
+    /// R[rd] = Hi
+    Mfhi { rd: String },
+
+    /// R[rd] = Lo 
+    Mflo { rd: String } 
 }
