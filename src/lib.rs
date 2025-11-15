@@ -597,5 +597,20 @@ mod tests {
         assert_eq!(cpu.get_hi(), 2);   // remainder
     }
 
+    #[test]
+    fn nor_test() {
+        let mut cpu = CPU::new();
+        let program = r#"
+            li $t0, 5       # 0101
+            li $t1, 2       # 0010
+            nor $t2, $t0, $t1   # ~(0101 | 0010) = ~(0111)
+        "#;
+
+        cpu.run_input(program).unwrap();
+
+        assert_eq!(cpu.get_reg("$t2"), !(5 | 2));
+    }
+
+
     
 }

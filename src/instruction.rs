@@ -102,6 +102,8 @@ pub enum Instruction {
 
     Div {rs:String, rt:String },
 
+
+    Nor {rd: String, rs: String, rt: String},
 }
 
 /// checks a register against a list of currently supported registers 
