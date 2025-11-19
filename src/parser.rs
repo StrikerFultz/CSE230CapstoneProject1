@@ -405,10 +405,10 @@ impl Parser {
 
             // match the instruction by lexeme to the right parsing fn
             match lexeme.as_str() {
-                "add" | "sub" | "or" | "addu" | "subu" | "and" | "slt" | "sltu" | "mult" | "mflo" | "mfhi" => self.parse_r_type(&lexeme),
+                "add" | "sub" | "or" | "addu" | "subu" | "and" | "slt" | "sltu" | "mult" | "mflo" | "mfhi" | "xor" | "div" | "nor" => self.parse_r_type(&lexeme),
                 "j" | "jal" | "jr" => self.parse_j_type(&lexeme),
                 //"li" => self.parse_li(),
-                "addi" | "addiu" | "lb" | "sb" | "lh" | "sh" | "lw" | "sw" | "ori" | "beq" | "bne" | "andi"| "slti" | "sltiu" => self.parse_i_type(&lexeme),
+                "addi" | "addiu" | "lb" | "sb" | "lh" | "sh" | "lw" | "sw" | "ori" | "beq" | "bne" | "andi"| "slti" | "sltiu"| "xori" => self.parse_i_type(&lexeme),
                 "la" | "li" | "blt" | "bgt" | "ble" | "bge" => self.parse_pseudo_instruction(&lexeme),
                 _ => Err(self.error(format!("Line {}: Unknown instruction {}", self.current_line, lexeme)))
             }
@@ -426,6 +426,7 @@ impl Parser {
             "$s0" | "$s1" | "$s2" | "$s3" | "$s4" | "$s5" | "$s6" | "$s7" |
             "$t8" | "$t9" |
             "$k0" | "$k1" |
+            "$gp" | "$sp" | "$fp" | "$ra"
             "$gp" | "$sp" | "$fp" | "$ra"
         )
     }
@@ -464,7 +465,7 @@ impl Parser {
         self.expect(TokenType::Mnemonic)?;
 
         match mnemonic {
-            "add" | "sub" | "or" | "addu" | "subu" | "and" | "slt" | "sltu" => {
+            "add" | "sub" | "or" | "addu" | "subu" | "and" | "slt" | "sltu" | "xor" | "nor" => {
                 let rd = self.parse_register()?;
                 self.expect(TokenType::Delimiter)?;
                 let rs = self.parse_register()?;
@@ -479,7 +480,9 @@ impl Parser {
                     "subu" => Ok(Instruction::Core(CoreInstruction::Subu { rd, rs, rt })),
                     "and"  => Ok(Instruction::Core(CoreInstruction::And { rd, rs, rt })),
                     "slt"  => Ok(Instruction::Core(CoreInstruction::Slt { rd, rs, rt })),
-                    "sltu" => Ok(Instruction::Core(CoreInstruction::Sltu { rd, rs, rt })),
+                    "sltu" => Ok(Instruction::Core(CoreInstruction::Sltu { rd, rs, rt })), 
+                    "xor"  => Ok(Instruction::Core(CoreInstruction::Xor {rd, rs, rt})),
+                    "nor" => Ok(Instruction::Core(CoreInstruction::Nor {rd, rs, rt})),
                     _ => unreachable!()
                 }
             },
@@ -501,7 +504,18 @@ impl Parser {
                 }
             },
 
-            _ => Err(self.error(format!("Line {}: Unknown R-Type instruction {}", self.current_line, mnemonic)))
+            "div" => {
+                let rs = self.parse_register()?;
+                self.expect(TokenType::Delimiter)?;
+                let rt = self.parse_register()?;
+
+                match mnemonic {
+                    "div" => Ok(Instruction::Core(CoreInstruction::Div {rs, rt})),
+                    _ => unreachable!()
+                }
+            },
+
+            _ => Err(self.error(format!("Line {}: Unknown R-Type instruction {} instruction {}", self.current_line, mnemonic, mnemonic)))
         }
     }
 
@@ -567,7 +581,7 @@ impl Parser {
                 "andi" => Ok(Instruction::Core(CoreInstruction::Andi { rt, rs, imm: self.parse_immediate::<u32>()? })),
                 "slti" => Ok(Instruction::Core(CoreInstruction::Slti {rt, rs, imm: self.parse_immediate::<i32>()? })),
                 "sltiu" => Ok(Instruction::Core(CoreInstruction::Sltiu {rt, rs, imm: self.parse_immediate::<u32>()? })),
-
+                "xori" => Ok(Instruction::Core(CoreInstruction::Xori {rt, rs, imm: self.parse_immediate::<u32>()? })),
                  _ => Err(self.error(format!("Line {}: Unhandled I-Type", self.current_line)))
             }
         }

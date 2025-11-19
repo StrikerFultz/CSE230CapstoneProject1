@@ -30,9 +30,15 @@ pub struct CPU {
 
     // line numbers of instructions containing breakpoints (indicated in the UI)
     pub breakpoints: HashSet<usize>
+    state_history: Vec<ExecutionState>,
+
+    // line numbers of instructions containing breakpoints (indicated in the UI)
+    pub breakpoints: HashSet<usize>
 }
 
 impl CPU {
+    pub fn get_lo(&self) -> u32 { self.lo}
+    pub fn get_hi(&self) -> u32 { self.hi}
     pub fn new() -> Self {
         CPU { 
             registers: Self::create_register_map(), 
@@ -41,6 +47,8 @@ impl CPU {
             hi: 0,
             program: None, 
             memory: Memory::new(),
+            state_history: Vec::new(),
+            breakpoints: HashSet::new()
             state_history: Vec::new(),
             breakpoints: HashSet::new()
         }
@@ -135,6 +143,8 @@ impl CPU {
                 self.set_reg(rd,r1.wrapping_add(r2));
             },   
 
+         
+
             CoreInstruction::Sub { rd, rs, rt } => {
                 let r1 = self.get_reg(rs) as i32;
                 let r2 = self.get_reg(rt) as i32;
@@ -147,6 +157,10 @@ impl CPU {
                 let r2 = self.get_reg(rt) as u32;
 
                 self.set_reg(rd, r1.wrapping_sub(r2) as u32);
+                let r1 = self.get_reg(rs);
+                let r2 = self.get_reg(rt);
+
+                self.set_reg(rd, r1.wrapping_sub(r2));
             },
 
             CoreInstruction::Lw { rt, rs, imm } => {
@@ -266,6 +280,18 @@ impl CPU {
                 self.set_reg(rd, r1 & r2);
             },
 
+            CoreInstruction::Xor { rd, rs, rt } => {
+                let val = self.get_reg(rs) ^ self.get_reg(rt);
+   //             println!("XOR {} = {} ^ {} -> {}", rd, self.get_reg(rs), self.get_reg(rt), val);
+                self.set_reg(rd, val)
+            },
+
+            CoreInstruction::Xori { rt, rs, imm } => {
+              let val = self.get_reg(rs) ^ imm;
+    //          println!("XORI {} = {} ^ {} -> {}", rt, self.get_reg(rs), imm, val);
+              self.set_reg(rt, val)
+            },
+
             CoreInstruction::Andi { rt, rs, imm } => {
                 let r = self.get_reg(rs);
                 self.set_reg(rt, r & *imm);
@@ -345,10 +371,33 @@ impl CPU {
 
             CoreInstruction::Mflo { rd } => {
                 self.set_reg(rd, self.lo);
+            },
+
+            CoreInstruction::Div {rs, rt} => {
+                let dividend = self.get_reg(rs) as i32;
+                let divisor = self.get_reg(rt) as i32;
+
+                if divisor ==0 {
+                    return Err(EmuError::DivideByZero); // add error to emuerro
+                }
+
+                self.lo = (dividend / divisor) as u32;
+                self.hi = (dividend % divisor) as u32;
+            },
+
+            CoreInstruction::Nor{ rd, rs, rt } => {
+                let r1 = self.get_reg(rs);
+                let r2 = self.get_reg(rt);
+
+                self.set_reg(rd, !(r1 | r2));
             }
         }
 
+
+        
+
         // branch instructions will modify the PC to another address instead of the sequential instruction
+        // maybe we have to deal with the one instruction leading to jr $ra due to branch delay
         if !is_branch {
             self.pc += 4;
         }
@@ -387,7 +436,21 @@ impl CPU {
                     break;
                 },
                 Err(EmuError::Breakpoint) => return Err(EmuError::Breakpoint),
+                Err(EmuError::Breakpoint) => return Err(EmuError::Breakpoint),
                 Err(e) => return Err(e)
+            }
+            
+            // check if the current instruction line contains a breakpoint in the set
+            if let Some(program) = self.program.as_ref() {
+                if let Some(index) = program.pc_to_index(self.pc) {
+                    if index < program.line_numbers.len() {
+                        let current_line = program.line_numbers[index] - 1;
+
+                        if self.breakpoints.contains(&current_line) {
+                            return Err(EmuError::Breakpoint);
+                        }
+                    }
+                }
             }
             
             // check if the current instruction line contains a breakpoint in the set
@@ -419,6 +482,10 @@ impl CPU {
         self.breakpoints = lines.into_iter().collect();
     }
 
+    pub fn set_breakpoints(&mut self, lines: Vec<usize>) {
+        self.breakpoints = lines.into_iter().collect();
+    }
+
     // below functions are used for Web Assembly only
     pub fn reset(&mut self) {
         self.registers = Self::create_register_map();
@@ -427,9 +494,13 @@ impl CPU {
         self.lo = 0;
         self.hi = 0;
 
+        self.lo = 0;
+        self.hi = 0;
+
         self.program = None;
 
         self.state_history.clear(); 
+        self.breakpoints.clear();
         self.breakpoints.clear();
     }
 
@@ -437,6 +508,10 @@ impl CPU {
         Snapshot {
             registers: self.registers.clone(),
         }
+    }
+
+    pub fn get_program(&self) -> Option<&Program> {
+        self.program.as_ref()
     }
 
     pub fn get_program(&self) -> Option<&Program> {

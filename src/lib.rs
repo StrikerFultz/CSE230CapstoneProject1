@@ -10,10 +10,8 @@ use cpu::CPU;
 use program::Program;
 use wasm_bindgen::prelude::*;
 use serde::{Serialize, Deserialize};
-
-use std::collections::HashMap;
 use program::EmuError;
-
+use std::collections::{HashMap, HashSet};
 
 //https://github.com/insou22/mipsy partial code used since its a rough outline of the code 
 // only li add and sub; shows register history as lineis entered (as changed) 
@@ -198,7 +196,7 @@ mod tests {
         assert_eq!(cpu.get_reg("$t1"), 10);
         assert_eq!(cpu.get_reg("$t2"), 30);
     }
-
+    
     #[test]
     fn addu_test() {
         let mut cpu = CPU::new();
@@ -229,6 +227,9 @@ mod tests {
         // -5 + 2^32 = 4294967291
     }
 
+
+
+
     #[test]
     fn lw_sw_test() {
         let mut cpu = CPU::new();
@@ -241,6 +242,53 @@ mod tests {
 
         cpu.run_input(program).unwrap();
         assert_eq!(cpu.get_reg("$t0"), 42);
+    }
+
+        #[test]
+    fn lw_sw_overwrite() {
+        let mut cpu = CPU::new();
+        let program = r#"
+            li $t0, 10
+            li $t1, 1
+            li $t2, 2
+            sw $t1, 0($t0)
+            sw $t2, 0($t0)
+            lw $t3, 0($t0)
+        "#;
+    
+        cpu.run_input(program).unwrap();
+        assert_eq!(cpu.get_reg("$t3"), 2);
+    }
+
+    #[test]
+    fn jr_nested_calls() {
+        let mut cpu = CPU::new();
+        let program = r#"
+            jal func1
+            j end
+    
+            func1:
+            addi $sp, $sp, -4
+            sw $ra, 0($sp)
+
+            li $t0, 10
+            jal func2
+
+            lw $ra, 0($sp)
+            addi $sp, $sp, 4
+            
+            jr $ra
+    
+            func2:
+            addi $t0, $t0, 5
+            jr $ra
+    
+            end:
+        "#;
+    
+        cpu.run_input(program).unwrap();
+        // func1 sets $t0=10, func2 adds 5, total = 15
+        assert_eq!(cpu.get_reg("$t0"), 15);
     }
 
     #[test]
@@ -367,4 +415,201 @@ mod tests {
         // 0b1111 & 0b0110 = 0b0110 = 6
         assert_eq!(cpu.get_reg("$t1"), 6);
     }
+
+
+
+    #[test]
+    fn slt_test() {
+        let mut cpu = CPU::new();
+        let program = r#"
+            li $t0, 5
+            li $t1, 10
+            slt $t2, $t0, $t1    # 5 < 10 -> 1
+            slt $t3, $t1, $t0    # 10 < 5 -> 0
+        "#;
+
+        cpu.run_input(program).unwrap();
+        assert_eq!(cpu.get_reg("$t2"), 1);
+        assert_eq!(cpu.get_reg("$t3"), 0);
+    }
+
+    #[test]
+    fn slti_test() {
+        let mut cpu = CPU::new();
+        let program = r#"
+            li $t0, 5
+            slti $t1, $t0, 10     # 5 < 10 -> 1
+            slti $t2, $t0, 3      # 5 < 3 -> 0
+        "#;
+
+        cpu.run_input(program).unwrap();
+        assert_eq!(cpu.get_reg("$t1"), 1);
+        assert_eq!(cpu.get_reg("$t2"), 0);
+    }
+
+    #[test]
+    fn sltu_test() {
+        let mut cpu = CPU::new();
+        let program = r#"
+            li $t0, 4294967290    # large unsigned
+            li $t1, 5
+            sltu $t2, $t0, $t1    # 4294967290 < 5 -> 0
+            sltu $t3, $t1, $t0    # 5 < 4294967290 -> 1
+        "#;
+
+        cpu.run_input(program).unwrap();
+        assert_eq!(cpu.get_reg("$t2"), 0);
+        assert_eq!(cpu.get_reg("$t3"), 1);
+    }
+
+    #[test]
+    fn sltiu_test() {
+        let mut cpu = CPU::new();
+        let program = r#"
+            li $t0, 4294967290
+            sltiu $t1, $t0, 4294967295   # 4294967290 < 4294967295 -> 1
+            sltiu $t2, $t0, 10            # 4294967290 < 10 -> 0
+        "#;
+
+        cpu.run_input(program).unwrap();
+        assert_eq!(cpu.get_reg("$t1"), 1);
+        assert_eq!(cpu.get_reg("$t2"), 0);
+    }
+
+    #[test]
+    fn blt_test() {
+        let mut cpu = CPU::new();
+        let program = r#"
+            li $t0, 5
+            li $t1, 10
+            blt $t0, $t1, less_than
+            li $t2, 100
+            j done
+        less_than:
+            li $t2, 50
+        done:
+        "#;
+
+        cpu.run_input(program).unwrap();
+        assert_eq!(cpu.get_reg("$t2"), 50); // 5 < 10 → branch taken
+    }
+
+    #[test]
+    fn bge_test() {
+        let mut cpu = CPU::new();
+        let program = r#"
+            li $t0, 15
+            li $t1, 10
+            bge $t0, $t1, ge_label
+            li $t2, 100
+            j done
+        ge_label:
+            li $t2, 55
+        done:
+        "#;
+
+        cpu.run_input(program).unwrap();
+        assert_eq!(cpu.get_reg("$t2"), 55); // 15 >= 10 → branch taken
+    }
+
+    #[test]
+    fn ble_test() {
+        let mut cpu = CPU::new();
+        let program = r#"
+            li $t0, 8
+            li $t1, 8
+            ble $t0, $t1, less_equal
+            li $t2, 200
+            j done
+        less_equal:
+            li $t2, 77
+        done:
+        "#;
+
+        cpu.run_input(program).unwrap();
+        assert_eq!(cpu.get_reg("$t2"), 77); // 8 <= 8 → branch taken
+    }
+
+    #[test]
+    fn bgt_test() {
+        let mut cpu = CPU::new();
+        let program = r#"
+            li $t0, 20
+            li $t1, 5
+            bgt $t0, $t1, greater_than
+            li $t2, 123
+            j done
+        greater_than:
+            li $t2, 456
+        done:
+        "#;
+
+        cpu.run_input(program).unwrap();
+        assert_eq!(cpu.get_reg("$t2"), 456); // 20 > 5 → branch taken
+    }
+
+    #[test]
+    fn pseudo_branch_not_taken_test() {
+        let mut cpu = CPU::new();
+        let program = r#"
+            li $t0, 3
+            li $t1, 9
+            bgt $t0, $t1, skip
+            li $t2, 222
+            j done
+        skip:
+            li $t2, 999
+        done:
+        "#;
+
+        cpu.run_input(program).unwrap();
+        assert_eq!(cpu.get_reg("$t2"), 222); // 3 > 9 → false, branch NOT taken
+    }
+
+    #[test]
+    fn move_test() {
+        let mut cpu = CPU::new();
+        let program = r#"
+            li $t0, 123
+            move $t1, $t0
+            li $t2, 50
+            move $t3, $t2
+        "#;
+
+        cpu.run_input(program).unwrap();
+        assert_eq!(cpu.get_reg("$t1"), 123);
+        assert_eq!(cpu.get_reg("$t3"), 50);
+    }
+
+    
+    #[test]
+    fn div_normal_test() {
+        let mut cpu = CPU::new();
+        let program = r#"
+            li $t0, 20
+            li $t1, 3
+            div $t0, $t1
+        "#;
+
+        cpu.run_input(program).unwrap();
+        assert_eq!(cpu.get_lo(), 6);   // quotient
+        assert_eq!(cpu.get_hi(), 2);   // remainder
+    }
+
+    #[test]
+    fn nor_test() {
+        let mut cpu = CPU::new();
+        let program = r#"
+            li $t0, 5       # 0101
+            li $t1, 2       # 0010
+            nor $t2, $t0, $t1   # ~(0101 | 0010) = ~(0111)
+        "#;
+
+        cpu.run_input(program).unwrap();
+
+        assert_eq!(cpu.get_reg("$t2"), !(5 | 2));
+    }
+
+
+    
 }

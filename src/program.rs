@@ -30,7 +30,10 @@ pub enum EmuError {
     Termination,
 
     /// indicates instruction breakpoint
-    Breakpoint
+    Breakpoint,
+
+    // when dividing by zero
+    DivideByZero  
 }
 
 /// structure used to hold a list of Instructions

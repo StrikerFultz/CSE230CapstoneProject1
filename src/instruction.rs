@@ -12,6 +12,7 @@ pub enum CoreInstruction {
     /// R[rt] = R[rs] + SignExtImm 
     Addi { rt: String, rs: String, imm: i32 },
 
+
     /// R[rt] = R[rs] + SignExtImm
     Addiu { rt: String, rs: String, imm: u32 },
 
@@ -89,6 +90,18 @@ pub enum CoreInstruction {
 
     /// R[rd] = Lo 
     Mflo { rd: String } 
+
+    /// R[rd] = R[rs] ^ R[rt] 
+    Xor { rd: String, rs: String, rt: String },
+
+    /// R[rt] = R[rs] ^ ZeroExtImm
+    Xori { rt: String, rs: String, imm: u32 },
+
+    /// {Lo, Hi} = R[rs] / R[rt]
+    Div {rs:String, rt:String },
+
+    /// R[rd] = ~(R[rs] | R[rt])
+    Nor {rd: String, rs: String, rt: String},
 }
 
 #[derive(Debug, Clone)]
