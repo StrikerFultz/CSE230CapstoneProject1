@@ -4,6 +4,8 @@ use crate::program::{EmuError, Program};
 use crate::Snapshot;
 use std::collections::HashMap;
 
+// use crate::lexer::alert;
+
 /// represents the state of the CPU at an instruction
 pub struct ExecutionState {
     pc: u32,
@@ -153,9 +155,9 @@ impl CPU {
                 self.memory.set_word(addr, val);
             },
 
-            CoreInstruction::Li { rd, imm } => {
-                self.set_reg(rd, *imm as u32);
-            },
+            // CoreInstruction::Li { rd, imm } => {
+            //     self.set_reg(rd, *imm as u32);
+            // },
 
             CoreInstruction::Lui { rt, imm } => {
                 self.set_reg(rt, imm << 16);
@@ -201,6 +203,8 @@ impl CPU {
 
                 self.pc = target;
                 is_branch = true;
+
+                // alert(format!("Jumping to address: 0x{:08X}", target).as_str());
             },
 
             CoreInstruction::Jal { label } => {
@@ -286,6 +290,17 @@ impl CPU {
                     is_branch = true;
                 }
             }
+
+            CoreInstruction::Slt { rd, rs, rt } => {
+                let r1 = self.get_reg(rs) as i32;
+                let r2 = self.get_reg(rt) as i32;
+
+                if r1 < r2 {
+                    self.set_reg(rd, 1);
+                } else {
+                    self.set_reg(rd, 0);
+                }
+            }
         }
 
         // branch instructions will modify the PC to another address instead of the sequential instruction
@@ -306,6 +321,7 @@ impl CPU {
             .ok_or(EmuError::Termination)?;
 
         let insn = program.core_instructions[index].clone();
+        // alert(format!("Executing instruction: {:?} at PC: 0x{:08X}", insn, self.pc).as_str());
         self.execute(&insn)?;
 
         Ok(())

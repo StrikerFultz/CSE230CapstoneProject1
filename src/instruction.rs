@@ -21,9 +21,6 @@ pub enum CoreInstruction {
     /// R[rd] = R[rs] - R[rt] 
     Subu { rd: String, rs: String, rt: String },
 
-    /// R[rd] = immediate
-    Li { rd: String, imm: u32 },
-
     /// R[rt] = imm << 16
     Lui { rt: String, imm: u32 },
 
@@ -71,12 +68,27 @@ pub enum CoreInstruction {
 
     /// if(R[rs] != R[rt]) PC=JumpAddr
     Bne { rs: String, rt: String, label: String },
+
+    // R[rd] = (R[rs] < R[rt]) ? 1 : 0
+    Slt { rd: String, rs: String, rt: String },
 }
 
 #[derive(Debug, Clone)]
 pub enum PseudoInstruction {
     Lw { rt: String, label: String },
     La { rt: String, label: String },
+
+    /// R[rd] = immediate
+    Li { rd: String, imm: u32 },
+
+    // if(R[rs] < R[rt]) PC=label
+    Blt { rs: String, rt: String, label: String },
+    // if(R[rs] > R[rt]) PC=label
+    Bgt { rs: String, rt: String, label: String },
+    // if(R[rs] <= R[rt]) PC=label
+    Ble { rs: String, rt: String, label: String },
+    // if(R[rs] >= R[rt]) PC=label
+    Bge { rs: String, rt: String, label: String },
 }
 
 #[derive(Debug, Clone)]

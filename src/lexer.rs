@@ -383,7 +383,8 @@ fn matchDirective(s: &str) -> bool {
 fn match_mnemonic(s: &str) -> bool {
     match s {
             "add" | "sub" | "or" | "addu" | "subu" | "and" |"j" | "jal" | "jr" |"li" |
-            "addi" | "addiu" | "lb" | "sb" | "lh" | "sh" | "lw" | "sw" | "ori" | "beq" | "bne" | "andi" | "la" => true,
+            "addi" | "addiu" | "lb" | "sb" | "lh" | "sh" | "lw" | "sw" | "ori" | "beq" | "bne" | "andi" | "la" |
+            "slt" | "blt" | "bgt" | "ble" | "bge" => true,
             _ => false,
         }
 }
@@ -473,7 +474,7 @@ impl fmt::Display for TokenType {
     }
 }
 
-// #[wasm_bindgen]
-// extern {
-//     pub fn alert(s: &str);
-// }
+#[wasm_bindgen]
+extern {
+    pub fn alert(s: &str);
+}

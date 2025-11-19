@@ -6,17 +6,16 @@ use crate::instruction::PseudoInstruction;
 use crate::program::EmuError;
 use crate::memory::Memory;
 use std::collections::{HashMap, VecDeque};
-
-enum SymbolType {
-    Label,
-    Variable,
-    Function,
+    
+#[derive(Debug, Clone)]
+pub struct Label {
+    pub name: String,
 }
 
-struct Symbol {
-    name: String,
-    address: u32,
-    symbol_type: SymbolType,
+#[derive(Debug, Clone)]
+pub enum ProgramStatement {
+    Instruction(Instruction),
+    Label(Label),
 }
 
 #[derive(Clone)]
@@ -33,7 +32,7 @@ pub struct Parser {
     section: Section,
     data_section_pointer: u32,
 
-    instructions: Vec<Instruction>,
+    program_statements: Vec<ProgramStatement>,
     pub symbol_table: HashMap<String, u32>,
     line_numbers: Vec<usize>,
     current_line: usize,
@@ -47,7 +46,7 @@ impl Parser {
             lexer: Lexer::new(), 
             syntax_error: false, 
             syntax_error_message: String::from("No Errors"),
-            instructions: Vec::new(),
+            program_statements: Vec::new(),
             symbol_table: HashMap::new(),
             line_numbers: Vec::new(),
             current_line: 0,
@@ -58,7 +57,7 @@ impl Parser {
         }
     }
 
-    pub fn parse_program(&mut self, code: &str, memory: &mut Memory) -> Result<(Vec<Instruction>, HashMap<String, u32>, Vec<usize>), EmuError> {
+    pub fn parse_program(&mut self, code: &str, memory: &mut Memory) -> Result<(Vec<ProgramStatement>, HashMap<String, u32>, Vec<usize>), EmuError> {
         self.reset();
         
         let all_tokens = self.lexer.tokenize(code);
@@ -142,12 +141,13 @@ impl Parser {
         // alert(memory_string.as_str());
 
         // validate labels
-        for insn in &self.instructions {
-             match insn {
-                Instruction::Core(CoreInstruction::J { label }) |
-                Instruction::Core(CoreInstruction::Jal { label }) |
-                Instruction::Core(CoreInstruction::Beq { label, .. }) |
-                Instruction::Core(CoreInstruction::Bne { label, .. }) => {
+        for program_statement in &self.program_statements {
+            
+             match program_statement {
+                ProgramStatement::Instruction(Instruction::Core(CoreInstruction::J { label })) |
+                ProgramStatement::Instruction(Instruction::Core(CoreInstruction::Jal { label })) |
+                ProgramStatement::Instruction(Instruction::Core(CoreInstruction::Beq { label, .. })) |
+                ProgramStatement::Instruction(Instruction::Core(CoreInstruction::Bne { label, .. })) => {
                     if !self.symbol_table.contains_key(label) {
                         return Err(EmuError::UndefinedLabel(label.clone()));
                     }
@@ -156,7 +156,7 @@ impl Parser {
             }
         }
 
-        Ok((self.instructions.clone(), self.symbol_table.clone(), self.line_numbers.clone()))
+        Ok((self.program_statements.clone(), self.symbol_table.clone(), self.line_numbers.clone()))
     }
 
     pub fn parse_statement(&mut self, memory: &mut Memory) -> Result<(), EmuError> {
@@ -373,7 +373,7 @@ impl Parser {
             if token.token_type == TokenType::Mnemonic {
                 let insn = self.parse_instruction()?;
                 // return instruction from parsing 
-                self.instructions.push(insn);
+                self.program_statements.push(ProgramStatement::Instruction(insn));
                 self.line_numbers.push(self.current_line);
                 self.instruction_index += 1;
 
@@ -382,9 +382,11 @@ impl Parser {
 
                 let label = token.lexeme.clone();
                 let line_num = token.line_number;
-                let address = crate::memory::DEFAULT_TEXT_BASE_ADDRESS + (self.instruction_index * 4);
-                if self.symbol_table.insert(label.to_string(), address).is_some() {
+                if self.symbol_table.insert(label.to_string(), 0).is_some() {
                     return Err(self.error(format!("Line {}: Duplicate label {}", line_num, label)));
+                } else {
+                    // alert(format!("Inserted label: {} at address: {}", label, self.symbol_table.get(&label).unwrap_or(&0)).as_str());
+                    self.program_statements.push(ProgramStatement::Label(Label { name: label }));
                 }
 
             } else if token.token_type != TokenType::Comment {
@@ -403,11 +405,11 @@ impl Parser {
 
             // match the instruction by lexeme to the right parsing fn
             match lexeme.as_str() {
-                "add" | "sub" | "or" | "addu" | "subu" | "and" => self.parse_r_type(&lexeme),
+                "add" | "sub" | "or" | "addu" | "subu" | "and" | "slt" => self.parse_r_type(&lexeme),
                 "j" | "jal" | "jr" => self.parse_j_type(&lexeme),
-                "li" => self.parse_li(),
+                //"li" => self.parse_li(),
                 "addi" | "addiu" | "lb" | "sb" | "lh" | "sh" | "lw" | "sw" | "ori" | "beq" | "bne" | "andi" => self.parse_i_type(&lexeme),
-                "la" => self.parse_pseudo_instruction(&lexeme),
+                "la" | "li" | "blt" | "bgt" | "ble" | "bge" => self.parse_pseudo_instruction(&lexeme),
                 _ => Err(self.error(format!("Line {}: Unknown instruction {}", self.current_line, lexeme)))
             }
         } else {
@@ -473,6 +475,7 @@ impl Parser {
             "addu" => Ok(Instruction::Core(CoreInstruction::Addu { rd, rs, rt })),
             "subu" => Ok(Instruction::Core(CoreInstruction::Subu { rd, rs, rt })),
             "and"  => Ok(Instruction::Core(CoreInstruction::And { rd, rs, rt })),
+            "slt"  => Ok(Instruction::Core(CoreInstruction::Slt { rd, rs, rt })),
             _ => Err(self.error(format!("Line {}: Unknown R-Type", self.current_line)))
         }
     }
@@ -542,22 +545,22 @@ impl Parser {
         }
     }
 
-    pub fn parse_li(&mut self) -> Result<Instruction, EmuError> {
-        self.expect(TokenType::Mnemonic)?;
-        let rd = self.parse_register()?;
-        self.expect(TokenType::Delimiter)?;
+    // pub fn parse_li(&mut self) -> Result<Instruction, EmuError> {
+    //     self.expect(TokenType::Mnemonic)?;
+    //     let rd = self.parse_register()?;
+    //     self.expect(TokenType::Delimiter)?;
 
-        let imm_token = self.expect(TokenType::Integer)?;
+    //     let imm_token = self.expect(TokenType::Integer)?;
 
-        // parse as i32 first (for negative number support like -1 as signed)
-        if let Ok(imm) = imm_token.lexeme.parse::<i32>() {
-            Ok(Instruction::Core(CoreInstruction::Li { rd, imm: imm as u32 }))
-        } else if let Ok(imm) = imm_token.lexeme.parse::<u32>() {
-            Ok(Instruction::Core(CoreInstruction::Li { rd, imm: imm }))
-        } else {
-            Err(self.error(format!("Line {}: Invalid immediate value {}", self.current_line, imm_token.lexeme)))
-        }
-    }
+    //     // parse as i32 first (for negative number support like -1 as signed)
+    //     if let Ok(imm) = imm_token.lexeme.parse::<i32>() {
+    //         Ok(Instruction::Core(CoreInstruction::Li { rd, imm: imm as u32 }))
+    //     } else if let Ok(imm) = imm_token.lexeme.parse::<u32>() {
+    //         Ok(Instruction::Core(CoreInstruction::Li { rd, imm: imm }))
+    //     } else {
+    //         Err(self.error(format!("Line {}: Invalid immediate value {}", self.current_line, imm_token.lexeme)))
+    //     }
+    // }
 
     pub fn parse_j_type(&mut self, mnemonic: &str) -> Result<Instruction, EmuError> {
         self.expect(TokenType::Mnemonic)?;
@@ -579,6 +582,52 @@ impl Parser {
                 self.expect(TokenType::Delimiter)?;
                 let label = self.parse_label()?;
                 Ok(Instruction::Pseudo(PseudoInstruction::La { rt, label }))
+            },
+            "li" => {
+                let rd = self.parse_register()?;
+                self.expect(TokenType::Delimiter)?;
+                let imm_token = self.expect(TokenType::Integer)?;
+
+                // parse as i32 first (for negative number support like -1 as signed)
+                if let Ok(imm) = imm_token.lexeme.parse::<i32>() {
+                    Ok(Instruction::Pseudo(PseudoInstruction::Li { rd, imm: imm as u32 }))
+                } else if let Ok(imm) = imm_token.lexeme.parse::<u32>() {
+                    Ok(Instruction::Pseudo(PseudoInstruction::Li { rd, imm: imm }))
+                } else {
+                    Err(self.error(format!("Line {}: Invalid immediate value {}", self.current_line, imm_token.lexeme)))
+                }
+            },
+            "blt" => {
+                let rs = self.parse_register()?;
+                self.expect(TokenType::Delimiter)?;
+                let rt = self.parse_register()?;
+                self.expect(TokenType::Delimiter)?;
+                let label = self.parse_label()?;
+                Ok(Instruction::Pseudo(PseudoInstruction::Blt { rs, rt, label }))
+            },
+            "bgt" => {
+                let rs = self.parse_register()?;
+                self.expect(TokenType::Delimiter)?;
+                let rt = self.parse_register()?;
+                self.expect(TokenType::Delimiter)?;
+                let label = self.parse_label()?;
+                Ok(Instruction::Pseudo(PseudoInstruction::Bgt { rs, rt, label }))
+            },
+            "ble" => {
+                let rs = self.parse_register()?;
+                self.expect(TokenType::Delimiter)?;
+                let rt = self.parse_register()?;
+                self.expect(TokenType::Delimiter)?;
+                let label = self.parse_label()?;
+                Ok(Instruction::Pseudo(PseudoInstruction::Ble { rs, rt, label }))
+            },
+            "bge" => {
+                let rs = self.parse_register()?;
+                self.expect(TokenType::Delimiter)?;
+                let rt = self.parse_register()?;
+                self.expect(TokenType::Delimiter)?;
+                let label = self.parse_label()?;
+                Ok(Instruction::Pseudo(PseudoInstruction::Bge { rs, rt, label }))
             },
             _ => Err(self.error(format!("Line {}: Unknown pseudo-instruction", self.current_line)))
         }
@@ -629,7 +678,7 @@ impl Parser {
         self.syntax_error = false;
         self.syntax_error_message = String::from("No Errors");
 
-        self.instructions.clear();
+        self.program_statements.clear();
         self.symbol_table.clear();
         self.line_numbers.clear();
         self.tokens.clear();
