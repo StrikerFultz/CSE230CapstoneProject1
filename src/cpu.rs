@@ -2,7 +2,7 @@ use crate::instruction::CoreInstruction;
 use crate::memory::*;
 use crate::program::{EmuError, Program};
 use crate::Snapshot;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 // use crate::lexer::alert;
 
@@ -15,7 +15,11 @@ pub struct ExecutionState {
 pub struct CPU { 
     // processor state 
     registers: HashMap<String, u32>,
-    pc: u32,
+    
+    // special registers that can't be directly accessed 
+    pub pc: u32,
+    lo: u32,
+    hi: u32, 
 
     // program + memory
     program: Option<Program>,
@@ -23,16 +27,22 @@ pub struct CPU {
 
     // log of all executed instructions 
     state_history: Vec<ExecutionState>
+
+    // line numbers of instructions containing breakpoints (indicated in the UI)
+    pub breakpoints: HashSet<usize>
 }
 
 impl CPU {
     pub fn new() -> Self {
         CPU { 
             registers: Self::create_register_map(), 
-            pc: DEFAULT_TEXT_BASE_ADDRESS, 
+            pc: DEFAULT_TEXT_BASE_ADDRESS,  
+            lo: 0,
+            hi: 0,
             program: None, 
             memory: Memory::new(),
-            state_history: Vec::new()
+            state_history: Vec::new(),
+            breakpoints: HashSet::new()
         }
     }
 
@@ -289,7 +299,7 @@ impl CPU {
                     self.pc = target;
                     is_branch = true;
                 }
-            }
+            },
 
             CoreInstruction::Slt { rd, rs, rt } => {
                 let r1 = self.get_reg(rs) as i32;
@@ -300,6 +310,41 @@ impl CPU {
                 } else {
                     self.set_reg(rd, 0);
                 }
+            },
+
+            Instruction::Slti {rt, rs, imm } => {
+                let r = self.get_reg(rs) as i32;
+                self.set_reg(rt, if r< *imm { 1 } else {0});
+            },
+
+            Instruction::Sltu {rd, rs, rt } => {
+                let r1 = self.get_reg(rs);
+                let r2 = self.get_reg(rt);
+                self.set_reg(rd, if r1<r2 { 1 } else {0});
+            },
+
+            Instruction::Sltiu {rt, rs, imm } => {
+                let r = self.get_reg(rs);
+                self.set_reg(rt, if r< (*imm as u32) { 1 } else {0});
+            },
+
+            Instruction::Mult { rs, rt } => {
+                let r1 = self.get_reg(rs) as i32 as i64;
+                let r2 = self.get_reg(rt) as i32 as i64;
+                
+                let result = r1.wrapping_mul(r2);
+
+                // store the low 32 bits in lo and high 32 bits in hi
+                self.lo = (result & 0xFFFFFFFF) as u32;
+                self.hi = ((result >> 32) & 0xFFFFFFFF) as u32;
+            },
+
+            Instruction::Mfhi { rd } => {
+                self.set_reg(rd, self.hi);
+            },
+
+            Instruction::Mflo { rd } => {
+                self.set_reg(rd, self.lo);
             }
         }
 
@@ -341,7 +386,21 @@ impl CPU {
 
                     break;
                 },
+                Err(EmuError::Breakpoint) => return Err(EmuError::Breakpoint),
                 Err(e) => return Err(e)
+            }
+            
+            // check if the current instruction line contains a breakpoint in the set
+            if let Some(program) = self.program.as_ref() {
+                if let Some(index) = program.pc_to_index(self.pc) {
+                    if index < program.line_numbers.len() {
+                        let current_line = program.line_numbers[index] - 1;
+
+                        if self.breakpoints.contains(&current_line) {
+                            return Err(EmuError::Breakpoint);
+                        }
+                    }
+                }
             }
         }   
 
@@ -361,14 +420,22 @@ impl CPU {
         self.registers = Self::create_register_map();
         self.memory = Memory::new();
         self.pc = DEFAULT_TEXT_BASE_ADDRESS;
+        self.lo = 0;
+        self.hi = 0;
+
         self.program = None;
 
         self.state_history.clear(); 
+        self.breakpoints.clear();
     }
 
     pub fn snapshot(&self) -> Snapshot {
         Snapshot {
             registers: self.registers.clone(),
         }
+    }
+
+    pub fn get_program(&self) -> Option<&Program> {
+        self.program.as_ref()
     }
 }

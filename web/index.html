@@ -1,12 +1,84 @@
-<!doctype html>
-<html>
-<head><meta charset="utf-8"><title>MIPS WASM</title></head>
-  <body>
-    <h1>MIPS32 Emulator</h1>
-    <textarea id="code" placeholder='e.g. "addi $t0, $t0, 5"'></textarea>
-    <button id="run">Run</button>
-    <pre id="out"></pre>
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css"
+    />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/mode/simple.min.js"></script>
 
-    <script type="module" src="./main.js"></script>
+    <title>MIPS Emulator</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="brand">MIPS Emulator</div>
+      <nav class="nav">
+        <a href="index.html" class="active">Labs</a>
+        <a href="teacher.html">Professor View</a>
+      </nav>
+    </header>
+
+    <!--labs/lessons-->
+    <section id="lesson-container" class="lesson-container hidden">
+      <div class="lesson-header">
+        <h2 id="lesson-title"></h2>
+        <button id="lesson-hide" class="lesson-hide-btn">Hide lesson</button>
+      </div>
+      <div id="lesson-body"></div>
+    </section>
+
+    <main class="workspace">
+            <!--files-->
+      <section class="panel files-panel">
+        <h3>Labs</h3>
+        <div class="files-list">
+        </div>
+      </section>
+
+      <!-- assembler and editor -->
+      <section class="panel assembler">
+        <h3>Assembler</h3>
+        <div class="assembler-content">
+          <textarea spellcheck="false"></textarea>
+        </div>
+      </section>
+
+      <!-- right side for registers memory widgets -->
+      <section class="panel right-panel">
+        <div class="side-box">
+          <strong>Registers</strong>
+          <div id="registers"></div>
+        </div>
+        <div class="side-box">
+          <strong>Memory</strong>
+          <div id="memory"></div>
+        </div>
+        <div class="side-box">
+          <strong>Widgets</strong>
+          <div id="widgets"></div>
+        </div>
+      </section>
+
+      <!--console-->
+      <section class="console">
+        <div class="console-header">
+          <span>Console</span>
+          <div class="buttons">
+            <button id="run">Run</button>
+            <button id="step">Step</button>
+            <button id="stop">Stop</button>
+          </div>
+        </div>
+        <div class="console-inner" id="console-output"></div>
+      </section>
+    </main>
+
+    <!-- scripts -->
+    <script type="module" src="lessons.js"></script>
+    <script type="module" src="main.js"></script>
   </body>
 </html>

@@ -10,7 +10,10 @@ use cpu::CPU;
 use program::Program;
 use wasm_bindgen::prelude::*;
 use serde::{Serialize, Deserialize};
+
 use std::collections::HashMap;
+use program::EmuError;
+
 
 //https://github.com/insou22/mipsy partial code used since its a rough outline of the code 
 // only li add and sub; shows register history as lineis entered (as changed) 
@@ -39,42 +42,132 @@ impl WasmCPU {
             cpu: CPU::new(),
         }
     }
-
+//added a reset method so it lets the frontend reset the emulator without remaking the WasmCPU
     #[wasm_bindgen]
-    pub fn run_program(&mut self, source_code: &str) -> JsValue {
+    pub fn reset(&mut self) {
+        self.cpu.reset()
+    }
+
+    //loads t he strings in mips source code as a program(resets the cpu before loading the new program)
+    #[wasm_bindgen]
+    pub fn load_source(&mut self, source: &str) -> JsValue {
         self.cpu.reset();
 
         // parse the program then run using provided code from HTML
         match Program::parse(source_code, &mut self.cpu.memory) {
             Ok(program) => {
                 self.cpu.load_program(program);
-
-                match self.cpu.run() {
-                    Ok(_) => {
-                        let snap = self.cpu.snapshot();
-                        let result = WasmResult {
-                            error: String::new(),
-                            snapshot: Some(snap),
-                        };
-                        serde_wasm_bindgen::to_value(&result).unwrap()
-                    }
-                    Err(e) => {
-                        let result: WasmResult = WasmResult {
-                            error: format!("Runtime Error: {:?}", e),
-                            snapshot: None,
-                        };
-                        serde_wasm_bindgen::to_value(&result).unwrap()
-                    }
-                }
-            }
+                //added in 2nd file the old one just did "self.cpu.load_program(program);"
+                serde_wasm_bindgen::to_value(&WasmResult {
+                    error: String::new(),
+                    snapshot: None
+                }).unwrap()
+            },
             Err(e) => {
-                let result = WasmResult {
-                    error: format!("Syntax Error: {:?}", e),
-                    snapshot: None,
-                };
-                serde_wasm_bindgen::to_value(&result).unwrap()
+                serde_wasm_bindgen::to_value(&WasmResult {
+                    error: format!("Syntax Error -- {:?}", e),
+                    snapshot: None
+                }).unwrap()
             }
         }
+    }
+
+    #[wasm_bindgen]
+    pub fn set_breakpoints(&mut self, lines: Vec<usize>) {
+        self.cpu.set_breakpoints(lines);
+    }
+
+    //emulate a single instruction using the MIPS CPU
+    #[wasm_bindgen]
+    pub fn step(&mut self) -> JsValue {
+        match self.cpu.next() {
+            Ok(_) => {
+                let snap = self.cpu.snapshot();
+
+                serde_wasm_bindgen::to_value(&WasmResult {
+                    error: String::new(),
+                    snapshot: Some(snap),
+                }).unwrap()
+            }
+            Err(EmuError::Termination) => {
+                serde_wasm_bindgen::to_value(&WasmResult {
+                    error: "Termination".to_string(),
+                    snapshot: Some(self.cpu.snapshot()),
+                }).unwrap()
+            },
+            Err(EmuError::Breakpoint) => {  
+                serde_wasm_bindgen::to_value(&WasmResult {
+                    error: "Breakpoint".to_string(),
+                    snapshot: Some(self.cpu.snapshot()),
+                }).unwrap()
+            }
+            Err(e) => {
+                serde_wasm_bindgen::to_value(&WasmResult {
+                    error: format!("Runtime Error -- {:?}", e),
+                    snapshot: Some(self.cpu.snapshot()),
+                }).unwrap()
+            }
+        }
+    }
+
+    //emulate the entire source using the CPU
+    #[wasm_bindgen]
+    pub fn run(&mut self) -> JsValue {
+        match self.cpu.run() {
+            Ok(_) => {
+                let snapshot = self.cpu.snapshot();
+                serde_wasm_bindgen::to_value(&WasmResult {
+                    error: "Termination".to_string(),
+                    snapshot: Some(snapshot)
+                }).unwrap()
+            },
+            Err(EmuError::Breakpoint) => {
+                serde_wasm_bindgen::to_value(&WasmResult {
+                    error: "Breakpoint".to_string(),
+                    snapshot: Some(self.cpu.snapshot()),
+                }).unwrap()
+            }
+            Err(e) => {
+                serde_wasm_bindgen::to_value(&WasmResult {
+                    error: format!("Runtime Error -- {:?}", e),
+                    snapshot: Some(self.cpu.snapshot()),
+                })
+                .unwrap()
+            }
+        }
+    }
+
+    /// returns next instruction to be emulated as a string 
+    /// this is to provide some additional context in the console (although could be replaced with just $PC register)
+    #[wasm_bindgen]
+    pub fn next_instruction(&self) -> String {
+        let pc = self.cpu.pc;
+        if let Some(program) = self.cpu.get_program() {
+            if let Some(index) = program.pc_to_index(pc) {
+                if index < program.instructions.len() {
+                    return format!("0x{:08x}: {:?}", pc, program.instructions[index]);
+                }
+            }
+        }
+        
+        //to help the UI know when the next instruction is empty
+        "---".to_string()
+    }
+
+    //gets the current line number using $PC register (due to mapping)
+    #[wasm_bindgen]
+    pub fn get_current_line(&self) -> i32 {
+        let pc = self.cpu.pc;
+
+        if let Some(program) = self.cpu.get_program() {
+            if let Some(index) = program.pc_to_index(pc) {
+                if index < program.line_numbers.len() {
+                    return (program.line_numbers[index] as i32) - 1;
+                }
+            }
+        }
+
+        -1
     }
 }
 

@@ -68,9 +68,27 @@ pub enum CoreInstruction {
 
     /// if(R[rs] != R[rt]) PC=JumpAddr
     Bne { rs: String, rt: String, label: String },
-
+    
     // R[rd] = (R[rs] < R[rt]) ? 1 : 0
     Slt { rd: String, rs: String, rt: String },
+    
+    ///
+    Slti { rt: String, rs: String, imm: i32 },
+
+    ///
+    Sltiu { rt: String, rs:String,imm:u32 },
+
+    ///
+    Sltu{ rd:String, rs:String, rt:String},
+
+    /// {Hi,Lo} = R[rs] * R[rt] 
+    Mult { rs: String, rt: String },
+
+    /// R[rd] = Hi
+    Mfhi { rd: String },
+
+    /// R[rd] = Lo 
+    Mflo { rd: String } 
 }
 
 #[derive(Debug, Clone)]
