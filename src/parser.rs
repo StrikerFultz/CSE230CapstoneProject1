@@ -489,14 +489,14 @@ impl Parser {
                 self.expect(TokenType::Delimiter)?;
                 let rt = self.parse_register()?;
 
-                Ok(Instruction::Mult { rs, rt })
+                Ok(Instruction::Core(CoreInstruction::Mult { rs, rt }))
             },
 
             "mflo" | "mfhi" => {
                 let rd = self.parse_register()?;
                 match mnemonic {
-                    "mflo" => Ok(Instruction::Mflo { rd }),
-                    "mfhi" => Ok(Instruction::Mfhi { rd }),
+                    "mflo" => Ok(Instruction::Core(CoreInstruction::Mflo { rd })),
+                    "mfhi" => Ok(Instruction::Core(CoreInstruction::Mfhi { rd })),
                     _ => unreachable!()
                 }
             },
@@ -565,8 +565,8 @@ impl Parser {
                 "addiu" => Ok(Instruction::Core(CoreInstruction::Addiu { rt, rs, imm: self.parse_immediate::<u32>()? })),
                 "ori" => Ok(Instruction::Core(CoreInstruction::Ori { rt, rs, imm: self.parse_immediate::<u32>()? })),
                 "andi" => Ok(Instruction::Core(CoreInstruction::Andi { rt, rs, imm: self.parse_immediate::<u32>()? })),
-                "slti" => Ok(Instruction::Core(CoreInstruction::Slti {rt, rs, imm: self.parse_immediate::<i32>()? }),
-                "sltiu" => Ok(Instruction::Core(CoreInstruction::Sltiu {rt, rs, imm: self.parse_immediate::<u32>()? }),
+                "slti" => Ok(Instruction::Core(CoreInstruction::Slti {rt, rs, imm: self.parse_immediate::<i32>()? })),
+                "sltiu" => Ok(Instruction::Core(CoreInstruction::Sltiu {rt, rs, imm: self.parse_immediate::<u32>()? })),
 
                  _ => Err(self.error(format!("Line {}: Unhandled I-Type", self.current_line)))
             }

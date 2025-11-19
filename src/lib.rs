@@ -54,7 +54,7 @@ impl WasmCPU {
         self.cpu.reset();
 
         // parse the program then run using provided code from HTML
-        match Program::parse(source_code, &mut self.cpu.memory) {
+        match Program::parse(source, &mut self.cpu.memory) {
             Ok(program) => {
                 self.cpu.load_program(program);
                 //added in 2nd file the old one just did "self.cpu.load_program(program);"
@@ -144,8 +144,8 @@ impl WasmCPU {
         let pc = self.cpu.pc;
         if let Some(program) = self.cpu.get_program() {
             if let Some(index) = program.pc_to_index(pc) {
-                if index < program.instructions.len() {
-                    return format!("0x{:08x}: {:?}", pc, program.instructions[index]);
+                if index < program.core_instructions.len() {
+                    return format!("0x{:08x}: {:?}", pc, program.core_instructions[index]);
                 }
             }
         }

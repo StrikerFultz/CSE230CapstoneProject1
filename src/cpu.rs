@@ -26,7 +26,7 @@ pub struct CPU {
     pub memory: Memory,     
 
     // log of all executed instructions 
-    state_history: Vec<ExecutionState>
+    state_history: Vec<ExecutionState>,
 
     // line numbers of instructions containing breakpoints (indicated in the UI)
     pub breakpoints: HashSet<usize>
@@ -312,23 +312,23 @@ impl CPU {
                 }
             },
 
-            Instruction::Slti {rt, rs, imm } => {
+            CoreInstruction::Slti {rt, rs, imm } => {
                 let r = self.get_reg(rs) as i32;
                 self.set_reg(rt, if r< *imm { 1 } else {0});
             },
 
-            Instruction::Sltu {rd, rs, rt } => {
+            CoreInstruction::Sltu {rd, rs, rt } => {
                 let r1 = self.get_reg(rs);
                 let r2 = self.get_reg(rt);
                 self.set_reg(rd, if r1<r2 { 1 } else {0});
             },
 
-            Instruction::Sltiu {rt, rs, imm } => {
+            CoreInstruction::Sltiu {rt, rs, imm } => {
                 let r = self.get_reg(rs);
                 self.set_reg(rt, if r< (*imm as u32) { 1 } else {0});
             },
 
-            Instruction::Mult { rs, rt } => {
+            CoreInstruction::Mult { rs, rt } => {
                 let r1 = self.get_reg(rs) as i32 as i64;
                 let r2 = self.get_reg(rt) as i32 as i64;
                 
@@ -339,11 +339,11 @@ impl CPU {
                 self.hi = ((result >> 32) & 0xFFFFFFFF) as u32;
             },
 
-            Instruction::Mfhi { rd } => {
+            CoreInstruction::Mfhi { rd } => {
                 self.set_reg(rd, self.hi);
             },
 
-            Instruction::Mflo { rd } => {
+            CoreInstruction::Mflo { rd } => {
                 self.set_reg(rd, self.lo);
             }
         }
@@ -413,6 +413,10 @@ impl CPU {
 
         self.load_program(program);
         self.run()
+    }
+
+    pub fn set_breakpoints(&mut self, lines: Vec<usize>) {
+        self.breakpoints = lines.into_iter().collect();
     }
 
     // below functions are used for Web Assembly only
