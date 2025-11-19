@@ -29,11 +29,7 @@ pub struct CPU {
     state_history: Vec<ExecutionState>,
 
     // line numbers of instructions containing breakpoints (indicated in the UI)
-    pub breakpoints: HashSet<usize>
-    state_history: Vec<ExecutionState>,
-
-    // line numbers of instructions containing breakpoints (indicated in the UI)
-    pub breakpoints: HashSet<usize>
+    pub breakpoints: HashSet<usize>,
 }
 
 impl CPU {
@@ -48,9 +44,7 @@ impl CPU {
             program: None, 
             memory: Memory::new(),
             state_history: Vec::new(),
-            breakpoints: HashSet::new()
-            state_history: Vec::new(),
-            breakpoints: HashSet::new()
+            breakpoints: HashSet::new(),
         }
     }
 
@@ -482,10 +476,6 @@ impl CPU {
         self.breakpoints = lines.into_iter().collect();
     }
 
-    pub fn set_breakpoints(&mut self, lines: Vec<usize>) {
-        self.breakpoints = lines.into_iter().collect();
-    }
-
     // below functions are used for Web Assembly only
     pub fn reset(&mut self) {
         self.registers = Self::create_register_map();
@@ -508,10 +498,6 @@ impl CPU {
         Snapshot {
             registers: self.registers.clone(),
         }
-    }
-
-    pub fn get_program(&self) -> Option<&Program> {
-        self.program.as_ref()
     }
 
     pub fn get_program(&self) -> Option<&Program> {

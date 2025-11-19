@@ -120,7 +120,6 @@ function coerceRegs(raw) {
   if (!raw) return {};
   if (raw instanceof Map) return Object.fromEntries(raw);
   if (Array.isArray(raw)) return Object.fromEntries(raw);
-  if (Array.isArray(raw)) return Object.fromEntries(raw);
   if (typeof raw === "object") return raw;
   return {};
 }

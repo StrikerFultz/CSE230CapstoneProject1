@@ -89,7 +89,7 @@ pub enum CoreInstruction {
     Mfhi { rd: String },
 
     /// R[rd] = Lo 
-    Mflo { rd: String } 
+    Mflo { rd: String } ,
 
     /// R[rd] = R[rs] ^ R[rt] 
     Xor { rd: String, rs: String, rt: String },

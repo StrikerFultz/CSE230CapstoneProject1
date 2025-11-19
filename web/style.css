@@ -203,38 +203,12 @@ th {
 }
 
 .CodeMirror {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  padding: 0;
-  margin: -1px;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
-  border: 0;
-}
-
-.cm-highlighted-line {
-  background-color: #fef9c3;
-}
-
-.CodeMirror {
   flex-grow: 1;
   border-top: 1px solid #000;
   font-family: monospace;
   font-size: 13px;
   height: auto;
-  height: auto;
   outline: none;
-}
-
-.CodeMirror-gutters {
-  border-right: 1px solid #ddd;
-}
-
-.CodeMirror-gutter.breakpoints {
-  width: 20px;
-  text-align: center;
-  background: #f7f7f7;
 }
 
 .CodeMirror-gutters {
