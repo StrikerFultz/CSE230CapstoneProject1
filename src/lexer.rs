@@ -383,8 +383,10 @@ fn matchDirective(s: &str) -> bool {
 fn match_mnemonic(s: &str) -> bool {
     match s {
             "add" | "sub" | "or" | "addu" | "subu" | "and" |"j" | "jal" | "jr" |"li" |
-            "addi" | "addiu" | "lb" | "sb" | "lh" | "sh" | "lw" | "sw" | "ori" | "beq" | "bne" | "andi" | "la" |
-            "slt" | "blt" | "bgt" | "ble" | "bge" => true,
+            "addi" | "addiu" | "lb" | "sb" | "lh" | "sh" | "lw" | "sw" | "ori" | "beq" | "bne" | "andi" | "la" | "lui" | 
+            "move" | "mult" | "mflo" | "mfhi" | "xor" | "xori" | "div" | "nor" |
+            "slt" | "slti" | "sltiu" |
+            "blt" | "bgt" | "ble" | "bge" => true,
             _ => false,
         }
 }
