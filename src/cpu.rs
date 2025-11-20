@@ -395,11 +395,21 @@ impl CPU {
             },
 
             Instruction::Nor{ rd, rs, rt } => {
-                let r1 = self.get_reg(rs);
-                let r2 = self.get_reg(rt);
+                let r1 = self.get_reg(&rs);
+                let r2 = self.get_reg(&rt);
 
-                self.set_reg(rd, !(r1 | r2));
-            }
+                self.set_reg(&rd, !(r1 | r2));
+            },
+
+            Instruction::Sll {rd, rt, sa } => {
+                let v = self.get_reg(&rt);
+                self.set_reg(&rd, v << sa);
+            },
+
+            Instruction::Srl { rd, rt, sa} =>{
+                let v = self.get_reg(&rt);
+                self.set_reg(&rd, v >> sa);
+            },
             }
 
 

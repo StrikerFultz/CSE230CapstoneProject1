@@ -611,6 +611,33 @@ mod tests {
         assert_eq!(cpu.get_reg("$t2"), !(5 | 2));
     }
 
+    #[test]
+    fn sll_test() {
+        let mut cpu = CPU::new();
+        let program = r#"
+            li $t0, 5        # 0000...0101
+            sll $t1, $t0, 2  # 5 << 2 = 20
+        "#;
+
+        cpu.run_input(program).unwrap();
+
+        assert_eq!(cpu.get_reg("$t1"), 5 << 2);
+    }
+
+
+    #[test]
+    fn srl_test() {
+        let mut cpu = CPU::new();
+        let program = r#"
+            li $t0, 20       # 0000...10100
+            srl $t1, $t0, 2  # 20 >> 2 = 5
+        "#;
+
+        cpu.run_input(program).unwrap();
+
+        assert_eq!(cpu.get_reg("$t1"), 20 >> 2);
+    }
+
 
     
 }

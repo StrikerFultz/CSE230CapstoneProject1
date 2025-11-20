@@ -128,7 +128,7 @@ impl Parser {
 
             // match the instruction by lexeme to the right parsing fn
             match lexeme.as_str() {
-                "add" | "sub" | "or" | "addu" | "subu" | "and" | "xor" | "slt" | "sltu" | "mult" | "mflo" | "mfhi" | "div" | "nor" => self.parse_r_type(&lexeme),
+                "add" | "sub" | "or" | "addu" | "subu" | "and" | "xor" | "slt" | "sltu" | "mult" | "mflo" | "mfhi" | "div" | "nor" | "sll" | "srl" => self.parse_r_type(&lexeme),
                 "j" | "jal" | "jr" => self.parse_j_type(&lexeme),
                 "li" => self.parse_li(),
                 "move"| "blt" | "bgt" | "ble" | "bge"  => self.parse_pseudo_type(&lexeme),
@@ -236,6 +236,25 @@ impl Parser {
                     _ => unreachable!()
                 }
             },
+
+            "srl" | "sll" => {
+                let rd = self.parse_register()?;
+                self.expect(TokenType::Delimiter)?;
+
+                let rt = self.parse_register()?;
+                self.expect(TokenType::Delimiter)?;
+
+                let sa_token = self.expect(TokenType::Integer)?;
+
+                let sa: u32 = sa_token.lexeme.parse::<u32>()
+                    .map_err(|_| self.error(format!("Line {}: invalid shift amoint '{}'", sa_token.line_number, sa_token.lexeme)))?;
+
+                match mnemonic {
+                    "sll" => Ok(Instruction::Sll {rd, rt, sa}),
+                    "srl" => Ok(Instruction::Srl {rd, rt, sa}),
+                    _ => unreachable!()
+                }
+            }
 
             _ => Err(self.error(format!("Line {}: Unknown R-Type instruction {}", self.current_line, mnemonic)))
         }

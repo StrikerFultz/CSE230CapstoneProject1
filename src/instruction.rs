@@ -104,6 +104,10 @@ pub enum Instruction {
 
 
     Nor {rd: String, rs: String, rt: String},
+
+    Sll {rd: String, rt: String, sa: u32},
+
+    Srl {rd: String, rt: String, sa: u32},
 }
 
 /// checks a register against a list of currently supported registers 
