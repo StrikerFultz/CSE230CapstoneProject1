@@ -542,34 +542,13 @@ impl Parser {
         if mnemonic == "lw" || mnemonic == "sw" || mnemonic == "lb" || mnemonic == "lh" || mnemonic == "sb" || mnemonic == "sh" {
             let rt = self.parse_register()?;
             self.expect(TokenType::Delimiter)?;
+            let imm = self.parse_immediate::<i32>()?;
+            self.expect(TokenType::LeftParen)?;
+            let rs = self.parse_register()?;
+            self.expect(TokenType::RightParen)?;
 
-            let x = self.peek(0);
-
-            if let Some(token) = x {
-                if token.token_type == TokenType::Integer {
-                    let imm = self.parse_immediate::<i32>()?;
-                    self.expect(TokenType::LeftParen)?;
-                    let rs = self.parse_register()?;
-                    self.expect(TokenType::RightParen)?;
-                    match mnemonic {
-                        "lw" => Ok(Instruction::Core(CoreInstruction::Lw { rt, rs, imm })),
-                        "sw" => Ok(Instruction::Core(CoreInstruction::Sw { rt, rs, imm })),
-                        "lb" => Ok(Instruction::Core(CoreInstruction::Lb { rt, rs, imm })),
-                        "sb" => Ok(Instruction::Core(CoreInstruction::Sb { rt, rs, imm })),
-                        "lh" => Ok(Instruction::Core(CoreInstruction::Lh { rt, rs, imm })),
-                        "sh" => Ok(Instruction::Core(CoreInstruction::Sh { rt, rs, imm })),
-                        _ => Err(self.error(format!("At line {}: Unexpected token {:?}", self.current_line, mnemonic))),
-                    }
-                } else if token.token_type == TokenType::Identifier {
-                    let label = self.expect(TokenType::Identifier)?;
-                    if mnemonic == "lw" {
-                        Ok(Instruction::Pseudo(PseudoInstruction::Lw { rt, label: label.lexeme }))
-                    } else {
-                        Err(self.error(format!("At line {}: Unsupported pseudo instruction", self.current_line)))
-                    }
-                } else {
-                    return Err(self.error(format!("At line {}: Unexpected token {:?}", self.current_line, token.lexeme)));
-                }
+            if mnemonic == "lw" {
+                Ok(Instruction::Lw { rt, rs, imm })
             } else {
                 return Err(self.error(format!("At line {}: Unexpected end of input", self.current_line)));
             }
