@@ -62,6 +62,18 @@ impl Assembler {
                                         //     alert(format!("Pseudo instruction: Lw with rt: {} and label: {} and address: 0x{:x} and imm: 0x{:x} and offset: 0x{:x}", rt, label, address, address >> 16, address & 0xFFFF).as_str());
                                         // },
                                         // Load address pseudo-instruction
+
+                                        PseudoInstruction::Move { rd, rs } => {
+                                            let insn = CoreInstruction::Addu {
+                                                rd: rd.clone(),
+                                                rs: rs.clone(),
+                                                rt: "$zero".to_string()
+                                            };
+
+                                            core_instructions.push(insn);
+                                            self.instruction_index += 1;
+                                        },
+
                                         PseudoInstruction::La { rt, label } => {
                                             let address = self.parser.symbol_table.get(label).cloned().unwrap_or(0);
                                             let inst_1 = CoreInstruction::Lui {

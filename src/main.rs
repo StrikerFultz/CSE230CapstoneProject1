@@ -22,16 +22,16 @@ fn main() {
         source.push_str(&line);
     }
 
-    match Program::parse(&source) {
-        Ok(program) => {
-            cpu.load_program(program);
+    // match Program::parse(&source) {
+    //     Ok(program) => {
+    //         cpu.load_program(program);
             
-            if let Err(e) = cpu.run() {
-                print!("Runtime Error -- {:?}", e);
-            }
-        },
-        Err(e) => {
-            print!("Syntax Error -- {:?}", e);
-        }
-    }
+    //         if let Err(e) = cpu.run() {
+    //             print!("Runtime Error -- {:?}", e);
+    //         }
+    //     },
+    //     Err(e) => {
+    //         print!("Syntax Error -- {:?}", e);
+    //     }
+    // }
 }

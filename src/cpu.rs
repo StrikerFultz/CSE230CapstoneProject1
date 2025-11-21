@@ -30,6 +30,9 @@ pub struct CPU {
 
     // line numbers of instructions containing breakpoints (indicated in the UI)
     pub breakpoints: HashSet<usize>,
+
+    // stack to validate saved registers
+    validation_stack: Vec<HashMap<String, u32>>
 }
 
 impl CPU {
@@ -45,6 +48,7 @@ impl CPU {
             memory: Memory::new(),
             state_history: Vec::new(),
             breakpoints: HashSet::new(),
+            validation_stack: Vec::new()
         }
     }
 
@@ -226,6 +230,18 @@ impl CPU {
             },
 
             CoreInstruction::Jal { label } => {
+                // create snapshot of registers for stack validation
+                let mut snapshot = HashMap::new();
+                snapshot.insert("$sp".to_string(), self.get_reg("$sp"));
+                snapshot.insert("$fp".to_string(), self.get_reg("$fp"));
+
+                for i in 0..=7 {
+                    let reg_name = format!("$s{}", i);
+                    snapshot.insert(reg_name.clone(), self.get_reg(&reg_name));
+                }
+                self.validation_stack.push(snapshot);
+
+                // jump and set $ra register
                 let return_addr = self.pc + 4;
                 self.set_reg("$ra", return_addr);
 
@@ -235,10 +251,45 @@ impl CPU {
                     .unwrap();
 
                 self.pc = target;
-                is_branch = true;       
+                is_branch = true; 
             },
 
             CoreInstruction::Jr { rs } => {
+                // validate the snapshop of stack registers from our snapshot
+                if rs == "$ra" {
+                    if let Some(snapshot) = self.validation_stack.pop() {
+                        
+                        // check $sp
+                        let current_sp = self.get_reg("$sp");
+                        if current_sp != snapshot["$sp"] {
+                            return Err(EmuError::CallingConventionViolation(
+                                format!("stack pointer $sp not restored. Expected 0x{:x}, found 0x{:x}", snapshot["$sp"], current_sp)
+                            ));
+                        }
+                        
+                        // check $fp
+                        let current_fp = self.get_reg("$fp");
+                        if current_fp != snapshot["$fp"] {
+                            return Err(EmuError::CallingConventionViolation(
+                                format!("frame pointer $fp not restored. Expected 0x{:x}, found 0x{:x}", snapshot["$fp"], current_fp)
+                            ));
+                        }
+
+                        // check $s0 through $s7 registers
+                        for i in 0..=7 {
+                            let reg_name = format!("$s{}", i);
+                            let current_val = self.get_reg(&reg_name);
+                            let snapshot_val = snapshot[&reg_name];
+
+                            if current_val != snapshot_val {
+                                return Err(EmuError::CallingConventionViolation(
+                                    format!("callee-saved register {} not restored. Expected 0x{:x}, found 0x{:x}", reg_name, snapshot_val, current_val)
+                                ));
+                            }
+                        }
+                    }
+                }
+
                 let target = self.get_reg(rs);
                 
                 // check if 4-byte aligned
@@ -371,7 +422,7 @@ impl CPU {
                 let dividend = self.get_reg(rs) as i32;
                 let divisor = self.get_reg(rt) as i32;
 
-                if divisor ==0 {
+                if divisor == 0 {
                     return Err(EmuError::DivideByZero); // add error to emuerro
                 }
 
@@ -384,11 +435,18 @@ impl CPU {
                 let r2 = self.get_reg(rt);
 
                 self.set_reg(rd, !(r1 | r2));
+            },
+
+            CoreInstruction::Sll {rd, rt, sa } => {
+                let v = self.get_reg(&rt);
+                self.set_reg(&rd, v << sa);
+            },
+
+            CoreInstruction::Srl { rd, rt, sa} =>{
+                let v = self.get_reg(&rt);
+                self.set_reg(&rd, v >> sa);
             }
-        }
-
-
-        
+        }        
 
         // branch instructions will modify the PC to another address instead of the sequential instruction
         // maybe we have to deal with the one instruction leading to jr $ra due to branch delay
@@ -429,7 +487,6 @@ impl CPU {
 
                     break;
                 },
-                Err(EmuError::Breakpoint) => return Err(EmuError::Breakpoint),
                 Err(EmuError::Breakpoint) => return Err(EmuError::Breakpoint),
                 Err(e) => return Err(e)
             }
@@ -491,7 +548,7 @@ impl CPU {
 
         self.state_history.clear(); 
         self.breakpoints.clear();
-        self.breakpoints.clear();
+        self.validation_stack.clear();
     }
 
     pub fn snapshot(&self) -> Snapshot {

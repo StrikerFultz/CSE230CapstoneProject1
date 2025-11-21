@@ -17,14 +17,17 @@ pub enum EmuError {
     /// indicates an invalid immediate when parsing 
     InvalidImm(String),
 
-    // indicates unaligned memory access during runtime execution
+    /// indicates unaligned memory access during runtime execution
     UnalignedAccess(u32),
 
-    // indicates invalid jump target during runtime 
+    /// indicates invalid jump target during runtime 
     InvalidJump(u32),
 
-    // indicates a label that does not exist 
+    /// indicates a label that does not exist 
     UndefinedLabel(String),
+
+    /// indicates a MIPS calling convention violation
+    CallingConventionViolation(String),
 
     /// indicates emulation termination
     Termination,

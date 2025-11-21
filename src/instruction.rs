@@ -102,12 +102,17 @@ pub enum CoreInstruction {
 
     /// R[rd] = ~(R[rs] | R[rt])
     Nor {rd: String, rs: String, rt: String},
+
+    Sll {rd: String, rt: String, sa: u32},
+
+    Srl {rd: String, rt: String, sa: u32},
 }
 
 #[derive(Debug, Clone)]
 pub enum PseudoInstruction {
     Lw { rt: String, label: String },
     La { rt: String, label: String },
+    Move { rd:String, rs:String },
 
     /// R[rd] = immediate
     Li { rd: String, imm: u32 },
