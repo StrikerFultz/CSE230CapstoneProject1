@@ -27,7 +27,10 @@ pub struct CPU {
     state_history: Vec<ExecutionState>,
 
     // line numbers of instructions containing breakpoints (indicated in the UI)
-    pub breakpoints: HashSet<usize>
+    pub breakpoints: HashSet<usize>,
+
+    // stack to validate saved registers
+    validation_stack: Vec<HashMap<String, u32>>
 }
 
 impl CPU {
@@ -40,7 +43,8 @@ impl CPU {
             program: None, 
             memory: Memory::new(),
             state_history: Vec::new(),
-            breakpoints: HashSet::new()
+            breakpoints: HashSet::new(),
+            validation_stack: Vec::new()
         }
     }
 
@@ -178,6 +182,18 @@ impl CPU {
             },
 
             Instruction::Jal { label } => {
+                // create snapshot of registers for stack validation
+                let mut snapshot = HashMap::new();
+                snapshot.insert("$sp".to_string(), self.get_reg("$sp"));
+                snapshot.insert("$fp".to_string(), self.get_reg("$fp"));
+
+                for i in 0..=7 {
+                    let reg_name = format!("$s{}", i);
+                    snapshot.insert(reg_name.clone(), self.get_reg(&reg_name));
+                }
+                self.validation_stack.push(snapshot);
+
+                // jump and set $ra register
                 let return_addr = self.pc + 4;
                 self.set_reg("$ra", return_addr);
 
@@ -191,6 +207,41 @@ impl CPU {
             },
 
             Instruction::Jr { rs } => {
+                // validate the snapshop of stack registers from our snapshot
+                if rs == "$ra" {
+                    if let Some(snapshot) = self.validation_stack.pop() {
+                        
+                        // check $sp
+                        let current_sp = self.get_reg("$sp");
+                        if current_sp != snapshot["$sp"] {
+                            return Err(EmuError::CallingConventionViolation(
+                                format!("stack pointer $sp not restored. Expected 0x{:x}, found 0x{:x}", snapshot["$sp"], current_sp)
+                            ));
+                        }
+                        
+                        // check $fp
+                        let current_fp = self.get_reg("$fp");
+                        if current_fp != snapshot["$fp"] {
+                            return Err(EmuError::CallingConventionViolation(
+                                format!("frame pointer $fp not restored. Expected 0x{:x}, found 0x{:x}", snapshot["$fp"], current_fp)
+                            ));
+                        }
+
+                        // check $s0 through $s7 registers
+                        for i in 0..=7 {
+                            let reg_name = format!("$s{}", i);
+                            let current_val = self.get_reg(&reg_name);
+                            let snapshot_val = snapshot[&reg_name];
+
+                            if current_val != snapshot_val {
+                                return Err(EmuError::CallingConventionViolation(
+                                    format!("callee-saved register {} not restored. Expected 0x{:x}, found 0x{:x}", reg_name, snapshot_val, current_val)
+                                ));
+                            }
+                        }
+                    }
+                }
+
                 let target = self.get_reg(rs);
                 
                 // check if 4-byte aligned
@@ -447,6 +498,7 @@ impl CPU {
 
         self.state_history.clear(); 
         self.breakpoints.clear();
+        self.validation_stack.clear();
     }
 
     pub fn snapshot(&self) -> Snapshot {

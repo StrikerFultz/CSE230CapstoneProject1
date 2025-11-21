@@ -24,6 +24,9 @@ pub enum EmuError {
     // indicates a label that does not exist 
     UndefinedLabel(String),
 
+    /// indicates a MIPS calling convention violation
+    CallingConventionViolation(String),
+
     /// indicates emulation termination
     Termination,
 

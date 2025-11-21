@@ -234,7 +234,10 @@ impl Parser {
         if mnemonic == "lw" || mnemonic == "sw" {
             let rt = self.parse_register()?;
             self.expect(TokenType::Delimiter)?;
-            let imm = self.parse_immediate::<i32>()?;
+
+            // (2) SignExtImm = { 16{immediate[15]}, immediate }
+            let imm = self.parse_immediate::<i16>()? as i32;
+
             self.expect(TokenType::LeftParen)?;
             let rs = self.parse_register()?;
             self.expect(TokenType::RightParen)?;
