@@ -542,14 +542,16 @@ impl Parser {
                         "sh" => Ok(Instruction::Core(CoreInstruction::Sh { rt, rs, imm })),
                         _ => Err(self.error(format!("At line {}: Unexpected token {:?}", self.current_line, mnemonic))),
                     }
-                } else if token.token_type == TokenType::Identifier {
-                    let label = self.expect(TokenType::Identifier)?;
-                    if mnemonic == "lw" {
-                        Ok(Instruction::Pseudo(PseudoInstruction::Lw { rt, label: label.lexeme }))
-                    } else {
-                        Err(self.error(format!("At line {}: Unsupported pseudo instruction", self.current_line)))
-                    }
-                } else {
+                } 
+                // else if token.token_type == TokenType::Identifier {
+                //     let label = self.expect(TokenType::Identifier)?;
+                //     if mnemonic == "lw" {
+                //         Ok(Instruction::Pseudo(PseudoInstruction::Lw { rt, label: label.lexeme }))
+                //     } else {
+                //         Err(self.error(format!("At line {}: Unsupported pseudo instruction", self.current_line)))
+                //     }
+                // } 
+                else {
                     return Err(self.error(format!("At line {}: Unexpected token {:?}", self.current_line, token.lexeme)));
                 }
             } else {
