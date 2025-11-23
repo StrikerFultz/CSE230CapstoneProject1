@@ -120,6 +120,8 @@ pub enum PseudoInstruction {
     Ble { rs: String, rt: String, label: String },
     // if(R[rs] >= R[rt]) PC=label
     Bge { rs: String, rt: String, label: String },
+
+    Move { rd: String, rs: String },
 }
 
 #[derive(Debug, Clone)]

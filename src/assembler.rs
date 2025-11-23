@@ -102,6 +102,7 @@ impl Assembler {
                                                     rt: "$at".to_string(),
                                                     imm: 0,
                                                 };
+                                                let inst_2 = CoreInstruction::Addi {
                                                     rt: rd.clone(),
                                                     rs: "$at".to_string(),
                                                     imm: *imm as i32,
@@ -233,8 +234,23 @@ impl Assembler {
                                             self.instruction_index += 2;
                                             self.line_number_index += 1;
                                         },
+                                        PseudoInstruction::Move { rd, rs } => {
+                                            let inst_1 = CoreInstruction::Lui {
+                                                rt: "$at".to_string(),
+                                                imm: 0,
+                                            };
+                                            let inst_2 = CoreInstruction::Add {
+                                                rd: rd.clone(),
+                                                rs: rs.clone(),
+                                                rt: "$at".to_string(),
+                                            };
+                                            core_instructions.push(inst_1);
+                                            core_instructions.push(inst_2);
+                                            new_line_numbers.push(line_numbers[self.line_number_index as usize]);
+                                            new_line_numbers.push(line_numbers[self.line_number_index as usize]);
 
                                             self.instruction_index += 2;
+                                            self.line_number_index += 1;
                                         },
                                         _ => {}
                                     }

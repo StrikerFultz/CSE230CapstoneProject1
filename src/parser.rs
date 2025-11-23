@@ -409,7 +409,7 @@ impl Parser {
                 "j" | "jal" | "jr" => self.parse_j_type(&lexeme),
                 //"li" => self.parse_li(),
                 "addi" | "addiu" | "lb" | "sb" | "lh" | "sh" | "lw" | "sw" | "ori" | "beq" | "bne" | "andi"| "slti" | "sltiu"| "xori" => self.parse_i_type(&lexeme),
-                "la" | "li" | "blt" | "bgt" | "ble" | "bge" => self.parse_pseudo_instruction(&lexeme),
+                "la" | "li" | "blt" | "bgt" | "ble" | "bge" | "move" => self.parse_pseudo_instruction(&lexeme),
                 _ => Err(self.error(format!("Line {}: Unknown instruction {}", self.current_line, lexeme)))
             }
         } else {
@@ -669,6 +669,12 @@ impl Parser {
                 self.expect(TokenType::Delimiter)?;
                 let label = self.parse_label()?;
                 Ok(Instruction::Pseudo(PseudoInstruction::Bge { rs, rt, label }))
+            },
+            "move" => {
+                let rd = self.parse_register()?;
+                self.expect(TokenType::Delimiter)?;
+                let rs = self.parse_register()?;
+                Ok(Instruction::Pseudo(PseudoInstruction::Move { rd, rs }))
             },
             _ => Err(self.error(format!("Line {}: Unknown pseudo-instruction", self.current_line)))
         }
