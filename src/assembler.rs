@@ -98,28 +98,37 @@ impl Assembler {
                                             let imm_unsigned_32_bits: bool = is_32_bit_unsigned(*imm);
 
                                             if imm_signed_16_bits {
-                                                let inst = CoreInstruction::Addi {
+                                                let inst_1 = CoreInstruction::Lui {
+                                                    rt: "$at".to_string(),
+                                                    imm: 0,
+                                                };
                                                     rt: rd.clone(),
-                                                    rs: "$zero".to_string(),
+                                                    rs: "$at".to_string(),
                                                     imm: *imm as i32,
                                                 };
-                                                core_instructions.push(inst);
+                                                core_instructions.push(inst_1);
+                                                core_instructions.push(inst_2);
                                                 new_line_numbers.push(line_numbers[self.line_number_index as usize]);
                                                 new_line_numbers.push(line_numbers[self.line_number_index as usize]);
 
-                                                self.instruction_index += 1;
+                                                self.instruction_index += 2;
                                                 self.line_number_index += 1;
                                             } else if imm_unsigned_16_bits {
-                                                let inst = CoreInstruction::Ori {
+                                                let inst_1 = CoreInstruction::Lui {
+                                                    rt: "$at".to_string(),
+                                                    imm: 0,
+                                                };
+                                                let inst_2 = CoreInstruction::Ori {
                                                     rt: rd.clone(),
-                                                    rs: "$zero".to_string(),
+                                                    rs: "$at".to_string(),
                                                     imm: *imm,
                                                 };
-                                                core_instructions.push(inst);
-                                                self.instruction_index += 1;
+                                                core_instructions.push(inst_1);
+                                                core_instructions.push(inst_2);
                                                 new_line_numbers.push(line_numbers[self.line_number_index as usize]);
                                                 new_line_numbers.push(line_numbers[self.line_number_index as usize]);
 
+                                                self.instruction_index += 2;
                                                 self.line_number_index += 1;
                                             } else if imm_signed_32_bits || imm_unsigned_32_bits {
                                                 let upper_imm = (*imm >> 16) as u32;
