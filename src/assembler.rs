@@ -14,6 +14,7 @@ use std::collections::{VecDeque, HashMap};
 
 pub struct Assembler {
     instruction_index: u32,
+    line_number_index: usize,
 
     pub parser: Parser,
 }
@@ -22,6 +23,7 @@ impl Assembler {
     pub fn new() -> Self {
         Assembler {
             instruction_index: 0,
+            line_number_index: 0,
 
             parser: Parser::new(),
         }
@@ -31,15 +33,21 @@ impl Assembler {
         let result = self.parser.parse_program(code, memory);
 
         match result {
-            Ok((program_statements, mut symbol_table, errors)) => {
+            Ok((program_statements, mut symbol_table, line_numbers)) => {
                 let mut core_instructions: Vec<CoreInstruction> = Vec::new();
+                let mut new_line_numbers: Vec<usize> = Vec::new();
+
+                // alert(format!("Line numbers: {:?}", errors).as_str());
+
                 for program_statement in &program_statements {
                     match program_statement {
                         ProgramStatement::Instruction(insn) => {
                             match insn {
                                 Instruction::Core(core) => {
+                                    new_line_numbers.push(line_numbers[self.line_number_index as usize]);
                                     core_instructions.push(core.clone());
                                     self.instruction_index += 1;
+                                    self.line_number_index += 1;
                                     // alert(format!("Core instruction: {:?}", core).as_str());
                                 },
                                 Instruction::Pseudo(pseudo) => {
@@ -76,9 +84,11 @@ impl Assembler {
 
                                             core_instructions.push(inst_1);
                                             core_instructions.push(inst_2);
+                                            new_line_numbers.push(line_numbers[self.line_number_index as usize]);
+                                            new_line_numbers.push(line_numbers[self.line_number_index as usize]);
 
                                             self.instruction_index += 2;
-
+                                            self.line_number_index += 1;
                                             // alert(format!("Pseudo instruction: La with rt: {} and label: {} and address: 0x{:x} and imm: 0x{:x} and offset: 0x{:x}", rt, label, address, address >> 16, address & 0xFFFF).as_str());
                                         },
                                         PseudoInstruction::Li { rd, imm } => {
@@ -94,8 +104,11 @@ impl Assembler {
                                                     imm: *imm as i32,
                                                 };
                                                 core_instructions.push(inst);
+                                                new_line_numbers.push(line_numbers[self.line_number_index as usize]);
+                                                new_line_numbers.push(line_numbers[self.line_number_index as usize]);
 
                                                 self.instruction_index += 1;
+                                                self.line_number_index += 1;
                                             } else if imm_unsigned_16_bits {
                                                 let inst = CoreInstruction::Ori {
                                                     rt: rd.clone(),
@@ -104,6 +117,10 @@ impl Assembler {
                                                 };
                                                 core_instructions.push(inst);
                                                 self.instruction_index += 1;
+                                                new_line_numbers.push(line_numbers[self.line_number_index as usize]);
+                                                new_line_numbers.push(line_numbers[self.line_number_index as usize]);
+
+                                                self.line_number_index += 1;
                                             } else if imm_signed_32_bits || imm_unsigned_32_bits {
                                                 let upper_imm = (*imm >> 16) as u32;
                                                 let lower_imm = (*imm & 0xFFFF) as u32;
@@ -120,8 +137,11 @@ impl Assembler {
 
                                                 core_instructions.push(inst_1);
                                                 core_instructions.push(inst_2);
+                                                new_line_numbers.push(line_numbers[self.line_number_index as usize]);
+                                                new_line_numbers.push(line_numbers[self.line_number_index as usize]);
 
                                                 self.instruction_index += 2;
+                                                self.line_number_index += 1;
                                             }
                                         },
                                         PseudoInstruction::Blt { rs, rt, label } => {
@@ -138,8 +158,11 @@ impl Assembler {
 
                                             core_instructions.push(inst_1);
                                             core_instructions.push(inst_2);
+                                            new_line_numbers.push(line_numbers[self.line_number_index as usize]);
+                                            new_line_numbers.push(line_numbers[self.line_number_index as usize]);
 
                                             self.instruction_index += 2;
+                                            self.line_number_index += 1;
                                         },
                                         PseudoInstruction::Bgt { rs, rt, label } => {
                                             let inst_1 = CoreInstruction::Slt {
@@ -155,8 +178,11 @@ impl Assembler {
 
                                             core_instructions.push(inst_1);
                                             core_instructions.push(inst_2);
+                                            new_line_numbers.push(line_numbers[self.line_number_index as usize]);
+                                            new_line_numbers.push(line_numbers[self.line_number_index as usize]);
 
                                             self.instruction_index += 2;
+                                            self.line_number_index += 1;
                                         },
                                         PseudoInstruction::Ble { rs, rt, label } => {
                                             let inst_1 = CoreInstruction::Slt {
@@ -172,8 +198,11 @@ impl Assembler {
 
                                             core_instructions.push(inst_1);
                                             core_instructions.push(inst_2);
+                                            new_line_numbers.push(line_numbers[self.line_number_index as usize]);
+                                            new_line_numbers.push(line_numbers[self.line_number_index as usize]);
 
                                             self.instruction_index += 2;
+                                            self.line_number_index += 1;
                                         },
                                         PseudoInstruction::Bge { rs, rt, label } => {
                                             let inst_1 = CoreInstruction::Slt {
@@ -189,6 +218,12 @@ impl Assembler {
 
                                             core_instructions.push(inst_1);
                                             core_instructions.push(inst_2);
+                                            new_line_numbers.push(line_numbers[self.line_number_index as usize]);
+                                            new_line_numbers.push(line_numbers[self.line_number_index as usize]);
+
+                                            self.instruction_index += 2;
+                                            self.line_number_index += 1;
+                                        },
 
                                             self.instruction_index += 2;
                                         },
@@ -209,7 +244,10 @@ impl Assembler {
                     }
                     // Process each instruction as needed
                 }
-                Ok((core_instructions, symbol_table, errors))
+
+                // alert(format!("New line numbers: {:?}", new_line_numbers).as_str());
+
+                Ok((core_instructions, symbol_table, new_line_numbers))
             },
             Err(e) => return Err(e),
         }
