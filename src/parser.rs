@@ -147,7 +147,12 @@ impl Parser {
                 ProgramStatement::Instruction(Instruction::Core(CoreInstruction::J { label })) |
                 ProgramStatement::Instruction(Instruction::Core(CoreInstruction::Jal { label })) |
                 ProgramStatement::Instruction(Instruction::Core(CoreInstruction::Beq { label, .. })) |
-                ProgramStatement::Instruction(Instruction::Core(CoreInstruction::Bne { label, .. })) => {
+                ProgramStatement::Instruction(Instruction::Core(CoreInstruction::Bne { label, .. })) |
+                ProgramStatement::Instruction(Instruction::Pseudo(PseudoInstruction::La { label, .. })) |
+                ProgramStatement::Instruction(Instruction::Pseudo(PseudoInstruction::Blt { label, .. })) |
+                ProgramStatement::Instruction(Instruction::Pseudo(PseudoInstruction::Bgt { label, .. })) |
+                ProgramStatement::Instruction(Instruction::Pseudo(PseudoInstruction::Ble { label, .. })) |
+                ProgramStatement::Instruction(Instruction::Pseudo(PseudoInstruction::Bge { label, .. })) => {
                     if !self.symbol_table.contains_key(label) {
                         return Err(EmuError::UndefinedLabel(label.clone()));
                     }
