@@ -147,7 +147,12 @@ impl Parser {
                 ProgramStatement::Instruction(Instruction::Core(CoreInstruction::J { label })) |
                 ProgramStatement::Instruction(Instruction::Core(CoreInstruction::Jal { label })) |
                 ProgramStatement::Instruction(Instruction::Core(CoreInstruction::Beq { label, .. })) |
-                ProgramStatement::Instruction(Instruction::Core(CoreInstruction::Bne { label, .. })) => {
+                ProgramStatement::Instruction(Instruction::Core(CoreInstruction::Bne { label, .. })) |
+                ProgramStatement::Instruction(Instruction::Pseudo(PseudoInstruction::La { label, .. })) |
+                ProgramStatement::Instruction(Instruction::Pseudo(PseudoInstruction::Blt { label, .. })) |
+                ProgramStatement::Instruction(Instruction::Pseudo(PseudoInstruction::Bgt { label, .. })) |
+                ProgramStatement::Instruction(Instruction::Pseudo(PseudoInstruction::Ble { label, .. })) |
+                ProgramStatement::Instruction(Instruction::Pseudo(PseudoInstruction::Bge { label, .. })) => {
                     if !self.symbol_table.contains_key(label) {
                         return Err(EmuError::UndefinedLabel(label.clone()));
                     }
@@ -559,13 +564,6 @@ impl Parser {
                         "lh" => Ok(Instruction::Core(CoreInstruction::Lh { rt, rs, imm })),
                         "sh" => Ok(Instruction::Core(CoreInstruction::Sh { rt, rs, imm })),
                         _ => Err(self.error(format!("At line {}: Unexpected token {:?}", self.current_line, mnemonic))),
-                    }
-                } else if token.token_type == TokenType::Identifier {
-                    let label = self.expect(TokenType::Identifier)?;
-                    if mnemonic == "lw" {
-                        Ok(Instruction::Pseudo(PseudoInstruction::Lw { rt, label: label.lexeme }))
-                    } else {
-                        Err(self.error(format!("At line {}: Unsupported pseudo instruction", self.current_line)))
                     }
                 } else {
                     return Err(self.error(format!("At line {}: Unexpected token {:?}", self.current_line, token.lexeme)));
