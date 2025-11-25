@@ -275,6 +275,80 @@ const cpuEditor = CodeMirror.fromTextArea(codeEl, {
   gutters: ["CodeMirror-linenumbers", "breakpoints"],
 });
 
+const memStartInput = document.getElementById("mem-start-input");
+const memGoBtn = document.getElementById("mem-go-btn");
+const memView = document.getElementById("memory-view");
+
+const MEM_CHUNK_SIZE = 128; // 128 bytes at a time max
+
+function getSafeChar(code) {
+  if (code >= 32 && code <= 126) {
+    return String.fromCharCode(code);
+  }
+
+  return ".";
+}
+
+function updateMemoryView() {
+  if (!cpu || !wasmReady || !memView) return;
+
+  // define the default address
+  let addrStr = memStartInput ? memStartInput.value : "0x10000000";
+  let startAddr = parseInt(addrStr, 16);
+
+  if (isNaN(startAddr)) 
+    startAddr = 0x10000000;
+
+  // get data from emulator cpu
+  let bytes;
+  try {
+    bytes = cpu.get_memory(startAddr, MEM_CHUNK_SIZE);
+  } catch (e) {
+    console.error("Memory read error:", e);
+    return;
+  }
+
+  // render rows
+  let html = "";
+  for (let i = 0; i < bytes.length; i += 16) {
+    const currentAddr = startAddr + i;
+    const slice = bytes.subarray(i, i + 16);
+
+    const addrFmt = "0x" + currentAddr.toString(16).toUpperCase().padStart(8, "0");
+
+    // show both hex and ascii
+    let hexFmt = "";
+    let asciiFmt = "";
+
+    for (let j = 0; j < 16; j++) {
+      if (j < slice.length) {
+        const val = slice[j];
+
+        hexFmt += val.toString(16).toUpperCase().padStart(2, "0") + " ";
+        asciiFmt += getSafeChar(val);
+      } else {
+        hexFmt += "   "; // padding
+      }
+      
+      if (j === 7) hexFmt += " "; 
+    }
+
+    html += `
+      <div class="mem-row">
+        <span class="m-addr">${addrFmt}</span>
+        <span class="m-hex">${hexFmt}</span>
+        <span class="m-ascii">${asciiFmt}</span>
+      </div>
+    `;
+  }
+  
+  memView.innerHTML = html;
+}
+
+if (memGoBtn) {
+  memGoBtn.addEventListener("click", updateMemoryView);
+}
+
 //highlight current line
 function clearHighlight() {
   if (currentLineMarker != null) {
@@ -339,6 +413,7 @@ function resetEmulator() {
   breakpoints.clear();
   cpuEditor.clearGutter("breakpoints");
   clearHighlight();
+  updateMemoryView();
 }
 
 function loadProgram() {
@@ -378,6 +453,8 @@ function handleWasmResult(result, { fromRun = false } = {}) {
   const tabRegs = filterForTab(allRegs, lastRegs);
 
   paintRegisters(tabRegs);
+
+  updateMemoryView();
 
   if (result && result.error) {
     // we have some kind of status / error string

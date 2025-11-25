@@ -152,7 +152,7 @@ impl WasmCPU {
         "---".to_string()
     }
 
-    //gets the current line number using $PC register (due to mapping)
+    // gets the current line number using $PC register (due to mapping)
     #[wasm_bindgen]
     pub fn get_current_line(&self) -> i32 {
         let pc = self.cpu.pc;
@@ -166,6 +166,12 @@ impl WasmCPU {
         }
 
         -1
+    }
+
+    // get a slice of memory from the memory module using the CPU
+    #[wasm_bindgen]
+    pub fn get_memory(&mut self, start_address: u32, size: usize) -> Vec<u8> {
+        self.cpu.memory.get_memory_slice(start_address, size)
     }
 }
 

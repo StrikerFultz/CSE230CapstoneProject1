@@ -206,6 +206,17 @@ impl Memory {
         // alert(format!("String stored at address {:x}: {}", address, value).as_str());
     }
 
+    pub fn get_memory_slice(&mut self, start_address: u32, length: usize) -> Vec<u8> {
+        let mut result = Vec::with_capacity(length);
+
+        for i in 0..length {
+            let val = self.load_byte(start_address + i as u32);
+            result.push(val as u8);
+        }
+        
+        result
+    }
+
     pub fn new() -> Self {
         println!("Memory module initialized.");
         println!("Stack Base Address: {:x}", DEFAULT_STACK_BASE_ADDRESS as u32);

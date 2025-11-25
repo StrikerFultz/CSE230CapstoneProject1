@@ -663,3 +663,101 @@ th {
     grid-template-columns: 1fr;
   }
 }
+
+/* memory panel */
+
+.memory-panel {
+  grid-column: 1 / 4; 
+  background-color: #e0e0e0;
+  border: 1px solid #000;
+  display: flex;
+  flex-direction: column;
+  height: 200px; 
+  margin-bottom: 10px;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+.memory-header-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background-color: #d0d0d0;
+  border-bottom: 1px solid #000;
+  padding: 4px 10px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.mem-controls {
+  display: flex;
+  gap: 5px;
+}
+
+.mem-controls input {
+  padding: 2px 5px;
+  border: 1px solid #999;
+  font-family: monospace;
+  width: 120px;
+}
+
+.mem-controls button {
+  padding: 2px 8px;
+  cursor: pointer;
+  background-color: #f0f0f0;
+  border: 1px solid #555;
+  font-size: 12px;
+}
+
+.mem-controls button:hover {
+  background-color: #fff;
+}
+
+.memory-grid-header {
+  display: flex;
+  background-color: #e8e8e8;
+  border-bottom: 1px solid #aaa;
+  padding: 4px 0;
+  font-family: monospace;
+  font-size: 12px;
+  font-weight: bold;
+  color: #555;
+}
+
+#memory-view {
+  flex: 1;
+  overflow-y: auto;
+  background-color: #f7f7f7;
+  padding: 5px 0;
+  font-family: monospace; 
+  font-size: 13px;
+}
+
+.mem-row {
+  display: flex;
+  padding: 2px 0;
+}
+
+.mem-row:hover {
+  background-color: #e6f7ff;
+}
+
+.m-addr {
+  width: 120px;
+  padding-left: 10px;
+  color: #0000aa;
+  border-right: 1px solid #ddd;
+}
+
+.m-hex {
+  width: 400px; 
+  padding-left: 15px;
+  color: #000;
+  letter-spacing: 1px;
+}
+
+.m-ascii {
+  flex: 1;
+  padding-left: 15px;
+  border-left: 1px solid #ddd;
+  color: #555;
+}

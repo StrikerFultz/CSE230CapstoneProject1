@@ -71,50 +71,6 @@ impl Parser {
         let mut sorted_lines: Vec<_> = tokens_by_line.keys().cloned().collect();
         sorted_lines.sort();
 
-        // let mut tokens_strings = String::new();
-        // for line_num in &sorted_lines {
-        //     let line_tokens = tokens_by_line.get(line_num).unwrap();
-        //     for token in line_tokens {
-        //         tokens_strings.push_str(&format!("{} ", token.token_type));
-        //     }
-        //     tokens_strings.push('\n');
-        // }
-
-        // alert(format!("Tokens:\n{}", tokens_strings).as_str());
-
-        // extract labels 
-        // for line_num in &sorted_lines {
-
-        //     let line_tokens = tokens_by_line.get(line_num).unwrap();
-        //     let first_token = line_tokens
-        //         .iter()
-        //         .find(|t| t.token_type != TokenType::Comment).cloned();
-            
-        //     let second_token = line_tokens
-        //         .iter()
-        //         .skip(1)
-        //         .find(|t| t.token_type != TokenType::Comment).cloned();
-
-        //     // basically insert the label to the label mapping using a counter for the instruction index
-        //     if let Some(token) = first_token {
-        //         if let Some(second_token) = second_token {
-        //             if (token.token_type == TokenType::Identifier || token.token_type == TokenType::Mnemonic) && second_token.token_type == TokenType::Colon {
-        //                 let label = &token.lexeme[..token.lexeme.len()];
-        //                 let address = crate::memory::DEFAULT_TEXT_BASE_ADDRESS + (self.instruction_index * 4);
-                        
-        //                 // insert with correct "memory" address relative to .text start 
-        //                 if self.symbol_table.insert(label.to_string(), address).is_some() {
-        //                     return Err(self.error(format!("Line {}: Duplicate label {}", line_num, label)));
-        //                 }
-        //                 // alert(format!("Inserted label: {} at address: {}", self.symbol_table.get(label.to_string()), address).as_str());
-        //             } else if token.token_type == TokenType::Mnemonic {
-        //                 self.instruction_index += 1;
-        //             }
-        //         }
-        //     }
-        // }
-
-        
         // parse each line using Paul's code
         for line_num in sorted_lines {
             self.tokens = tokens_by_line.get(&line_num).unwrap().clone().into(); 
@@ -122,23 +78,6 @@ impl Parser {
             
             self.parse_statement(memory)?; 
         }
-        // alert(format!("identifiers: {:?}", self.symbol_table).as_str());
-        // let mut string = String::from("Identifiers:\n");
-        // for label in self.symbol_table.keys() {
-        //     string.push_str(&format!("{}: {:x}\n", label, self.symbol_table.get(label).unwrap()));
-        //     if memory.load_byte(*self.symbol_table.get(label).unwrap()) != 0 {
-        //         string.push_str(&format!("Value: {}\n", memory.load_byte(*self.symbol_table.get(label).unwrap())));
-        //     }
-        // }
-        // alert(string.as_str());
-
-        // let mut memory_string = String::from("Data Segment Memory in bytes:\n");
-        // let num_of_bytes_in_memory = 16;
-        // for i in 0..num_of_bytes_in_memory {
-        //     let byte = memory.load_byte(crate::memory::DEFAULT_STATIC_DATA_BASE_ADDRESS + i);
-        //     memory_string.push_str(&format!("Memory[0x{:x}]: {:02}\n", crate::memory::DEFAULT_STATIC_DATA_BASE_ADDRESS + i, byte));
-        // }
-        // alert(memory_string.as_str());
 
         // validate labels
         for program_statement in &self.program_statements {

@@ -177,10 +177,6 @@ impl CPU {
                 self.memory.set_word(addr, val);
             },
 
-            // CoreInstruction::Li { rd, imm } => {
-            //     self.set_reg(rd, *imm as u32);
-            // },
-
             CoreInstruction::Lui { rt, imm } => {
                 self.set_reg(rt, imm << 16);
             },
