@@ -19,6 +19,8 @@ use std::collections::{HashMap, HashSet};
 #[derive(Serialize, Deserialize, Default)]
 pub struct Snapshot {
     pub registers: HashMap<String, u32>,
+    pub memory_access_addr: Option<u32>,
+    pub memory_access_size: Option<u32>
 }
 
 #[derive(Serialize, Deserialize)]
@@ -232,9 +234,6 @@ mod tests {
         // 5 - 10 = -5
         // -5 + 2^32 = 4294967291
     }
-
-
-
 
     #[test]
     fn lw_sw_test() {

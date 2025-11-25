@@ -289,47 +289,67 @@ function getSafeChar(code) {
   return ".";
 }
 
-function updateMemoryView() {
+function updateMemoryView(highlightAddr = null, highlightSize = 0) {
   if (!cpu || !wasmReady || !memView) return;
 
-  // define the default address
+  // get address
   let addrStr = memStartInput ? memStartInput.value : "0x10000000";
   let startAddr = parseInt(addrStr, 16);
 
-  if (isNaN(startAddr)) 
+  // default to 0x10000000 if input is empty or garbage (NaN)
+  if (isNaN(startAddr)) {
     startAddr = 0x10000000;
+  }
 
-  // get data from emulator cpu
+  // fix go button so check if number type
+  if (typeof highlightAddr === 'number') {
+      const rowStart = Math.floor(highlightAddr / 16) * 16;
+      startAddr = rowStart;
+      
+      if (memStartInput) {
+        memStartInput.value = "0x" + startAddr.toString(16).toUpperCase();
+      }
+  }
+
+  // read memory
   let bytes;
   try {
-    bytes = cpu.get_memory(startAddr, MEM_CHUNK_SIZE);
+    bytes = cpu.get_memory(startAddr, MEM_CHUNK_SIZE || 128);
   } catch (e) {
     console.error("Memory read error:", e);
     return;
   }
 
-  // render rows
+  // render
   let html = "";
+  
   for (let i = 0; i < bytes.length; i += 16) {
     const currentAddr = startAddr + i;
     const slice = bytes.subarray(i, i + 16);
 
     const addrFmt = "0x" + currentAddr.toString(16).toUpperCase().padStart(8, "0");
 
-    // show both hex and ascii
     let hexFmt = "";
     let asciiFmt = "";
 
     for (let j = 0; j < 16; j++) {
+      const byteAddr = currentAddr + j;
+      let classStr = "byte-val";
+
+      if (typeof highlightAddr === 'number' && 
+          byteAddr >= highlightAddr && 
+          byteAddr < highlightAddr + highlightSize) {
+            
+        classStr += " mem-highlight";
+      }
+
       if (j < slice.length) {
         const val = slice[j];
-
-        hexFmt += val.toString(16).toUpperCase().padStart(2, "0") + " ";
+        hexFmt += `<span class="${classStr}">${val.toString(16).toUpperCase().padStart(2, "0")}</span> `;
         asciiFmt += getSafeChar(val);
       } else {
-        hexFmt += "   "; // padding
+        hexFmt += "   "; 
       }
-      
       if (j === 7) hexFmt += " "; 
     }
 
@@ -346,7 +366,7 @@ function updateMemoryView() {
 }
 
 if (memGoBtn) {
-  memGoBtn.addEventListener("click", updateMemoryView);
+  memGoBtn.addEventListener("click", () => updateMemoryView());
 }
 
 //highlight current line
@@ -441,29 +461,38 @@ function loadProgram() {
   isProgramLoaded = true;
   cpu.set_breakpoints(Array.from(breakpoints));
   highlightCurrentLine();
+
   return true;
 }
 
 function handleWasmResult(result, { fromRun = false } = {}) {
-  const rawRegs =
-    (result && result.snapshot && result.snapshot.registers) ||
-    (result && result.registers) ||
-    null;
+  const rawRegs = (result && result.snapshot && result.snapshot.registers) || {};
   const allRegs = coerceRegs(rawRegs);
   const tabRegs = filterForTab(allRegs, lastRegs);
-
   paintRegisters(tabRegs);
 
-  updateMemoryView();
+  // handle memory read/write
+  let hlAddr = null;
+  let hlSize = 0;
+
+  if (result && result.snapshot && 
+      typeof result.snapshot.memory_access_addr === 'number') {
+      
+      hlAddr = result.snapshot.memory_access_addr;
+      hlSize = result.snapshot.memory_access_size || 4;
+  }
+
+  updateMemoryView(hlAddr, hlSize);
 
   if (result && result.error) {
     // we have some kind of status / error string
     if (result.error === "Termination") {
-      // normal “finished” case
       clearHighlight();
+
       if (Object.keys(allRegs).length) {
         log("All Registers (decimal + hex):");
         log("--------------------------------");
+
         for (const [r, v] of Object.entries(allRegs).sort(([a, b]) =>
           a.localeCompare(b)
         )) {
@@ -472,22 +501,25 @@ function handleWasmResult(result, { fromRun = false } = {}) {
         log("\nProgram Finished");
       }
       isProgramLoaded = false;
+      
       if (stepBtn) stepBtn.disabled = true;
       if (runBtn) runBtn.disabled = true;
+
     } else if (result.error === "Breakpoint") {
-      // breakpoint case – don't dump everything, just pause
       log("\n--- Hit Breakpoint ---");
       highlightCurrentLine();
       isProgramLoaded = true;
       if (stepBtn) stepBtn.disabled = false;
       if (runBtn) runBtn.disabled = false;
+
     } else {
-      // some other error (e.g. invalid instruction)
       clearHighlight();
+
       log(`\n--- ${result.error} ---`);
       if (Object.keys(allRegs).length) {
         log("All Registers (decimal + hex):");
         log("--------------------------------");
+
         for (const [r, v] of Object.entries(allRegs).sort(([a, b]) =>
           a.localeCompare(b)
         )) {
@@ -495,11 +527,13 @@ function handleWasmResult(result, { fromRun = false } = {}) {
         }
       }
       isProgramLoaded = false;
+
       if (stepBtn) stepBtn.disabled = true;
       if (runBtn) runBtn.disabled = true;
     }
   } else if (fromRun) {
     clearHighlight();
+
     if (Object.keys(allRegs).length) {
       log("All Registers (decimal + hex):");
       log("--------------------------------");
@@ -509,9 +543,12 @@ function handleWasmResult(result, { fromRun = false } = {}) {
         log(`  ${r}: ${fmt(v)}`);
       }
     }
+
     isProgramLoaded = false;
+
     if (stepBtn) stepBtn.disabled = true;
     if (runBtn) runBtn.disabled = true;
+
     log("\nProgram Finished");
   }
 

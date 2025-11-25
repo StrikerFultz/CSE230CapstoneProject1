@@ -735,6 +735,7 @@ th {
 .mem-row {
   display: flex;
   padding: 2px 0;
+  align-items: center;
 }
 
 .mem-row:hover {
@@ -749,10 +750,13 @@ th {
 }
 
 .m-hex {
-  width: 400px; 
+  width: 440px;
+  min-width: 440px;
   padding-left: 15px;
   color: #000;
   letter-spacing: 1px;
+  white-space: nowrap;
+  overflow: hidden;
 }
 
 .m-ascii {
@@ -760,4 +764,17 @@ th {
   padding-left: 15px;
   border-left: 1px solid #ddd;
   color: #555;
+}
+
+.byte-val {
+  display: inline-block;
+  padding: 0 1px;
+}
+
+.mem-highlight {
+  background-color: #ffd700;
+  color: #000;
+  font-weight: bold;
+  border-radius: 2px;
+  box-shadow: 0 0 2px rgba(0,0,0,0.3);
 }
