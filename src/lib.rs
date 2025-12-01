@@ -635,4 +635,135 @@ mod tests {
 
         assert_eq!(cpu.get_reg("$t1"), 20 >> 2);
     }
+
+    #[cfg(test)]
+    mod tests_divu_multu {
+        use super::CPU;
+
+        #[test]
+        fn multu_basic_test() {
+            let mut cpu = CPU::new();
+            let program = r#"
+                li $t0, 10
+                li $t1, 20
+                multu $t0, $t1
+                mflo $t2
+                mfhi $t3
+            "#;
+
+            cpu.run_input(program).unwrap();
+
+            assert_eq!(cpu.get_reg("$t2"), 200); // LO
+            assert_eq!(cpu.get_reg("$t3"), 0);   // HI
+        }
+
+        #[test]
+        fn multu_zero_test() {
+            let mut cpu = CPU::new();
+            let program = r#"
+                li $t0, 0
+                li $t1, 12345
+                multu $t0, $t1
+                mflo $t2
+                mfhi $t3
+            "#;
+
+            cpu.run_input(program).unwrap();
+
+            assert_eq!(cpu.get_reg("$t2"), 0); // LO
+            assert_eq!(cpu.get_reg("$t3"), 0); // HI
+        }
+
+        #[test]
+        fn multu_max_unsigned_test() {
+            let mut cpu = CPU::new();
+            let program = r#"
+                li $t0, 4294967295
+                li $t1, 2
+                multu $t0, $t1
+                mflo $t2
+                mfhi $t3
+            "#;
+
+            cpu.run_input(program).unwrap();
+
+            // 4294967295 * 2 = 8589934590 → 0x1FFFFFFFE
+            // LO = lower 32 bits, HI = upper 32 bits
+            assert_eq!(cpu.get_reg("$t2"), 4294967294); // LO
+            assert_eq!(cpu.get_reg("$t3"), 1);          // HI
+        }
+
+        #[test]
+        fn divu_basic_test() {
+            let mut cpu = CPU::new();
+            let program = r#"
+                li $t0, 20
+                li $t1, 3
+                divu $t0, $t1
+                mflo $t2
+                mfhi $t3
+            "#;
+
+            cpu.run_input(program).unwrap();
+
+            assert_eq!(cpu.get_reg("$t2"), 6);  // quotient
+            assert_eq!(cpu.get_reg("$t3"), 2);  // remainder
+        }
+
+        #[test]
+        fn divu_divide_by_one_test() {
+            let mut cpu = CPU::new();
+            let program = r#"
+                li $t0, 12345
+                li $t1, 1
+                divu $t0, $t1
+                mflo $t2
+                mfhi $t3
+            "#;
+
+            cpu.run_input(program).unwrap();
+
+            assert_eq!(cpu.get_reg("$t2"), 12345); // quotient
+            assert_eq!(cpu.get_reg("$t3"), 0);     // remainder
+        }
+
+        #[test]
+        fn divu_divide_by_zero_no_change_test() {
+            let mut cpu = CPU::new();
+            let program = r#"
+                li $t0, 100
+                li $t1, 0
+                divu $t0, $t1
+                mflo $t2
+                mfhi $t3
+            "#;
+
+            // This test assumes your CPU handles divide-by-zero gracefully
+            // For example, leaves LO/HI unchanged or zeroed
+            cpu.run_input(program).unwrap();
+
+            assert_eq!(cpu.get_reg("$t2"), 0); // LO unchanged / set to 0
+            assert_eq!(cpu.get_reg("$t3"), 0); // HI unchanged / set to 0
+        }
+
+        #[test]
+        fn divu_max_unsigned_test() {
+            let mut cpu = CPU::new();
+            let program = r#"
+                li $t0, 4294967295
+                li $t1, 2
+                divu $t0, $t1
+                mflo $t2
+                mfhi $t3
+            "#;
+
+            cpu.run_input(program).unwrap();
+
+            // 4294967295 / 2 = 2147483647 remainder 1
+            assert_eq!(cpu.get_reg("$t2"), 2147483647); // quotient
+            assert_eq!(cpu.get_reg("$t3"), 1);          // remainder
+        }
+    }
+
+
 }
