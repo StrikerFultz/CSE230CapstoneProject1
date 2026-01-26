@@ -5,6 +5,7 @@ pub mod lexer;
 pub mod memory;
 pub mod parser;
 pub mod program;
+pub mod mmio;
 
 use cpu::CPU;
 use program::Program;
@@ -12,6 +13,7 @@ use wasm_bindgen::prelude::*;
 use serde::{Serialize, Deserialize};
 use program::EmuError;
 use std::collections::{HashMap, HashSet};
+use mmio::DeviceState; 
 
 //https://github.com/insou22/mipsy partial code used since its a rough outline of the code 
 // only li add and sub; shows register history as lineis entered (as changed) 
@@ -20,7 +22,8 @@ use std::collections::{HashMap, HashSet};
 pub struct Snapshot {
     pub registers: HashMap<String, u32>,
     pub memory_access_addr: Option<u32>,
-    pub memory_access_size: Option<u32>
+    pub memory_access_size: Option<u32>,
+    pub mmio: Option<HashMap<u32, DeviceState>> 
 }
 
 #[derive(Serialize, Deserialize)]
@@ -174,6 +177,11 @@ impl WasmCPU {
     #[wasm_bindgen]
     pub fn get_memory(&mut self, start_address: u32, size: usize) -> Vec<u8> {
         self.cpu.memory.get_memory_slice(start_address, size)
+    }
+
+    #[wasm_bindgen]
+    pub fn get_mmio_state(&self) -> JsValue {
+        serde_wasm_bindgen::to_value(&self.cpu.memory.mmio.snapshot()).unwrap()
     }
 }
 

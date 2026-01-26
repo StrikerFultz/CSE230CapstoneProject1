@@ -230,13 +230,11 @@ th {
 }
 
 .side-box {
-  flex: 0 1 auto;
-  border-bottom: 1px solid #000;
+  flex: 1; 
   display: flex;
   flex-direction: column;
-  min-height: 80px;
-  height: auto;
-  background-color: #e0e0e0;
+  background-color: #e0e0e0; 
+  border-bottom: 1px solid #000;
 }
 
 .side-box:last-child {
@@ -252,16 +250,14 @@ th {
 }
 
 .side-box div {
+  flex-grow: 1; 
   padding: 6px;
   font-size: 13px;
   font-family: monospace;
-  background-color: #f7f7f7;
+  background-color: #f7f7f7; 
   border-top: 1px solid #aaa;
-  resize: vertical;
   overflow: auto;
-  min-height: 100px;
-  max-height: none;
-  flex: none;
+  min-height: 100px; 
 }
 
 /*reg grid*/
@@ -278,7 +274,79 @@ th {
 
 #memory,
 #widgets {
-  white-space: pre-wrap;
+  padding: 0 !important;
+  white-space: normal !important;
+  min-height: 60px;
+}
+
+#widgets * {
+  white-space: normal;
+}
+
+.widget-item {
+  background: #ffffff;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+  padding: 8px 12px;
+  margin-bottom: 4px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 45px; 
+  box-sizing: border-box;
+}
+
+.led-status-dot {
+  width: 12px;
+  height: 12px;
+  min-width: 12px;
+  min-height: 12px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  border: 1px solid rgba(0,0,0,0.2);
+  transition: all 0.2s ease;
+}
+
+.widget-main {
+  flex-grow: 1;
+  line-height: 1.1;
+}
+
+.widget-label {
+  display: block;
+  font-size: 10px;
+  font-weight: 800;
+  color: #222;
+  text-transform: uppercase;
+}
+
+.widget-meta {
+  font-size: 10px;
+  color: #888;
+  font-family: 'Consolas', monospace;
+}
+
+.widget-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.hex-chip {
+  font-family: 'Consolas', monospace;
+  font-size: 10px;
+  background: #f0f0f0;
+  padding: 2px 5px;
+  border-radius: 3px;
+  color: #444;
+  border: 1px solid #ddd;
+}
+
+.status-text {
+  font-size: 10px;
+  font-weight: 900;
+  min-width: 40px;
+  text-align: right;
 }
 
 /*console*/

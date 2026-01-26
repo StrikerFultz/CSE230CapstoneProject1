@@ -434,6 +434,13 @@ function resetEmulator() {
   cpuEditor.clearGutter("breakpoints");
   clearHighlight();
   updateMemoryView();
+
+  if (cpu && wasmReady) {
+    updateWidgets(cpu.get_mmio_state());
+    console.log("MMIO state:", cpu.get_mmio_state());
+  } else {
+    updateWidgets({});
+  }
 }
 
 function loadProgram() {
@@ -461,6 +468,8 @@ function loadProgram() {
   isProgramLoaded = true;
   cpu.set_breakpoints(Array.from(breakpoints));
   highlightCurrentLine();
+  updateWidgets(cpu.get_mmio_state());
+  console.log("MMIO state:", cpu.get_mmio_state());
 
   return true;
 }
@@ -483,6 +492,11 @@ function handleWasmResult(result, { fromRun = false } = {}) {
   }
 
   updateMemoryView(hlAddr, hlSize);
+
+  if (cpu && wasmReady) {
+    updateWidgets(cpu.get_mmio_state());
+    console.log("MMIO state:", cpu.get_mmio_state());
+  }
 
   if (result && result.error) {
     // we have some kind of status / error string
@@ -620,6 +634,60 @@ if (stopBtn) {
   stopBtn.addEventListener("click", () => {
     resetEmulator();
   });
+}
+
+function updateWidgets(mmioMap) {
+  const widgetsDiv = document.getElementById("widgets");
+  if (!widgetsDiv) return;
+
+  let entries = [];
+  if (mmioMap instanceof Map) {
+    entries = Array.from(mmioMap.entries());
+  } else if (Array.isArray(mmioMap)) {
+    entries = mmioMap;
+  } else if (mmioMap && typeof mmioMap === "object") {
+    entries = Object.entries(mmioMap);
+  }
+
+  if (entries.length === 0) {
+    widgetsDiv.innerHTML = `<div style="padding:15px; color:#aaa; font-size:11px; text-align:center;">No active MMIO peripherals</div>`;
+    return;
+  }
+
+  let html = "";
+  for (const [addrKey, device] of entries) {
+    const address = typeof addrKey === "string" ? parseInt(addrKey, 10) : addrKey;
+    const hexAddr = "0x" + address.toString(16).toUpperCase();
+
+    if (device && device.type === "Led") {
+      const isOn = (device.data?.value ?? 0) !== 0;
+      const colorInt = device.data?.color ?? 0x00FF00; 
+      const colorHex = colorInt.toString(16).toUpperCase().padStart(6, "0");
+      
+      const dotColor = isOn ? `#${colorHex}` : "#444444";
+      const glow = isOn ? `0 0 8px #${colorHex}AA` : "inset 0 1px 2px rgba(0,0,0,0.5)";
+
+      html += `
+        <div class="widget-item">
+          <div class="led-status-dot" style="background: ${dotColor}; box-shadow: ${glow};"></div>
+          
+          <div class="widget-main">
+            <span class="widget-label">LED Indicator</span>
+            <span class="widget-meta">${hexAddr}</span>
+          </div>
+
+          <div class="widget-right">
+            <span class="hex-chip" style="color: ${isOn ? `#${colorHex}` : '#888'};">#${colorHex}</span>
+            <span class="status-text" style="color: ${isOn ? '#2e7d32' : '#757575'};">
+              ${isOn ? "ACTIVE" : "OFF"}
+            </span>
+          </div>
+        </div>
+      `;
+    }
+  }
+
+  widgetsDiv.innerHTML = html;
 }
 
 //init wasm

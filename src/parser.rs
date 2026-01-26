@@ -351,7 +351,7 @@ impl Parser {
             match lexeme.as_str() {
                 "add" | "sub" | "or" | "addu" | "subu" | "and" | "slt" | "sltu" | "mult" | "mflo" | "mfhi" | "xor" | "div" | "nor" | "sll" | "srl" => self.parse_r_type(&lexeme),
                 "j" | "jal" | "jr" => self.parse_j_type(&lexeme),
-                "addi" | "addiu" | "lb" | "sb" | "lh" | "sh" | "lw" | "sw" | "ori" | "beq" | "bne" | "andi"| "slti" | "sltiu"| "xori" => self.parse_i_type(&lexeme),
+                "addi" | "addiu" | "lb" | "sb" | "lh" | "sh" | "lw" | "sw" | "ori" | "beq" | "bne" | "andi"| "slti" | "sltiu"| "xori" | "lui" => self.parse_i_type(&lexeme),
                 "move" | "la" | "li" | "blt" | "bgt" | "ble" | "bge" => self.parse_pseudo_instruction(&lexeme),
                 _ => Err(self.error(format!("Line {}: Unknown instruction {}", self.current_line, lexeme)))
             }
@@ -387,11 +387,26 @@ impl Parser {
         }
     }
 
-    fn parse_immediate<T: std::str::FromStr>(&mut self) -> Result<T, EmuError> {
+    fn parse_immediate<T>(&mut self) -> Result<T, EmuError>
+    where
+        T: TryFrom<i64>,
+    {
         let token = self.expect(TokenType::Integer)?;
-        token.lexeme.parse::<T>().map_err(|_| {
-            self.error(format!("Line {}: Invalid immediate value", self.current_line))
-        })
+        let val = Self::parse_int_literal(&token.lexeme)
+            .ok_or_else(|| self.error(format!("Line {}: Invalid immediate value {}", self.current_line, token.lexeme)))?;
+        T::try_from(val)
+            .map_err(|_| self.error(format!("Line {}: Immediate value out of range {}", self.current_line, token.lexeme)))
+    }
+
+    fn parse_int_literal(s: &str) -> Option<i64> {
+        let s = s.trim();
+        if s.starts_with("0x") || s.starts_with("0X") {
+            i64::from_str_radix(&s[2..], 16).ok()
+        } else if s.starts_with("-0x") || s.starts_with("-0X") {
+            i64::from_str_radix(&s[3..], 16).ok().map(|v| -v)
+        } else {
+            s.parse::<i64>().ok()
+        }
     }
     
     fn parse_label(&mut self) -> Result<String, EmuError> {
@@ -466,8 +481,8 @@ impl Parser {
 
                 let sa_token = self.expect(TokenType::Integer)?;
 
-                let sa: u32 = sa_token.lexeme.parse::<u32>()
-                    .map_err(|_| self.error(format!("Line {}: invalid shift amount {}", self.current_line, sa_token.lexeme)))?;
+                let sa = Self::parse_int_literal(&sa_token.lexeme)
+                    .ok_or_else(|| self.error(format!("Line {}: invalid shift amount {}", self.current_line, sa_token.lexeme)))? as u32;
 
                 match mnemonic {
                     "sll" => Ok(Instruction::Core(CoreInstruction::Sll { rd, rt, sa })),
@@ -482,6 +497,14 @@ impl Parser {
 
     pub fn parse_i_type(&mut self, mnemonic: &str) -> Result<Instruction, EmuError> {
         self.expect(TokenType::Mnemonic)?;
+
+        if mnemonic == "lui" {
+            let rt = self.parse_register()?;
+            self.expect(TokenType::Delimiter)?;
+
+            let imm = self.parse_immediate::<u32>()?; 
+            return Ok(Instruction::Core(CoreInstruction::Lui { rt, imm }));
+        }
 
         if mnemonic == "lw" || mnemonic == "sw" || mnemonic == "lb" || mnemonic == "lh" || mnemonic == "sb" || mnemonic == "sh" {
             let rt = self.parse_register()?;
@@ -591,14 +614,10 @@ impl Parser {
                 self.expect(TokenType::Delimiter)?;
                 let imm_token = self.expect(TokenType::Integer)?;
 
-                // parse as i32 first (for negative number support like -1 as signed)
-                if let Ok(imm) = imm_token.lexeme.parse::<i32>() {
-                    Ok(Instruction::Pseudo(PseudoInstruction::Li { rd, imm: imm as u32 }))
-                } else if let Ok(imm) = imm_token.lexeme.parse::<u32>() {
-                    Ok(Instruction::Pseudo(PseudoInstruction::Li { rd, imm: imm }))
-                } else {
-                    Err(self.error(format!("Line {}: Invalid immediate value {}", self.current_line, imm_token.lexeme)))
-                }
+                let imm: i64 = Self::parse_int_literal(&imm_token.lexeme)
+                    .ok_or_else(|| self.error(format!("Line {}: Invalid immediate value {}", self.current_line, imm_token.lexeme)))?;
+
+                Ok(Instruction::Pseudo(PseudoInstruction::Li { rd, imm: imm as u32 }))
             },
             "blt" => {
                 let rs = self.parse_register()?;

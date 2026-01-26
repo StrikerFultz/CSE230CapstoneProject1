@@ -551,6 +551,7 @@ impl CPU {
             registers: self.registers.clone(),
             memory_access_addr: addr,
             memory_access_size: size,
+            mmio: Some(self.memory.mmio.snapshot())
         }
     }
 
