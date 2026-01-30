@@ -108,6 +108,10 @@ pub enum CoreInstruction {
     Srl {rd: String, rt: String, sa: u32},
 
     Sra { rd: String, rt: String, imm: i32 }, // added on sponsor request 
+
+    Multu { rs: String, rt: String },
+    
+    Divu { rs: String, rt: String }
 }
 
 #[derive(Debug, Clone)]

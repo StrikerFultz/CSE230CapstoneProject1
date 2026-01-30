@@ -478,6 +478,25 @@ impl CPU {
                 let result = v >> imm;             // arithmetic shift
                 self.set_reg(rd, result as u32);   // store back as u32
             }
+            CoreInstruction::Multu { rs, rt } => {
+            let r1 = self.get_reg(rs) as u64;
+            let r2 = self.get_reg(rt) as u64;
+
+            let res = r1 * r2;
+            self.lo = (res & 0xFFFF_FFFF) as u32;
+            self.hi = (res >> 32) as u32;
+        },
+
+        CoreInstruction::Divu { rs, rt } => {
+            let r1 = self.get_reg(rs);
+            let r2 = self.get_reg(rt);
+
+            if r2 != 0 {
+                self.lo = r1 / r2;
+                self.hi = r1 % r2;
+            }
+        }
+
 
         }        
 

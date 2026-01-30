@@ -405,7 +405,7 @@ impl Parser {
 
             // match the instruction by lexeme to the right parsing fn
             match lexeme.as_str() {
-                "add" | "sub" | "or" | "addu" | "subu" | "and" | "slt" | "sltu" | "mult" | "mflo" | "mfhi" | "xor" | "div" | "nor" | "sll" | "srl"|"sra" => self.parse_r_type(&lexeme),
+                "add" | "sub" | "or" | "addu" | "subu" | "and" | "slt" | "sltu" | "mult" |"multu"| "mflo" | "mfhi" | "xor" | "div" |"divu"| "nor" | "sll" | "srl"|"sra" => self.parse_r_type(&lexeme),
                 "j" | "jal" | "jr" => self.parse_j_type(&lexeme),
                 "addi" | "addiu" | "lb" | "sb" | "lh" | "sh" | "lw" | "sw" | "ori" | "beq" | "bne" | "andi"| "slti" | "sltiu"| "xori" | "lui"=> self.parse_i_type(&lexeme),
                 "move" | "la" | "li" | "blt" | "bgt" | "ble" | "bge" => self.parse_pseudo_instruction(&lexeme),
@@ -485,12 +485,16 @@ impl Parser {
                 }
             },
 
-            "mult" => {
+            "mult"| "multu" => {
                 let rs = self.parse_register()?;
                 self.expect(TokenType::Delimiter)?;
                 let rt = self.parse_register()?;
 
-                Ok(Instruction::Core(CoreInstruction::Mult { rs, rt }))
+                match mnemonic{
+                "mult" => Ok(Instruction::Core(CoreInstruction::Mult { rs, rt })),
+                "multu" => Ok(Instruction::Core(CoreInstruction::Multu { rs, rt })),
+                 _ => unreachable!()
+                }
             },
 
             "mflo" | "mfhi" => {
@@ -502,13 +506,14 @@ impl Parser {
                 }
             },
 
-            "div" => {
+            "div"|"divu" => {
                 let rs = self.parse_register()?;
                 self.expect(TokenType::Delimiter)?;
                 let rt = self.parse_register()?;
 
                 match mnemonic {
                     "div" => Ok(Instruction::Core(CoreInstruction::Div {rs, rt})),
+                    "divu" => Ok(Instruction::Core(CoreInstruction::Divu {rs, rt})),
                     _ => unreachable!()
                 }
             },
