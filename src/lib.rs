@@ -244,6 +244,56 @@ mod tests {
         assert_eq!(cpu.get_reg("$t0"), 42);
     }
 
+    #[test]
+    fn test_unaligned_13_and_14_both_round_to_12() {
+        let mut cpu = CPU::new();
+        
+        let program = r#"
+            li $t0, 13         # Address 13 (rounds to 12)
+            li $t1, 100
+            sw $t1, 0($t0)     # Store 100 at address 13 (actually 12)
+            
+            li $t2, 14         # Address 14 (also rounds to 12)
+            li $t3, 200
+            sw $t3, 0($t2)     # Store 200 at address 14 (actually 12, overwrites)
+            
+            li $t4, 12         # Read from aligned address 12
+            lw $t5, 0($t4)     # Should get 200 (the second value)
+        "#;
+        
+        cpu.run_input(program).unwrap();
+        assert_eq!(cpu.get_reg("$t5"), 200);  
+    }
+
+    #[test]
+    fn test_unaligned_addresses_same_word() {
+        let mut cpu = CPU::new();
+        
+        // Test all addresses 12, 13, 14, 15 round to 12
+        let program = r#"
+            li $t0, 12
+            li $t1, 111
+            sw $t1, 0($t0)     # Store 111 at 12
+            
+            li $t0, 13
+            li $t1, 222
+            sw $t1, 0($t0)     # Store 222 at 13 -> 12 (overwrite)
+            
+            li $t0, 14
+            li $t1, 333
+            sw $t1, 0($t0)     # Store 333 at 14 -> 12 (overwrite)
+            
+            li $t0, 15
+            li $t1, 444
+            sw $t1, 0($t0)     # Store 444 at 15 -> 12 (overwrite)
+            
+            lw $t2, 12($zero)  # Read from 12
+        "#;
+        
+        cpu.run_input(program).unwrap();
+        assert_eq!(cpu.get_reg("$t2"), 444);  // Last write wins
+    }
+
         #[test]
     fn lw_sw_overwrite() {
         let mut cpu = CPU::new();
@@ -258,6 +308,42 @@ mod tests {
     
         cpu.run_input(program).unwrap();
         assert_eq!(cpu.get_reg("$t3"), 2);
+    }
+
+    #[test]
+fn test_unaligned_access_rounds_down() {
+    let mut cpu = CPU::new();
+    
+    // Test that address 10 rounds down to 8
+    let program = r#"
+        li $t0, 10         # Unaligned address
+        li $t1, 99
+        sw $t1, 0($t0)     # Store at address 10 (should round to 8)
+        
+        li $t2, 8          # Aligned address
+        lw $t3, 0($t2)     # Load from address 8
+    "#;
+    
+    cpu.run_input(program).unwrap();
+    assert_eq!(cpu.get_reg("$t3"), 99);  // Should read value stored at "10" (actually 8)
+}
+
+    #[test]
+    fn test_unaligned_access_rounds_down_15_to_12() {
+        let mut cpu = CPU::new();
+        
+        // Test that address 15 rounds down to 12, copied from zylabs 
+        let program = r#"
+            li $t0, 15         # Unaligned address
+            li $t1, 123
+            sw $t1, 0($t0)     # Store at address 15 (should round to 12)
+            
+            li $t2, 12         # Aligned address
+            lw $t3, 0($t2)     # Load from address 12
+        "#;
+        
+        cpu.run_input(program).unwrap();
+        assert_eq!(cpu.get_reg("$t3"), 123);  // Should read value stored at "15" (actually 12)
     }
 
     #[test]
@@ -581,7 +667,7 @@ mod tests {
         assert_eq!(cpu.get_reg("$t3"), 50);
     }
 
-    
+
     #[test]
     fn div_normal_test() {
         let mut cpu = CPU::new();
@@ -635,4 +721,18 @@ mod tests {
 
         assert_eq!(cpu.get_reg("$t1"), 20 >> 2);
     }
+
+    #[test]
+    fn sra_negative_test() {
+        let mut cpu = CPU::new();
+        let program = r#"
+            li $t0, -8
+            sra $t1, $t0, 1
+        "#;
+
+        cpu.run_input(program).unwrap();
+
+        assert_eq!(cpu.get_reg("$t1"), (-4i32) as u32);
+    }
+
 }
