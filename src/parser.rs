@@ -405,7 +405,7 @@ impl Parser {
 
             // match the instruction by lexeme to the right parsing fn
             match lexeme.as_str() {
-                "add" | "sub" | "or" | "addu" | "subu" | "and" | "slt" | "sltu" | "mult" |"multu"| "mflo" | "mfhi" | "xor" | "div" |"divu"| "nor" | "sll" | "srl"|"sra" => self.parse_r_type(&lexeme),
+                "add" | "sub" | "or" | "addu" | "subu" | "and" | "slt" | "sltu" | "mult" | "multu" | "mflo" | "mfhi" | "xor" | "div" | "divu" | "nor" | "sll" | "srl"| "sra" => self.parse_r_type(&lexeme),
                 "j" | "jal" | "jr" => self.parse_j_type(&lexeme),
                 "addi" | "addiu" | "lb" | "sb" | "lh" | "sh" | "lw" | "sw" | "ori" | "beq" | "bne" | "andi"| "slti" | "sltiu"| "xori" | "lui"=> self.parse_i_type(&lexeme),
                 "move" | "la" | "li" | "blt" | "bgt" | "ble" | "bge" => self.parse_pseudo_instruction(&lexeme),
