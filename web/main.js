@@ -1,8 +1,28 @@
 import init, { WasmCPU } from "./pkg/mips_emu_wasm.js";
 import { LESSONS as BASE_LESSONS } from "./lessons.js";
 
-//for the lesson and files
+// API Configuration
+const API_BASE = 'http://localhost:5000/api';
+
+// For lesson and files - now supports both local and API
 const STORAGE_KEY = "customLessons";
+
+// Fetch lessons from API
+async function fetchLessonsFromAPI() {
+  try {
+    const response = await fetch(`${API_BASE}/labs`, {
+      credentials: 'include'
+    });
+    if (response.ok) {
+      const labs = await response.json();
+      console.log('Fetched labs from database:', Object.keys(labs).length, 'labs');
+      return labs;
+    }
+  } catch (error) {
+    console.warn('Could not fetch labs from API, using local storage:', error);
+  }
+  return {};
+}
 
 function getCustomLessons() {
   try {
@@ -12,19 +32,21 @@ function getCustomLessons() {
   }
 }
 
-function allLessons() {
-  return { ...BASE_LESSONS, ...getCustomLessons() };
+async function allLessons() {
+  const apiLessons = await fetchLessonsFromAPI();
+  const customLessons = getCustomLessons();
+  return { ...BASE_LESSONS, ...apiLessons, ...customLessons };
 }
 
-// lesson underlined in hedder
+// Lesson UI elements
 const lessonContainer = document.getElementById("lesson-container");
 const lessonTitle = document.getElementById("lesson-title");
 const lessonBody = document.getElementById("lesson-body");
 const lessonHide = document.getElementById("lesson-hide");
 const filesListEl = document.querySelector(".files-list");
 
-function renderFiles(selectedId) {
-  const lessons = allLessons();
+async function renderFiles(selectedId) {
+  const lessons = await allLessons();
   if (!filesListEl) return;
 
   filesListEl.innerHTML = "";
@@ -49,8 +71,8 @@ function renderFiles(selectedId) {
     });
 }
 
-function showLesson(id) {
-  const lessons = allLessons();
+async function showLesson(id) {
+  const lessons = await allLessons();
   const data = lessons[id];
   if (!data) return;
 
@@ -63,7 +85,13 @@ function showLesson(id) {
       el.classList.toggle("active", el.dataset.lesson === id);
     });
   }
-  //keeps page stable (scrolls to top so can see lesson when u click on lab)
+  
+  // Load starter code if available
+  if (data.starter_code && cpuEditor) {
+    cpuEditor.setValue(data.starter_code);
+  }
+  
+  // Scroll to top to see lesson
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
@@ -73,17 +101,19 @@ if (lessonHide) {
   });
 }
 
+// Initialize lessons
 const urlParams = new URLSearchParams(window.location.search);
-const initialLessonId =
-  urlParams.get("lesson") || Object.keys(BASE_LESSONS)[0] || null;
+const initialLessonId = urlParams.get("lesson") || Object.keys(BASE_LESSONS)[0] || null;
 
-renderFiles(initialLessonId);
-if (initialLessonId && allLessons()[initialLessonId]) {
-  showLesson(initialLessonId);
-}
+(async () => {
+  await renderFiles(initialLessonId);
+  const lessons = await allLessons();
+  if (initialLessonId && lessons[initialLessonId]) {
+    showLesson(initialLessonId);
+  }
+})();
 
-//console and reg ui
-
+// Console and register UI
 const consoleOut = document.getElementById("console-output");
 const runBtn = document.getElementById("run");
 const stepBtn = document.getElementById("step");
@@ -91,14 +121,13 @@ const stopBtn = document.getElementById("stop");
 const registersDiv = document.getElementById("registers");
 const codeEl = document.querySelector(".assembler textarea");
 
-//emultor stuff
+// Emulator helpers
 function log(msg) {
   if (!consoleOut) return;
   consoleOut.textContent += msg + "\n";
   consoleOut.scrollTop = consoleOut.scrollHeight;
 }
 
-// Helpers for numbers / registers
 function toNumber(v) {
   if (typeof v === "number") return v;
   if (typeof v === "bigint") return Number(v);
@@ -124,11 +153,8 @@ function coerceRegs(raw) {
   return {};
 }
 
-//filters to show the used regs
-
-//show in tab
+// Filter registers to show
 const INTERESTING = /^\$(?:s[0-7]|t[0-9]|a[0-3]|v[0-1])$/i;
-//hide unless changed
 const SYSTEM = /^\$(?:zero|gp|sp|fp|ra|at|k0|k1|lo|hi)$/i;
 
 function filterForTab(curr, prev) {
@@ -136,9 +162,6 @@ function filterForTab(curr, prev) {
 
   for (const [name, val] of Object.entries(curr)) {
     const now = toNumber(val);
-
-    //if don't have a previous snapshot treat it as "same as now"
-    //so changed will be false on first run
     const hadPrev = Object.prototype.hasOwnProperty.call(prev, name);
     const was = hadPrev ? toNumber(prev[name]) : now;
 
@@ -154,15 +177,13 @@ function filterForTab(curr, prev) {
       if (changed) out[name] = now;
       continue;
     }
-    //other regs show only if nonzero or changed
     if (nonZero || changed) out[name] = now;
   }
 
   return out;
 }
 
-//add 11/14 (make reg table editable)
-
+// Editable register table
 function paintRegisters(regObj) {
   if (!registersDiv) return;
 
@@ -206,13 +227,12 @@ function paintRegisters(regObj) {
   html += "</tbody></table>";
   registersDiv.innerHTML = html;
 
-  //hook up "change" handlers: editing input changes register value
+  // Hook up change handlers for editable registers
   registersDiv.querySelectorAll(".reg-edit").forEach((input) => {
     input.addEventListener("change", () => {
       const regName = input.dataset.reg;
       const newVal = Number(input.value) || 0;
 
-      //updates the CPU if API supports it
       try {
         if (cpu && typeof cpu.set_register === "function") {
           cpu.set_register(regName, newVal);
@@ -225,15 +245,13 @@ function paintRegisters(regObj) {
         log("Error setting register: " + e.message);
       }
 
-      //keeps local snapshots in sync until next run/step
       regObj[regName] = newVal;
       lastRegs[regName] = newVal;
     });
   });
 }
 
-//easm and cpu
-
+// CPU and editor setup
 let cpu = null;
 let wasmReady = false;
 let isProgramLoaded = false;
@@ -241,18 +259,15 @@ let lastRegs = {};
 let breakpoints = new Set();
 let currentLineMarker = null;
 
-//uses coldmirror
-
+// CodeMirror syntax highlighting
 CodeMirror.defineSimpleMode("mips-custom", {
   start: [
     {
-      //instructions
       regex:
         /(?:add|addu|addi|addiu|sub|subu|li|sw|lw|j|jal|jr|or|ori|and|andi|beq|bne|slt|slti|sltiu|sltu|blt|bgt|ble|bge|move|mult|mflo|mfhi)\b/i,
       token: "keyword",
     },
     {
-      //registers
       regex: /\$(?:zero|at|v[01]|a[0-3]|t[0-9]|s[0-7]|k[01]|gp|sp|fp|ra)\b/,
       token: "variable-2",
     },
@@ -275,7 +290,7 @@ const cpuEditor = CodeMirror.fromTextArea(codeEl, {
   gutters: ["CodeMirror-linenumbers", "breakpoints"],
 });
 
-//highlight current line
+// Highlight current line
 function clearHighlight() {
   if (currentLineMarker != null) {
     cpuEditor.removeLineClass(
@@ -301,7 +316,7 @@ function highlightCurrentLine() {
   }
 }
 
-//breakpoints via gutter click
+// Breakpoints via gutter click
 cpuEditor.on("gutterClick", (cm, lineIndex, gutter) => {
   if (gutter !== "breakpoints") return;
 
@@ -321,8 +336,7 @@ cpuEditor.on("gutterClick", (cm, lineIndex, gutter) => {
   }
 });
 
-//control for the emulator
-
+// Emulator controls
 function resetEmulator() {
   if (cpu && wasmReady) {
     cpu.reset();
@@ -380,9 +394,7 @@ function handleWasmResult(result, { fromRun = false } = {}) {
   paintRegisters(tabRegs);
 
   if (result && result.error) {
-    // we have some kind of status / error string
     if (result.error === "Termination") {
-      // normal “finished” case
       clearHighlight();
       if (Object.keys(allRegs).length) {
         log("All Registers (decimal + hex):");
@@ -398,14 +410,12 @@ function handleWasmResult(result, { fromRun = false } = {}) {
       if (stepBtn) stepBtn.disabled = true;
       if (runBtn) runBtn.disabled = true;
     } else if (result.error === "Breakpoint") {
-      // breakpoint case – don't dump everything, just pause
       log("\n--- Hit Breakpoint ---");
       highlightCurrentLine();
       isProgramLoaded = true;
       if (stepBtn) stepBtn.disabled = false;
       if (runBtn) runBtn.disabled = false;
     } else {
-      // some other error (e.g. invalid instruction)
       clearHighlight();
       log(`\n--- ${result.error} ---`);
       if (Object.keys(allRegs).length) {
@@ -438,12 +448,10 @@ function handleWasmResult(result, { fromRun = false } = {}) {
     log("\nProgram Finished");
   }
 
-  // keep snapshots in sync
   lastRegs = allRegs;
 }
 
-
-//buttons
+// Button event handlers
 if (runBtn) {
   runBtn.addEventListener("click", async () => {
     if (!wasmReady || !cpu) {
@@ -463,7 +471,6 @@ if (runBtn) {
     await new Promise(requestAnimationFrame);
     const result = cpu.run();
     handleWasmResult(result, { fromRun: true });
-
   });
 }
 
@@ -508,8 +515,7 @@ if (stopBtn) {
   });
 }
 
-//init wasm
-
+// Initialize WASM
 init()
   .then(() => {
     cpu = new WasmCPU();
@@ -521,4 +527,3 @@ init()
     console.error("Error initializing WASM:", err);
     log("Error initializing WASM: " + err);
   });
-
