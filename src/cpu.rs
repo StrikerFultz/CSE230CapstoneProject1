@@ -165,42 +165,43 @@ impl CPU {
                 let base = self.get_reg(rs);
                 let addr = base.wrapping_add(*imm as u32);
 
-              //  if(addr %4 != 0){
-                //    return Err(EmuError::UnalignedAccess(addr));
-               // }
+                if addr %4 != 0 {
+                    return Err(EmuError::UnalignedAccess(addr));
+                }
              //  addr &= !0x3;
                 //let val = self.memory.load_word(addr);
                // self.set_reg(rt, val as u32);
-                let aligned_addr = addr & !0x3;
+               // rs + imm should be offset of 4 else raise address trap error 
+               // let aligned_addr = addr & !0x3;
                 
-                let val = self.memory.load_word(aligned_addr);
-                self.set_reg(rt, val as u32);
-             //  let val = self.memory.load_word(addr);   // load 4 bytes starting at addr
+               // let val = self.memory.load_word(aligned_addr);
                // self.set_reg(rt, val as u32);
+               let val = self.memory.load_word(addr);   // load 4 bytes starting at addr
+                self.set_reg(rt, val as u32);
             },
 
             CoreInstruction::Sw { rs, rt, imm } => {
                 let base = self.get_reg(rs);
                 let addr = base.wrapping_add(*imm as u32);
 
-               // if(addr %4 !=0 ){// would only allow multiples of 4 to be input numbers 
-             //      return Err(EmuError::UnalignedAccess(addr)); 
-             //   }
+                if addr %4 !=0  {// would only allow multiples of 4 to be input numbers 
+                   return Err(EmuError::UnalignedAccess(addr)); 
+                }
               //  addr &= !0x3; // only allowed multiples of 4 to exist (ie: 10 wouldnt be able to be used so this wasnt a fix)
               //
                // let val = self.get_reg(rt)as i32;
 //
              //   self.memory.set_word(addr, val);
 
-             //let val = self.get_reg(rt) as i32;
-           // self.memory.set_word(addr, val);
+             let val = self.get_reg(rt) as i32;
+            self.memory.set_word(addr, val);
 
-           let aligned_addr = addr & !0x3; // this will now allow any number to be input and only allow for the writing of addresses by multiples of 4 
+           //let aligned_addr = addr & !0x3; // this will now allow any number to be input and only allow for the writing of addresses by multiples of 4 
            // what it does it takes the number and rounds DOWN to the nearest multiple of 4
            //  (ex: 8->8, 9->8, 11->8, 12->12) and when multiple at same memory it will overwrite the previous 
             
-            let val = self.get_reg(rt) as i32;
-            self.memory.set_word(aligned_addr, val);
+            //let val = self.get_reg(rt) as i32;
+            //self.memory.set_word(aligned_addr, val);
             },
 
             // CoreInstruction::Li { rd, imm } => {
