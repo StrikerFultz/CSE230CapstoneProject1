@@ -1,8 +1,96 @@
 import { LESSONS as BASE_LESSONS } from "./lessons.js";
 
+// API Configuration
+const API_BASE = 'http://localhost:5000/api';
+
 const STORAGE_KEY = "customLessons";
 const AUTH_KEY = "professorAuthed";
 
+// API helper functions
+async function apiRequest(endpoint, options = {}) {
+  try {
+    const response = await fetch(`${API_BASE}${endpoint}`, {
+      ...options,
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+        ...options.headers,
+      },
+    });
+    
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'API request failed');
+    }
+    
+    return await response.json();
+  } catch (error) {
+    console.error('API Error:', error);
+    throw error;
+  }
+}
+
+async function fetchLessonsFromAPI() {
+  try {
+    const labs = await apiRequest('/labs');
+    console.log('Fetched from database:', Object.keys(labs).length, 'labs');
+    return labs;
+  } catch (error) {
+    console.warn('Could not fetch labs from API:', error);
+    return {};
+  }
+}
+
+async function saveLessonToAPI(labId, title, html) {
+  try {
+    const labData = {
+      lab_id: labId,
+      title: title,
+      instructions: html,
+      is_published: true,
+      difficulty: 'beginner',
+      points: 100
+    };
+    
+    // Try to update first
+    try {
+      await apiRequest(`/labs/${labId}`, {
+        method: 'PUT',
+        body: JSON.stringify(labData)
+      });
+      console.log('Lab updated in database');
+      return true;
+    } catch (updateError) {
+      // If update fails, try to create
+      await apiRequest('/labs', {
+        method: 'POST',
+        body: JSON.stringify(labData)
+      });
+      console.log('Lab created in database');
+      return true;
+    }
+  } catch (error) {
+    console.error('Failed to save lab to database:', error);
+    alert('Failed to save to database: ' + error.message + '\n\nSaved locally only.');
+    return false;
+  }
+}
+
+async function deleteLessonFromAPI(labId) {
+  try {
+    await apiRequest(`/labs/${labId}`, {
+      method: 'DELETE'
+    });
+    console.log('Lab deleted from database');
+    return true;
+  } catch (error) {
+    console.error('Failed to delete lab from database:', error);
+    alert('Failed to delete from database: ' + error.message);
+    return false;
+  }
+}
+
+// Local storage fallback
 const getCustom = () => {
   try {
     return JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}");
@@ -15,36 +103,40 @@ const setCustom = (obj) => {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(obj));
 };
 
-const allLessons = () => ({ ...BASE_LESSONS, ...getCustom() });
+const allLessons = async () => {
+  const apiLessons = await fetchLessonsFromAPI();
+  const customLessons = getCustom();
+  return { ...BASE_LESSONS, ...apiLessons, ...customLessons };
+};
 
 // DOM elements
-const idEl        = document.getElementById("lesson-id");
-const titleEl     = document.getElementById("lesson-title");
-const editor      = document.getElementById("editor");
-const preview     = document.getElementById("preview");
-const saveBtn     = document.getElementById("btn-save");
-const newBtn      = document.getElementById("btn-new");
-const deleteBtn   = document.getElementById("btn-delete");
-const openBtn     = document.getElementById("btn-open");
-const exportBtn   = document.getElementById("btn-export");
+const idEl = document.getElementById("lesson-id");
+const titleEl = document.getElementById("lesson-title");
+const editor = document.getElementById("editor");
+const preview = document.getElementById("preview");
+const saveBtn = document.getElementById("btn-save");
+const newBtn = document.getElementById("btn-new");
+const deleteBtn = document.getElementById("btn-delete");
+const openBtn = document.getElementById("btn-open");
+const exportBtn = document.getElementById("btn-export");
 const importInput = document.getElementById("file-import");
-const lessonListEl= document.getElementById("lesson-list");
-const docChipTitle= document.getElementById("doc-title");
-const timeEl      = document.getElementById("doc-time");
-const countEl     = document.getElementById("doc-count");
-const saveStatus  = document.getElementById("save-status");
+const lessonListEl = document.getElementById("lesson-list");
+const docChipTitle = document.getElementById("doc-title");
+const timeEl = document.getElementById("doc-time");
+const countEl = document.getElementById("doc-count");
+const saveStatus = document.getElementById("save-status");
 const collapseBtn = document.getElementById("btn-collapse-library");
-const libraryEl   = document.getElementById("library");
+const libraryEl = document.getElementById("library");
 
 let currentId = null;
 
-//login and ui
+// Login and UI
 document.addEventListener("DOMContentLoaded", () => {
-  const overlay   = document.getElementById("login-overlay");
+  const overlay = document.getElementById("login-overlay");
   const userInput = document.getElementById("login-username");
   const passInput = document.getElementById("login-password");
   const submitBtn = document.getElementById("login-submit");
-  const errorEl   = document.getElementById("login-error");
+  const errorEl = document.getElementById("login-error");
   const logoutBtn = document.getElementById("logout-prof");
 
   if (!overlay || !userInput || !passInput || !submitBtn) {
@@ -60,27 +152,45 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
-  // hide on load
   syncOverlayWithAuth();
 
-  // handle login whenn click
-  submitBtn.addEventListener("click", () => {
+  // Handle login
+  submitBtn.addEventListener("click", async () => {
     const username = userInput.value.trim();
     const password = passInput.value;
 
-    //temp place to store credentials
-    // Username: 1
-    // Password: 1
+    // Try API login first
+    try {
+      const result = await apiRequest('/auth/login', {
+        method: 'POST',
+        body: JSON.stringify({ username, password })
+      });
+      
+      if (result.user) {
+        localStorage.setItem(AUTH_KEY, "true");
+        overlay.style.display = "none";
+        errorEl.textContent = "";
+        console.log('✓ Logged in as:', result.user.username);
+        alert(`Welcome, ${result.user.first_name || username}!`);
+        renderList(null);
+        return;
+      }
+    } catch (apiError) {
+      console.warn('API login failed, trying local auth:', apiError);
+    }
+
+    // Fallback to local auth (username: 1, password: 1)
     if (username === "1" && password === "1") {
       localStorage.setItem(AUTH_KEY, "true");
       overlay.style.display = "none";
       errorEl.textContent = "";
+      console.log('✓ Logged in locally');
     } else {
       errorEl.textContent = "Incorrect username or password.";
     }
   });
 
-  //this makes it so when u press enter in either field it submits
+  // Enter key support
   [userInput, passInput].forEach((input) => {
     input.addEventListener("keydown", (e) => {
       if (e.key === "Enter") {
@@ -89,21 +199,36 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   });
 
-  //logout buttons
+  // Logout
   if (logoutBtn) {
-    logoutBtn.addEventListener("click", () => {
+    logoutBtn.addEventListener("click", async () => {
+      try {
+        await apiRequest('/auth/logout', { method: 'POST' });
+      } catch (error) {
+        console.warn('API logout failed:', error);
+      }
       localStorage.removeItem(AUTH_KEY);
-      window.location.href="index.html";
+      window.location.href = "index.html";
     });
   }
 });
 
-//helpers
-function updateCount() {
-  const baseCount   = Object.keys(BASE_LESSONS).length;
+// Helper functions
+async function updateCount() {
+  const baseCount = Object.keys(BASE_LESSONS).length;
   const customCount = Object.keys(getCustom()).length;
-  if (countEl) {
-    countEl.textContent = `Base: ${baseCount} · Custom: ${customCount}`;
+  
+  try {
+    const apiLessons = await fetchLessonsFromAPI();
+    const apiCount = Object.keys(apiLessons).length;
+    
+    if (countEl) {
+      countEl.textContent = `Base: ${baseCount} · Database: ${apiCount} · Local: ${customCount}`;
+    }
+  } catch (error) {
+    if (countEl) {
+      countEl.textContent = `Base: ${baseCount} · Custom: ${customCount}`;
+    }
   }
 }
 
@@ -123,15 +248,15 @@ function selectListItem(id) {
   });
 }
 
-function loadLesson(id) {
-  const lessons = allLessons();
+async function loadLesson(id) {
+  const lessons = await allLessons();
   const data = lessons[id];
   if (!data) return;
 
   currentId = id;
   idEl.value = id;
   titleEl.value = data.title || id;
-  editor.innerHTML = data.html || "";
+  editor.innerHTML = data.html || data.instructions || "";
   renderPreview();
   selectListItem(id);
   if (timeEl) {
@@ -142,8 +267,8 @@ function loadLesson(id) {
   }
 }
 
-function renderList(selectId = null) {
-  const lessons = allLessons();
+async function renderList(selectId = null) {
+  const lessons = await allLessons();
   lessonListEl.innerHTML = "";
 
   Object.entries(lessons)
@@ -171,7 +296,7 @@ function renderList(selectId = null) {
   updateCount();
 }
 
-//actions
+// Actions
 function ensureId() {
   let id = idEl.value.trim();
   if (!id) {
@@ -182,27 +307,31 @@ function ensureId() {
   return id;
 }
 
-function saveCurrent() {
+async function saveCurrent() {
   const id = ensureId();
   if (!id) return;
 
   const title = titleEl.value.trim() || id;
-  const html  = editor.innerHTML;
+  const html = editor.innerHTML;
 
+  // Save to API first
+  const apiSuccess = await saveLessonToAPI(id, title, html);
+  
+  // Also save to local storage as backup
   const custom = getCustom();
   custom[id] = { title, html };
   setCustom(custom);
 
   currentId = id;
-  renderList(id);
+  await renderList(id);
   renderPreview();
 
   const now = new Date().toLocaleString();
   if (timeEl) {
-    timeEl.textContent = "Last saved " + now;
+    timeEl.textContent = "Last saved " + now + (apiSuccess ? " (database)" : " (local only)");
   }
   if (saveStatus) {
-    saveStatus.textContent = "Saved " + now;
+    saveStatus.textContent = "Saved " + now + (apiSuccess ? " ✓ DB" : " ⚠ Local");
   }
 }
 
@@ -217,20 +346,26 @@ function newLesson() {
   if (saveStatus) saveStatus.textContent = "New lesson (unsaved)";
 }
 
-function deleteCurrent() {
+async function deleteCurrent() {
   const id = idEl.value.trim();
   if (!id) return;
 
-  const custom = getCustom();
-  if (!(id in custom)) {
-    alert("Only custom lessons can be deleted.");
+  if (!confirm(`Are you sure you want to delete "${id}"?`)) {
     return;
   }
-  delete custom[id];
-  setCustom(custom);
+
+  // Try to delete from API
+  await deleteLessonFromAPI(id);
+
+  // Also delete from local storage
+  const custom = getCustom();
+  if (id in custom) {
+    delete custom[id];
+    setCustom(custom);
+  }
 
   newLesson();
-  renderList(null);
+  await renderList(null);
 }
 
 function openInLabs() {
@@ -243,11 +378,10 @@ function exportCurrent() {
   const id = idEl.value.trim();
   if (!id) return;
 
-  const lessons = allLessons();
-  const data = lessons[id];
-  if (!data) return;
+  const title = titleEl.value.trim() || id;
+  const html = editor.innerHTML;
 
-  const payload = { id, title: data.title || id, html: data.html || "" };
+  const payload = { id, title, html };
   const blob = new Blob([JSON.stringify(payload, null, 2)], {
     type: "application/json",
   });
@@ -261,16 +395,15 @@ function exportCurrent() {
   URL.revokeObjectURL(url);
 }
 
-function importFromFile(file) {
+async function importFromFile(file) {
   const reader = new FileReader();
-  reader.onload = (e) => {
+  reader.onload = async (e) => {
     try {
       const text = String(e.target.result || "");
       const obj = JSON.parse(text);
 
       let toSave = {};
       if (obj && typeof obj === "object" && obj.id && obj.html) {
-        //single file lessons
         toSave[obj.id] = { title: obj.title || obj.id, html: obj.html };
       } else {
         for (const [id, val] of Object.entries(obj)) {
@@ -285,11 +418,17 @@ function importFromFile(file) {
         return;
       }
 
+      // Save to API and local storage
+      for (const [id, data] of Object.entries(toSave)) {
+        await saveLessonToAPI(id, data.title, data.html);
+      }
+
       const custom = getCustom();
       const merged = { ...custom, ...toSave };
       setCustom(merged);
-      renderList(null);
-      updateCount();
+      
+      await renderList(null);
+      await updateCount();
       alert("Imported lesson(s).");
     } catch (err) {
       console.error(err);
@@ -299,7 +438,7 @@ function importFromFile(file) {
   reader.readAsText(file);
 }
 
-//to close or expand lib
+// Collapse/expand library
 if (collapseBtn && libraryEl) {
   collapseBtn.addEventListener("click", () => {
     const collapsed = libraryEl.classList.toggle("collapsed");
@@ -307,11 +446,11 @@ if (collapseBtn && libraryEl) {
   });
 }
 
-//wires the events
-if (saveBtn)   saveBtn.addEventListener("click", saveCurrent);
-if (newBtn)    newBtn.addEventListener("click", newLesson);
+// Wire up events
+if (saveBtn) saveBtn.addEventListener("click", saveCurrent);
+if (newBtn) newBtn.addEventListener("click", newLesson);
 if (deleteBtn) deleteBtn.addEventListener("click", deleteCurrent);
-if (openBtn)   openBtn.addEventListener("click", openInLabs);
+if (openBtn) openBtn.addEventListener("click", openInLabs);
 if (exportBtn) exportBtn.addEventListener("click", exportCurrent);
 
 if (importInput) {
@@ -338,13 +477,13 @@ if (titleEl) {
   });
 }
 
-//renders
+// Initial render
+(async () => {
+  await renderList(null);
+  await updateCount();
 
-renderList(null);
-updateCount();
-
-//auto select the first base lesson if present
-const firstBase = Object.keys(BASE_LESSONS)[0];
-if (firstBase) {
-  loadLesson(firstBase);
-}
+  const firstBase = Object.keys(BASE_LESSONS)[0];
+  if (firstBase) {
+    loadLesson(firstBase);
+  }
+})();

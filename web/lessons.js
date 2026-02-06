@@ -50,9 +50,181 @@ export const LESSONS = {
 <p class="lesson-example">
   Hint: Think of this as <code>Z = ((A + B) + C) - D</code> and build it up in <code>$t0</code> one step at a time.
 </p>
-`
+`,
+    testCases: [
+      {
+        name: "Test 1: Compare storage (4 points)",
+        points: 4,
+        initialRegisters: {
+          "$s0": 2,
+          "$s1": 4,
+          "$s2": 6,
+          "$s3": 5
+        },
+        expectedRegisters: {
+          "$t0": 12,
+          "$s0": 2,
+          "$s1": 4,
+          "$s2": 6,
+          "$s3": 5,
+          "$s4": 7
+        }
+      },
+      {
+        name: "Test 2: Compare storage (3 points)",
+        points: 3,
+        initialRegisters: {
+          "$s0": 1,
+          "$s1": 2,
+          "$s2": 3,
+          "$s3": 10
+        },
+        expectedRegisters: {
+          "$t0": 6,
+          "$s0": 1,
+          "$s1": 2,
+          "$s2": 3,
+          "$s3": 10,
+          "$s4": -4
+        }
+      },
+      {
+        name: "Test 3: Compare storage (3 points)",
+        points: 3,
+        initialRegisters: {
+          "$s0": 1,
+          "$s1": 1,
+          "$s2": 1,
+          "$s3": 3
+        },
+        expectedRegisters: {
+          "$t0": 3,
+          "$s0": 1,
+          "$s1": 1,
+          "$s2": 1,
+          "$s3": 3,
+          "$s4": 0
+        }
+      }
+    ]
   },
 
+  "lab-12-3": {
+    title: "12.3 LAB: Arithmetic expression - add/sub/mult",
+    html: `
+<p style="text-align:center">
+  Given the mapping of registers to variables below, write a program to implement the following expression:
+</p>
+<p style="text-align:center;font-weight:bold">
+  Z = (A + B) * (C - D)
+</p>
+
+<div class="center-table">
+  <table>
+    <thead>
+      <tr><th>Registers</th><th>Variables</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>$s0</td><td>A</td></tr>
+      <tr><td>$s1</td><td>B</td></tr>
+      <tr><td>$s2</td><td>C</td></tr>
+      <tr><td>$s3</td><td>D</td></tr>
+      <tr><td>$s4</td><td>Z</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<p class="lesson-example">
+  Ex: If the values of <code>$s0</code>, <code>$s1</code>, <code>$s2</code>, and <code>$s3</code> are initialized in the simulator as:
+</p>
+
+<div class="center-table">
+  <table>
+    <thead>
+      <tr><th>Register</th><th>Data</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>$s0</td><td>2</td></tr>
+      <tr><td>$s1</td><td>4</td></tr>
+      <tr><td>$s2</td><td>6</td></tr>
+      <tr><td>$s3</td><td>3</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<p class="lesson-example">
+  the result is stored in <code>$s4</code>:
+</p>
+
+<div class="center-table">
+  <table>
+    <thead>
+      <tr><th>Register</th><th>Data</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>$s4</td><td>18</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<p class="lesson-example">
+  <strong>Note:</strong> Use the '+' button under the Registers display to initialize register values for <code>$s0</code>, <code>$s1</code>, <code>$s2</code>, and <code>$s3</code>.
+</p>
+`,
+    testCases: [
+      {
+        name: "Test 1: Compare storage (4 points)",
+        points: 4,
+        initialRegisters: {
+          "$s0": 2,
+          "$s1": 4,
+          "$s2": 6,
+          "$s3": 3
+        },
+        expectedRegisters: {
+          "$s0": 2,
+          "$s1": 4,
+          "$s2": 6,
+          "$s3": 3,
+          "$s4": 18
+        }
+      },
+      {
+        name: "Test 2: Compare storage (3 points)",
+        points: 3,
+        initialRegisters: {
+          "$s0": 3,
+          "$s1": 6,
+          "$s2": 3,
+          "$s3": 6
+        },
+        expectedRegisters: {
+          "$s0": 3,
+          "$s1": 6,
+          "$s2": 3,
+          "$s3": 6,
+          "$s4": -27
+        }
+      },
+      {
+        name: "Test 3: Compare storage (3 points)",
+        points: 3,
+        initialRegisters: {
+          "$s0": 5,
+          "$s1": 5,
+          "$s2": 5,
+          "$s3": 5
+        },
+        expectedRegisters: {
+          "$s0": 5,
+          "$s1": 5,
+          "$s2": 5,
+          "$s3": 5,
+          "$s4": 0
+        }
+      }
+    ]
+  },
 "lab-12-11": {
     title: "12.11 LAB: Arithmetic Expressions",
     html: `
@@ -573,3 +745,6 @@ void newElement(int* P, int k, int pow) {
 `
   }
 };
+
+// ── DIAGNOSTIC: fires after module evaluates ──
+console.log("[MIPS DEBUG] lessons.js loaded. LESSONS keys:", Object.keys(LESSONS));
