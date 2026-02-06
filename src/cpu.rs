@@ -154,18 +154,29 @@ impl CPU {
             CoreInstruction::Lw { rt, rs, imm } => {
                 let base = self.get_reg(rs);
                 let addr = base.wrapping_add(*imm as u32);
-                let val = self.memory.load_word(addr);
 
+                if addr % 4 != 0 {
+                    return Err(EmuError::UnalignedAccess(addr));
+                }
+
+                let val = self.memory.load_word(addr);   // load 4 bytes starting at addr
                 self.set_reg(rt, val as u32);
+                
                 self.last_mem_access = Some((addr, 4));
             },
 
             CoreInstruction::Sw { rs, rt, imm } => {
                 let base = self.get_reg(rs);
                 let addr = base.wrapping_add(*imm as u32);
-                let val = self.get_reg(rt)as i32;
 
+                // would only allow multiples of 4 to be input numbers 
+                if addr % 4 != 0  {
+                   return Err(EmuError::UnalignedAccess(addr)); 
+                }
+
+                let val = self.get_reg(rt) as i32;
                 self.memory.set_word(addr, val);
+
                 self.last_mem_access = Some((addr, 4));
             },
 
@@ -435,6 +446,31 @@ impl CPU {
             CoreInstruction::Srl { rd, rt, sa} =>{
                 let v = self.get_reg(&rt);
                 self.set_reg(&rd, v >> sa);
+            },
+
+            CoreInstruction::Sra { rd, rt, imm } => {
+                let v = self.get_reg(rt) as i32;        // interpret as signed
+                let result = v >> imm;                       // arithmetic shift
+                self.set_reg(rd, result as u32);      // store back as u32
+            },
+
+            CoreInstruction::Multu { rs, rt } => {
+                let r1 = self.get_reg(rs) as u64;
+                let r2 = self.get_reg(rt) as u64;
+
+                let res = r1 * r2;
+                self.lo = (res & 0xFFFF_FFFF) as u32;
+                self.hi = (res >> 32) as u32;
+            },
+
+            CoreInstruction::Divu { rs, rt } => {
+                let r1 = self.get_reg(rs);
+                let r2 = self.get_reg(rt);
+
+                if r2 != 0 {
+                    self.lo = r1 / r2;
+                    self.hi = r1 % r2;
+                }
             }
         }        
 

@@ -1,8 +1,28 @@
 import init, { WasmCPU } from "./pkg/mips_emu_wasm.js";
 import { LESSONS as BASE_LESSONS } from "./lessons.js";
 
+// API Configuration
+const API_BASE = 'http://localhost:5000/api';
+
 //for the lesson and files
 const STORAGE_KEY = "customLessons";
+
+// Fetch lessons from API
+async function fetchLessonsFromAPI() {
+  try {
+    const response = await fetch(`${API_BASE}/labs`, {
+      credentials: 'include'
+    });
+    if (response.ok) {
+      const labs = await response.json();
+      console.log('Fetched labs from database:', Object.keys(labs).length, 'labs');
+      return labs;
+    }
+  } catch (error) {
+    console.warn('Could not fetch labs from API, using local storage:', error);
+  }
+  return {};
+}
 
 function getCustomLessons() {
   try {
@@ -12,8 +32,10 @@ function getCustomLessons() {
   }
 }
 
-function allLessons() {
-  return { ...BASE_LESSONS, ...getCustomLessons() };
+async function allLessons() {
+  const apiLessons = await fetchLessonsFromAPI();
+  const customLessons = getCustomLessons();
+  return { ...BASE_LESSONS, ...apiLessons, ...customLessons };
 }
 
 // lesson underlined in hedder
@@ -23,8 +45,8 @@ const lessonBody = document.getElementById("lesson-body");
 const lessonHide = document.getElementById("lesson-hide");
 const filesListEl = document.querySelector(".files-list");
 
-function renderFiles(selectedId) {
-  const lessons = allLessons();
+async function renderFiles(selectedId) {
+  const lessons = await allLessons();
   if (!filesListEl) return;
 
   filesListEl.innerHTML = "";
@@ -49,8 +71,8 @@ function renderFiles(selectedId) {
     });
 }
 
-function showLesson(id) {
-  const lessons = allLessons();
+async function showLesson(id) {
+  const lessons = await allLessons();
   const data = lessons[id];
   if (!data) return;
 
@@ -63,6 +85,16 @@ function showLesson(id) {
       el.classList.toggle("active", el.dataset.lesson === id);
     });
   }
+
+  // Load starter code if available
+  if (data.starter_code && cpuEditor) {
+    cpuEditor.setValue(data.starter_code);
+  }
+
+  // Render test cases if available - support both field names
+  const testCases = data.test_cases || data.testCases;
+  renderTestCases(testCases);
+
   //keeps page stable (scrolls to top so can see lesson when u click on lab)
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
@@ -73,14 +105,123 @@ if (lessonHide) {
   });
 }
 
+// Test cases rendering
+const testCasesSection = document.getElementById("test-cases-section");
+const testCasesToggle = document.getElementById("test-cases-toggle");
+const testCasesContent = document.getElementById("test-cases-content");
+const testCasesList = document.getElementById("test-cases-list");
+
+if (testCasesToggle) {
+  testCasesToggle.addEventListener("click", () => {
+    const isHidden = testCasesContent.classList.toggle("hidden");
+    testCasesToggle.textContent = isHidden ? "▼ Show Test Cases" : "▲ Hide Test Cases";
+  });
+}
+
+function renderTestCases(testCases) {
+  if (!testCasesSection || !testCasesList) return;
+  
+  // Hide section if no test cases
+  if (!testCases || testCases.length === 0) {
+    testCasesSection.classList.add("hidden");
+    return;
+  }
+  
+  // Show section and render test cases
+  testCasesSection.classList.remove("hidden");
+  testCasesList.innerHTML = "";
+  
+  testCases.forEach((testCase, index) => {
+    const item = document.createElement("div");
+    item.className = "test-case-item";
+    
+    // Support both naming conventions: inputs/initialRegisters and expected/expectedRegisters
+    const inputs = testCase.inputs || testCase.initialRegisters || {};
+    const expected = testCase.expected || testCase.expectedRegisters || {};
+    
+    // Build inputs table
+    let inputsHTML = "";
+    if (Object.keys(inputs).length > 0) {
+      inputsHTML = `
+        <table class="test-case-table">
+          <thead>
+            <tr>
+              <th>Register</th>
+              <th>Value</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${Object.entries(inputs).map(([reg, val]) => `
+              <tr>
+                <td>${reg}</td>
+                <td>${val}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      `;
+    } else {
+      inputsHTML = '<p style="font-size: 12px; color: #666;">No input values</p>';
+    }
+    
+    // Build expected outputs table
+    let outputsHTML = "";
+    if (Object.keys(expected).length > 0) {
+      outputsHTML = `
+        <table class="test-case-table">
+          <thead>
+            <tr>
+              <th>Register</th>
+              <th>Expected Value</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${Object.entries(expected).map(([reg, val]) => `
+              <tr>
+                <td>${reg}</td>
+                <td>${val}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      `;
+    } else {
+      outputsHTML = '<p style="font-size: 12px; color: #666;">No expected outputs</p>';
+    }
+    
+    item.innerHTML = `
+      <div class="test-case-header">
+        <div class="test-case-name">${testCase.name || `Test Case ${index + 1}`}</div>
+        <div class="test-case-points">${testCase.points || 0} points</div>
+      </div>
+      <div class="test-case-body">
+        <div class="test-case-column">
+          <h4>Initial Values</h4>
+          ${inputsHTML}
+        </div>
+        <div class="test-case-column">
+          <h4>Expected Outputs</h4>
+          ${outputsHTML}
+        </div>
+      </div>
+    `;
+    
+    testCasesList.appendChild(item);
+  });
+}
+
 const urlParams = new URLSearchParams(window.location.search);
 const initialLessonId =
   urlParams.get("lesson") || Object.keys(BASE_LESSONS)[0] || null;
 
-renderFiles(initialLessonId);
-if (initialLessonId && allLessons()[initialLessonId]) {
-  showLesson(initialLessonId);
-}
+// Initialize lessons async
+(async () => {
+  await renderFiles(initialLessonId);
+  const lessons = await allLessons();
+  if (initialLessonId && lessons[initialLessonId]) {
+    showLesson(initialLessonId);
+  }
+})();
 
 //console and reg ui
 
@@ -475,7 +616,10 @@ function loadProgram() {
 }
 
 function handleWasmResult(result, { fromRun = false } = {}) {
-  const rawRegs = (result && result.snapshot && result.snapshot.registers) || {};
+  // Support both result formats (raw registers or snapshot object)
+  const rawRegs = (result && result.snapshot && result.snapshot.registers) || 
+                  (result && result.registers) || {};
+                  
   const allRegs = coerceRegs(rawRegs);
   const tabRegs = filterForTab(allRegs, lastRegs);
   paintRegisters(tabRegs);
@@ -703,4 +847,3 @@ init()
     console.error("Error initializing WASM:", err);
     log("Error initializing WASM: " + err);
   });
-
