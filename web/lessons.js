@@ -743,7 +743,623 @@ void newElement(int* P, int k, int pow) {
   </table>
 </div>
 `
-  }
+  },
+
+  "lab-12-15": {
+  title: "12.15 ZyLab 4 - Nested Procedure Call",
+  html: `
+<p>
+  Write a MIPS program to add a given node in a linked list at the specified location,
+  using Nested Procedure Calls. If your code runs perfectly, but you did not use
+  Procedure Execution correctly, you will be given zero points.
+</p>
+
+<p>Given Inputs:</p>
+<ul>
+  <li>the head of linked list, i.e. address of the start (first node) of the list</li>
+  <li>location: number of node in the linked list after which node is to be added (0 to add before the 1st node, 1 to add after 1st node and so on.)</li>
+  <li>the address of the node to be inserted AND each node contains:</li>
+  <li>an integer value</li>
+  <li>address to the next node (address is NULL (0) if it is the last node in the list)</li>
+</ul>
+
+<p>
+  Write the following three functions that will be called in order to update the linked
+  list by adding the new node.
+</p>
+
+<ul>
+  <li>
+    <strong>main</strong>
+    <ul>
+      <li>task: calls the addNode function and reads the value of the newly added node.</li>
+    </ul>
+  </li>
+
+  <li>
+    <strong>addNode</strong>
+    <ul>
+      <li>inputs: head of linked list (head), location to add node (n) and address of node to be added (node)</li>
+      <li>task: calls the findNode function and add the node after the n’th node in the linked list. If the number is greater than the size of list, then add the node at the end of the list.</li>
+      <li>output: value of the inserted node.</li>
+    </ul>
+  </li>
+
+  <li>
+    <strong>findNode</strong>
+    <ul>
+      <li>inputs: head of linked list (head) and location to add node (n)</li>
+      <li>task: navigate the linked list to find the addresses of the n’th and (n+1)’th nodes</li>
+      <li>outputs: addresses of the n’th and (n+1)’th nodes.</li>
+    </ul>
+  </li>
+</ul>
+
+<p>
+  Following is a sample C code segment to perform the required task. (this code is
+  incomplete and does not include creating the linked list or a new node, so you cannot
+  compile it using any C compiler). You may modify the code for the functions, but the
+  task performed should not be changed.
+</p>
+
+<pre>
+// Parameters of a node in the linked list (need not declare or initialize in MIPS)
+typedef struct node {
+    int value;     // Value in the node accessed by node->value
+    node* next;    // Address of next node accessed by node->next
+} node;            // Datatype for each node
+
+node *head;        // Address of head (first node) of linked list (global pointer)
+
+int main() {
+    // Variable Declaration
+    node *newNode; // Address of node to be added
+    int n;         // Number of the node in the list after which node is to be added
+    int value;     // Value of the node to be added
+
+    // Task of main function
+    value = addNode(head, n, newNode);
+}
+
+int addNode(node* head, int n, node* newNode) {
+    node *addr1, *addr2;        // addr1 = address of n^th node, addr2 = address of (n+1)^th node
+    if (n == 0 || head == 0) {  // If node should be added at the beginning of the list
+        newNode->next = head;   // Next for new node = head of original list
+        head = newNode;         // global head updated to the new node
+        return(newNode->value); // value of the node = data at the address of the node, and then return to caller
+    }
+    else {
+        [addr1, addr2] = findNode(head, n);   // Call findNode function
+        addr1->next = newNode;                // Next for n^th node = node to be added
+        newNode->next = addr2;                // Next for added node = (n+1)^th node of original list
+        return(newNode->value);               // value of the node = data at the address of the node
+    }
+}
+
+node* findNode(node* head, int n) {
+    node* curr = head;                  // Start with head of linked list
+    for (int i = 1; i < n; i++) {
+        curr = curr->next;              // Update the pointer to next node address
+        if (curr == 0)                  // Break if end of List
+            break;
+        if (curr->next == 0)            // Break if end of List
+            break;
+    }
+    return(curr, curr->next);           // Two return values (need not return as array in MIPS)
+}
+</pre>
+
+<div class="center-table">
+  <table>
+    <thead>
+      <tr><th>Registers</th><th>Variables</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>$s0</td><td>head</td></tr>
+      <tr><td>$s1</td><td>newNode</td></tr>
+      <tr><td>$s2</td><td>n</td></tr>
+      <tr><td>$s3</td><td>val</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<p>
+  Linked List and New Node in Memory:
+</p>
+
+<div class="center-table">
+  <table>
+    <thead>
+      <tr><th>Addresses</th><th>Contents</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>newNode</td><td>newNode->value</td></tr>
+      <tr><td>head</td><td>node1->value</td></tr>
+      <tr><td>head + 4</td><td>node1->next</td></tr>
+      <tr><td>node1->next</td><td>node2->value</td></tr>
+      <tr><td>node1->next + 4</td><td>node2->next</td></tr>
+      <tr><td>node2->next</td><td>node3->value</td></tr>
+      <tr><td>node2->next + 4</td><td>node3->next</td></tr>
+      <tr><td>...</td><td>...</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<p>
+  Example Test: If the values of <code>$s0</code> through <code>$s3</code> and Memory
+  contents are initialized in the simulator as:
+</p>
+
+<div class="center-table">
+  <table>
+    <thead>
+      <tr><th>Registers</th><th>Data</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>$s0</td><td>4000</td></tr>
+      <tr><td>$s1</td><td>8000</td></tr>
+      <tr><td>$s2</td><td>2</td></tr>
+      <tr><td>$s3</td><td>0</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<div class="center-table">
+  <table>
+    <thead>
+      <tr><th>Addresses</th><th>Contents</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>8000</td><td>230</td></tr>
+      <tr><td>4000</td><td>4</td></tr>
+      <tr><td>4004</td><td>3848</td></tr>
+      <tr><td>3848</td><td>-15</td></tr>
+      <tr><td>3852</td><td>6104</td></tr>
+      <tr><td>6104</td><td>-10</td></tr>
+      <tr><td>6108</td><td>5008</td></tr>
+      <tr><td>5008</td><td>0</td></tr>
+      <tr><td>5012</td><td>4500</td></tr>
+      <tr><td>4500</td><td>40</td></tr>
+      <tr><td>4504</td><td>0</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<p>The resultant registers are:</p>
+
+<div class="center-table">
+  <table>
+    <thead>
+      <tr><th>Registers</th><th>Data</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>$s0</td><td>4000</td></tr>
+      <tr><td>$s1</td><td>8000</td></tr>
+      <tr><td>$s2</td><td>2</td></tr>
+      <tr><td>$s3</td><td>230</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<p>The resultant array is:</p>
+
+<div class="center-table">
+  <table>
+    <thead>
+      <tr><th>Addresses</th><th>Contents</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>8000</td><td>230</td></tr>
+      <tr><td>8004</td><td>6104</td></tr>
+      <tr><td>4000</td><td>4</td></tr>
+      <tr><td>4004</td><td>3848</td></tr>
+      <tr><td>3848</td><td>-15</td></tr>
+      <tr><td>3852</td><td>8000</td></tr>
+      <tr><td>6104</td><td>-10</td></tr>
+      <tr><td>6108</td><td>5008</td></tr>
+      <tr><td>5008</td><td>0</td></tr>
+      <tr><td>5012</td><td>4500</td></tr>
+      <tr><td>4500</td><td>40</td></tr>
+      <tr><td>4504</td><td>0</td></tr>
+    </tbody>
+  </table>
+</div>
+`
+},
+
+"lab-12-16": {
+  title: "12.16 ZyLab 5 - Recursive Procedure Call",
+  html: `
+<p>
+  Write a MIPS program using <em>Recursive Procedure Execution</em> to perform the
+  following tasks: <strong>Note:</strong> If your code runs perfectly, but you didn't
+  use Procedure Execution correctly, you will be given zero points.
+</p>
+
+<p>Write the following functions in MIPS.</p>
+
+<ul>
+  <li>
+    <strong>main</strong>
+    <ul>
+      <li>inputs: integers a, b</li>
+      <li>
+        task: Compute the integer:
+        <code>a * F(|a+b|, |a-b|) - b * F(|b-a|, |b+a|)</code>.
+      </li>
+    </ul>
+  </li>
+
+  <li>
+    <strong>recursion F(x, y)</strong>
+    <ul>
+      <li>inputs: integers x, y</li>
+      <li>task:</li>
+    </ul>
+  </li>
+</ul>
+
+<pre>
+F(x, y) = F(x-1, y) + F(x, y-1), if x, y > 0
+F(x, y) = y if x <= 0, y > 0
+F(x, y) = x if y <= 0, x > 0
+F(x, y) = 0 if x, y <= 0
+</pre>
+
+<p>
+  Following is a sample C code segment. You may modify the code for the functions, but
+  the task performed should not be changed, i.e., you should use recursive procedure
+  calls.
+</p>
+
+<pre>
+int main(int a, int b) {
+    int result = a * recursion(abs(a+b), abs(a-b)) - b * recursion(abs(b-a), abs(b+a));
+}
+
+int recursion(int x, int y) {
+    if (x <= 0 && y <= 0)
+        return(0);
+    else if (x > 0 && y <= 0)
+        return(x);
+    else if (x <= 0 && y > 0)
+        return(y);
+    else
+        return(recursion(x-1, y) + recursion(x, y-1));
+}
+</pre>
+
+<div class="center-table">
+  <table>
+    <thead>
+      <tr><th>Registers</th><th>Variables</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>$s0</td><td>a</td></tr>
+      <tr><td>$s1</td><td>b</td></tr>
+      <tr><td>$s2</td><td>result</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<p>
+  Example Test: If the values of <code>$s1</code> and <code>$s2</code> are initialized in
+  the simulator as:
+</p>
+
+<div class="center-table">
+  <table>
+    <thead>
+      <tr><th>Registers</th><th>Data</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>$s0</td><td>1</td></tr>
+      <tr><td>$s1</td><td>2</td></tr>
+      <tr><td>$s2</td><td>0</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<p>The resultant registers are:</p>
+
+<div class="center-table">
+  <table>
+    <thead>
+      <tr><th>Registers</th><th>Data</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>$s0</td><td>1</td></tr>
+      <tr><td>$s1</td><td>2</td></tr>
+      <tr><td>$s2</td><td>-7</td></tr>
+    </tbody>
+  </table>
+</div>
+`
+},
+
+"lab-12-17": {
+  title: "12.17 ZyLab 6 - MIPS Recursive Multiplication",
+  html: `
+<p>
+  Write a MIPS program to compute the product of two 16-bit signed numbers using
+  <em>recursive procedure calls</em>.
+  <strong>Note:</strong> You CANNOT use the <code>mult</code> or <code>mul</code>
+  instructions. You should use Procedure Execution for full credit. If your test cases
+  pass but you have not used Procedure execution, you will receive only half the points
+  (at most 2 points).
+</p>
+
+<p>
+  Given the multiplicand (<code>md</code>) and multiplier (<code>m</code>) as inputs,
+  write the <strong>main</strong> and <strong>recursion</strong> functions to compute
+  the product (<code>p</code>) using the shift and add recursive algorithm for
+  multiplication.
+</p>
+
+<p>Write the following functions in MIPS.</p>
+
+<ul>
+  <li>
+    <strong>main</strong>
+    <ul>
+      <li>
+        task: initialize product, multiplicand and multiplier registers and call the
+        recursion function with iteration number equal to the size of numbers (16-bit).
+      </li>
+      <li>
+        Note: If numbers are negative, convert to positive numbers and then multiply.
+        Add sign separately at the end. Do not convert the original input registers,
+        only convert the argument registers sent to the recursion function.
+      </li>
+    </ul>
+  </li>
+
+  <li>
+    <strong>recursion</strong>
+    <ul>
+      <li>
+        inputs: product (p), multiplicand (md) and multiplier (m) registers and the
+        iteration number (n).
+      </li>
+      <li>
+        task: compute the nth iterative step of multiplication, call recursion function
+        by decrementing n and return if n = 0.
+      </li>
+      <li>outputs: updated product (p).</li>
+    </ul>
+  </li>
+</ul>
+
+<p>
+  Refer to the binary shift and add multiplication algorithm discussed in class. While
+  writing the code,
+</p>
+
+<p>
+  Following is a sample C code segment. You may modify the code for the functions, but
+  the task performed should not be changed, i.e., you should use recursive procedure
+  calls.
+</p>
+
+<pre>
+// multiplier and multiplicand are inputs (For compilable C code, you should use argc and argv for command line inputs)
+int main(int m, int md) {         
+    // Initializing Arguments
+    int sign_p = 0;
+     // negate the operands if negative 
+    if (m < 0 and md > 0) or (m > 0 and md < 0)
+         sign_p = 1;
+    if (m < 0)   
+        arg_m = - m;     // Modify Argument not Given Register
+    if (md < 0)    
+        arg_md = - md;    // Modify Argument not Given Register
+    int p = recursion(0, arg_md, arg_m, 16);     // 16-bit unsigned multiplication => recursion 16 times
+    if (sign_p == 1)
+        p = - p;        // negate if one of the operands is negative
+}
+
+int recursion(int p, int md, int m, int n) {
+    if (n == 0) 
+        return(p);
+    else {
+        int m_0 = m & 1;    // 0th or least significant bit of multiplier
+        if (m_0  == 1)
+              p = p + md;
+        m = m >> 1;
+        md = md << 1;     
+        p = recursion(p, md, m, n-1);         // updated values of p, md and m - arguments
+        return(p);
+    }
+}
+</pre>
+
+<div class="center-table">
+  <table>
+    <thead>
+      <tr><th>Registers</th><th>Variables</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>$s0</td><td>product</td></tr>
+      <tr><td>$s1</td><td>multiplicand</td></tr>
+      <tr><td>$s2</td><td>multiplier</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<p>
+  Example Test: If the values of <code>$s1</code> and <code>$s2</code> are initialized in
+  the simulator as:
+</p>
+
+<div class="center-table">
+  <table>
+    <thead>
+      <tr><th>Registers</th><th>Data</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>$s0</td><td>0</td></tr>
+      <tr><td>$s1</td><td>8000</td></tr>
+      <tr><td>$s2</td><td>15000</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<p>The resultant registers are:</p>
+
+<div class="center-table">
+  <table>
+    <thead>
+      <tr><th>Registers</th><th>Data</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>$s0</td><td>120000000</td></tr>
+      <tr><td>$s1</td><td>8000</td></tr>
+      <tr><td>$s2</td><td>15000</td></tr>
+    </tbody>
+  </table>
+</div>
+`
+},
+
+"lab-12-18": {
+  title: "12.18 Zylab 7 - MIPS Procedure Execution",
+  html: `
+<p>
+  Given an array of at least one integer, write a program to create a new array with
+  elements equal to the exponent of each element in the original array raised to the
+  index, i.e., <code>B[i] = sum of 1st i elements of A</code>.
+</p>
+
+<p>
+  For this, write the following two functions using <strong>Procedure Execution</strong>.
+  (If procedure execution or functions are not used, you will receive a score of 0, even
+  if the tests pass).
+</p>
+
+<ul>
+  <li>
+    <strong>main</strong>
+    <ul>
+      <li>task: Create array B by obtaining the sum from the nSum function.</li>
+    </ul>
+  </li>
+  <li>
+    <strong>nSum</strong>
+    <ul>
+      <li>inputs: base address of array A (<code>*A</code>), index of B (<code>k</code>)</li>
+      <li>
+        task: compute the sum of 1st <code>k</code> elements of array A.
+        (If array A elements are overwritten, the updated values should be used.)
+      </li>
+      <li>return: sum of 1st <code>k</code> elements of array A.</li>
+    </ul>
+  </li>
+</ul>
+
+<p>
+  Following is a sample C code to perform the required task. You may modify the code for
+  the functions, but the task performed should not be changed.
+</p>
+
+<pre>
+int main() {
+    // Variable Declaration
+    int* A, B;      // Base addresses of A and B
+    int n;          // Length of arrays A and B
+
+    // Task of main function
+    for (int j = 0; j < n; j++) {
+        B[j] = nSum(A, j);
+    }
+}
+
+int nSum(int* A, int k) {
+    int sum = A[0];
+    for (int j = 1; j <= k; j++) {
+        sum = sum + A[j];
+    }
+    return(sum);
+}
+</pre>
+
+<div class="center-table">
+  <table>
+    <thead>
+      <tr><th>Registers</th><th>Variables</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>$s0</td><td>A</td></tr>
+      <tr><td>$s1</td><td>B</td></tr>
+      <tr><td>$s2</td><td>n</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<div class="center-table">
+  <table>
+    <thead>
+      <tr><th>Addresses</th><th>Contents</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>$s0</td><td>A[0]</td></tr>
+      <tr><td>$s0+4</td><td>A[1]</td></tr>
+      <tr><td>…</td><td>…</td></tr>
+      <tr><td>$s0+4*(n-1)</td><td>A[n-1]</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<p>
+  Example Test: If the values of <code>$s1</code> through <code>$s7</code> are initialized
+  in the simulator as:
+</p>
+
+<div class="center-table">
+  <table>
+    <thead>
+      <tr><th>Registers</th><th>Data</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>$s0</td><td>4000</td></tr>
+      <tr><td>$s1</td><td>8000</td></tr>
+      <tr><td>$s2</td><td>5</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<div class="center-table">
+  <table>
+    <thead>
+      <tr><th>Addresses</th><th>Contents</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>4000</td><td>10</td></tr>
+      <tr><td>4004</td><td>5</td></tr>
+      <tr><td>4008</td><td>-5</td></tr>
+      <tr><td>4012</td><td>-2</td></tr>
+      <tr><td>4016</td><td>0</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<p>The resultant array B is:</p>
+
+<div class="center-table">
+  <table>
+    <thead>
+      <tr><th>Addresses</th><th>Contents</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>8000</td><td>10</td></tr>
+      <tr><td>8004</td><td>15</td></tr>
+      <tr><td>8008</td><td>10</td></tr>
+      <tr><td>8012</td><td>8</td></tr>
+      <tr><td>8016</td><td>8</td></tr>
+    </tbody>
+  </table>
+</div>
+`
+}
 };
 
 // ── DIAGNOSTIC: fires after module evaluates ──
