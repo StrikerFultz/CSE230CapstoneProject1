@@ -389,7 +389,7 @@ CodeMirror.defineSimpleMode("mips-custom", {
     {
       //instructions
       regex:
-        /(?:add|addu|addi|addiu|sub|subu|li|sw|lw|sb|lb|sh|lh|lui|la|j|jal|jr|or|ori|and|andi|beq|bne|slt|slti|sltiu|sltu|blt|bgt|ble|bge|move|mult|mflo|mfhi|xor|xori|div|nor|sll|srl)\b/i,
+        /(?:add|addu|addi|addiu|sub|subu|li|sw|lw|sb|lb|sh|lh|lui|la|j|jal|jr|or|ori|and|andi|beq|bne|slt|slti|sltiu|sltu|blt|bgt|ble|bge|move|mult|multu|mflo|mfhi|xor|xori|div|divu|nor|sll|srl|sra)\b/i,
       token: "keyword",
     },
     {
@@ -747,8 +747,8 @@ if (stepBtn) {
     }
 
     if (!isProgramLoaded) {
-      if (!loadProgram()) return;
-      return;
+      if (!loadProgram())
+        loadProgram();
     }
 
     cpu.set_breakpoints(Array.from(breakpoints));
