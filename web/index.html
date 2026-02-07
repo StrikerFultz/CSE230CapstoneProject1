@@ -54,13 +54,27 @@
           <div id="registers"></div>
         </div>
         <div class="side-box">
-          <strong>Memory</strong>
-          <div id="memory"></div>
-        </div>
-        <div class="side-box">
           <strong>Widgets</strong>
           <div id="widgets"></div>
         </div>
+      </section>
+
+      <section class="memory-panel">
+        <div class="memory-header-bar">
+          <span>Memory</span>
+          <div class="mem-controls">
+            <input type="text" id="mem-start-input" value="0x10000000" placeholder="Address">
+            <button id="mem-go-btn">Go</button>
+          </div>
+        </div>
+
+        <div class="memory-grid-header">
+          <span class="m-addr">Address</span>
+          <span class="m-hex">Hex (16 bytes)</span>
+          <span class="m-ascii">ASCII</span>
+        </div>
+
+        <div id="memory-view"></div>
       </section>
 
       <!--console-->
@@ -74,6 +88,17 @@
           </div>
         </div>
         <div class="console-inner" id="console-output"></div>
+
+              <!-- Test Cases Dropdown -->
+      <div id="test-cases-section" class="test-cases-section">
+        <div class="test-cases-header">
+          <h3>Test Cases</h3>
+          <button id="test-cases-toggle" class="test-cases-toggle-btn">▼ Show Test Cases</button>
+        </div>
+        <div id="test-cases-content" class="test-cases-content">
+          <div id="test-cases-list"></div>
+        </div>
+      </div>
       </section>
     </main>
 

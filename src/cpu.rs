@@ -6,12 +6,6 @@ use std::collections::{HashMap, HashSet};
 
 // use crate::lexer::alert;
 
-/// represents the state of the CPU at an instruction
-pub struct ExecutionState {
-    pc: u32,
-    core_instruction: CoreInstruction
-}
-
 pub struct CPU { 
     // processor state 
     registers: HashMap<String, u32>,
@@ -25,14 +19,14 @@ pub struct CPU {
     program: Option<Program>,
     pub memory: Memory,     
 
-    // log of all executed instructions 
-    state_history: Vec<ExecutionState>,
-
     // line numbers of instructions containing breakpoints (indicated in the UI)
     pub breakpoints: HashSet<usize>,
 
-    // stack to validate saved registers
-    validation_stack: Vec<HashMap<String, u32>>
+    // stack to validate saved registers for procedure execution
+    pub validation_stack: Vec<HashMap<String, u32>>,
+
+    // record the last memory read/write to update memory UI
+    pub last_mem_access: Option<(u32, u32)>,
 }
 
 impl CPU {
@@ -46,9 +40,9 @@ impl CPU {
             hi: 0,
             program: None, 
             memory: Memory::new(),
-            state_history: Vec::new(),
             breakpoints: HashSet::new(),
-            validation_stack: Vec::new()
+            validation_stack: Vec::new(),
+            last_mem_access: None
         }
     }
 
@@ -113,8 +107,6 @@ impl CPU {
     pub fn execute(&mut self, insn: &CoreInstruction) -> Result<(), EmuError> {
         let mut is_branch = false;
         println!("{:?}", insn);
-
-        // TODO: probably have to handle overflow or integer bounds for 32-bit signed integer
         
         // handle instruction based on type
         match insn {
@@ -141,8 +133,6 @@ impl CPU {
                 self.set_reg(rd,r1.wrapping_add(r2));
             },   
 
-         
-
             CoreInstruction::Sub { rd, rs, rt } => {
                 let r1 = self.get_reg(rs) as i32;
                 let r2 = self.get_reg(rt) as i32;
@@ -164,22 +154,31 @@ impl CPU {
             CoreInstruction::Lw { rt, rs, imm } => {
                 let base = self.get_reg(rs);
                 let addr = base.wrapping_add(*imm as u32);
-                let val = self.memory.load_word(addr);
 
+                if addr % 4 != 0 {
+                    return Err(EmuError::UnalignedAccess(addr));
+                }
+
+                let val = self.memory.load_word(addr);   // load 4 bytes starting at addr
                 self.set_reg(rt, val as u32);
+                
+                self.last_mem_access = Some((addr, 4));
             },
 
             CoreInstruction::Sw { rs, rt, imm } => {
                 let base = self.get_reg(rs);
                 let addr = base.wrapping_add(*imm as u32);
-                let val = self.get_reg(rt)as i32;
 
+                // would only allow multiples of 4 to be input numbers 
+                if addr % 4 != 0  {
+                   return Err(EmuError::UnalignedAccess(addr)); 
+                }
+
+                let val = self.get_reg(rt) as i32;
                 self.memory.set_word(addr, val);
-            },
 
-            // CoreInstruction::Li { rd, imm } => {
-            //     self.set_reg(rd, *imm as u32);
-            // },
+                self.last_mem_access = Some((addr, 4));
+            },
 
             CoreInstruction::Lui { rt, imm } => {
                 self.set_reg(rt, imm << 16);
@@ -191,6 +190,7 @@ impl CPU {
                 let val = self.memory.load_byte(addr);
                 
                 self.set_reg(rt, val as u32);
+                self.last_mem_access = Some((addr, 1));
             },
 
             CoreInstruction::Sb { rs, rt, imm } => {
@@ -199,6 +199,7 @@ impl CPU {
                 let val = self.get_reg(rt)as i8;
 
                 self.memory.set_byte(addr, val);
+                self.last_mem_access = Some((addr, 1));
             },
 
             CoreInstruction::Lh { rt, rs, imm } => {
@@ -207,6 +208,7 @@ impl CPU {
                 let val = self.memory.load_halfword(addr);
 
                 self.set_reg(rt, val as u32);
+                self.last_mem_access = Some((addr, 2));
             },
 
             CoreInstruction::Sh { rt, rs, imm } => {
@@ -215,6 +217,7 @@ impl CPU {
                 let val = self.get_reg(rt)as i16;
 
                 self.memory.set_halfword(addr, val);
+                self.last_mem_access = Some((addr, 2));
             },
 
             CoreInstruction::J { label } => {
@@ -327,13 +330,11 @@ impl CPU {
 
             CoreInstruction::Xor { rd, rs, rt } => {
                 let val = self.get_reg(rs) ^ self.get_reg(rt);
-   //             println!("XOR {} = {} ^ {} -> {}", rd, self.get_reg(rs), self.get_reg(rt), val);
                 self.set_reg(rd, val)
             },
 
             CoreInstruction::Xori { rt, rs, imm } => {
               let val = self.get_reg(rs) ^ imm;
-    //          println!("XORI {} = {} ^ {} -> {}", rt, self.get_reg(rs), imm, val);
               self.set_reg(rt, val)
             },
 
@@ -445,6 +446,31 @@ impl CPU {
             CoreInstruction::Srl { rd, rt, sa} =>{
                 let v = self.get_reg(&rt);
                 self.set_reg(&rd, v >> sa);
+            },
+
+            CoreInstruction::Sra { rd, rt, imm } => {
+                let v = self.get_reg(rt) as i32;        // interpret as signed
+                let result = v >> imm;                       // arithmetic shift
+                self.set_reg(rd, result as u32);      // store back as u32
+            },
+
+            CoreInstruction::Multu { rs, rt } => {
+                let r1 = self.get_reg(rs) as u64;
+                let r2 = self.get_reg(rt) as u64;
+
+                let res = r1 * r2;
+                self.lo = (res & 0xFFFF_FFFF) as u32;
+                self.hi = (res >> 32) as u32;
+            },
+
+            CoreInstruction::Divu { rs, rt } => {
+                let r1 = self.get_reg(rs);
+                let r2 = self.get_reg(rt);
+
+                if r2 != 0 {
+                    self.lo = r1 / r2;
+                    self.hi = r1 % r2;
+                }
             }
         }        
 
@@ -460,6 +486,7 @@ impl CPU {
     /// executes a single MIPS instruction 
     pub fn next(&mut self) -> Result<(), EmuError> {
         let program = self.program.as_ref().unwrap();
+        self.last_mem_access = None;
 
         // get the current instruction using the $pc register
         // we could iterate the array but this is better when we also deal with branches and jumps 
@@ -546,14 +573,21 @@ impl CPU {
 
         self.program = None;
 
-        self.state_history.clear(); 
         self.breakpoints.clear();
         self.validation_stack.clear();
     }
 
     pub fn snapshot(&self) -> Snapshot {
+        let (addr, size) = match self.last_mem_access {
+            Some((a, s)) => (Some(a), Some(s)),
+            None => (None, None),
+        };
+
         Snapshot {
             registers: self.registers.clone(),
+            memory_access_addr: addr,
+            memory_access_size: size,
+            mmio: Some(self.memory.mmio.snapshot())
         }
     }
 

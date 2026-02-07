@@ -1,8 +1,28 @@
 import init, { WasmCPU } from "./pkg/mips_emu_wasm.js";
 import { LESSONS as BASE_LESSONS } from "./lessons.js";
 
+// API Configuration
+const API_BASE = 'http://localhost:5000/api';
+
 //for the lesson and files
 const STORAGE_KEY = "customLessons";
+
+// Fetch lessons from API
+async function fetchLessonsFromAPI() {
+  try {
+    const response = await fetch(`${API_BASE}/labs`, {
+      credentials: 'include'
+    });
+    if (response.ok) {
+      const labs = await response.json();
+      console.log('Fetched labs from database:', Object.keys(labs).length, 'labs');
+      return labs;
+    }
+  } catch (error) {
+    console.warn('Could not fetch labs from API, using local storage:', error);
+  }
+  return {};
+}
 
 function getCustomLessons() {
   try {
@@ -12,8 +32,10 @@ function getCustomLessons() {
   }
 }
 
-function allLessons() {
-  return { ...BASE_LESSONS, ...getCustomLessons() };
+async function allLessons() {
+  const apiLessons = await fetchLessonsFromAPI();
+  const customLessons = getCustomLessons();
+  return { ...BASE_LESSONS, ...apiLessons, ...customLessons };
 }
 
 // lesson underlined in hedder
@@ -23,8 +45,8 @@ const lessonBody = document.getElementById("lesson-body");
 const lessonHide = document.getElementById("lesson-hide");
 const filesListEl = document.querySelector(".files-list");
 
-function renderFiles(selectedId) {
-  const lessons = allLessons();
+async function renderFiles(selectedId) {
+  const lessons = await allLessons();
   if (!filesListEl) return;
 
   filesListEl.innerHTML = "";
@@ -49,8 +71,8 @@ function renderFiles(selectedId) {
     });
 }
 
-function showLesson(id) {
-  const lessons = allLessons();
+async function showLesson(id) {
+  const lessons = await allLessons();
   const data = lessons[id];
   if (!data) return;
 
@@ -63,6 +85,16 @@ function showLesson(id) {
       el.classList.toggle("active", el.dataset.lesson === id);
     });
   }
+
+  // Load starter code if available
+  if (data.starter_code && cpuEditor) {
+    cpuEditor.setValue(data.starter_code);
+  }
+
+  // Render test cases if available - support both field names
+  const testCases = data.test_cases || data.testCases;
+  renderTestCases(testCases);
+
   //keeps page stable (scrolls to top so can see lesson when u click on lab)
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
@@ -73,14 +105,123 @@ if (lessonHide) {
   });
 }
 
+// Test cases rendering
+const testCasesSection = document.getElementById("test-cases-section");
+const testCasesToggle = document.getElementById("test-cases-toggle");
+const testCasesContent = document.getElementById("test-cases-content");
+const testCasesList = document.getElementById("test-cases-list");
+
+if (testCasesToggle) {
+  testCasesToggle.addEventListener("click", () => {
+    const isHidden = testCasesContent.classList.toggle("hidden");
+    testCasesToggle.textContent = isHidden ? "▼ Show Test Cases" : "▲ Hide Test Cases";
+  });
+}
+
+function renderTestCases(testCases) {
+  if (!testCasesSection || !testCasesList) return;
+  
+  // Hide section if no test cases
+  if (!testCases || testCases.length === 0) {
+    testCasesSection.classList.add("hidden");
+    return;
+  }
+  
+  // Show section and render test cases
+  testCasesSection.classList.remove("hidden");
+  testCasesList.innerHTML = "";
+  
+  testCases.forEach((testCase, index) => {
+    const item = document.createElement("div");
+    item.className = "test-case-item";
+    
+    // Support both naming conventions: inputs/initialRegisters and expected/expectedRegisters
+    const inputs = testCase.inputs || testCase.initialRegisters || {};
+    const expected = testCase.expected || testCase.expectedRegisters || {};
+    
+    // Build inputs table
+    let inputsHTML = "";
+    if (Object.keys(inputs).length > 0) {
+      inputsHTML = `
+        <table class="test-case-table">
+          <thead>
+            <tr>
+              <th>Register</th>
+              <th>Value</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${Object.entries(inputs).map(([reg, val]) => `
+              <tr>
+                <td>${reg}</td>
+                <td>${val}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      `;
+    } else {
+      inputsHTML = '<p style="font-size: 12px; color: #666;">No input values</p>';
+    }
+    
+    // Build expected outputs table
+    let outputsHTML = "";
+    if (Object.keys(expected).length > 0) {
+      outputsHTML = `
+        <table class="test-case-table">
+          <thead>
+            <tr>
+              <th>Register</th>
+              <th>Expected Value</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${Object.entries(expected).map(([reg, val]) => `
+              <tr>
+                <td>${reg}</td>
+                <td>${val}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      `;
+    } else {
+      outputsHTML = '<p style="font-size: 12px; color: #666;">No expected outputs</p>';
+    }
+    
+    item.innerHTML = `
+      <div class="test-case-header">
+        <div class="test-case-name">${testCase.name || `Test Case ${index + 1}`}</div>
+        <div class="test-case-points">${testCase.points || 0} points</div>
+      </div>
+      <div class="test-case-body">
+        <div class="test-case-column">
+          <h4>Initial Values</h4>
+          ${inputsHTML}
+        </div>
+        <div class="test-case-column">
+          <h4>Expected Outputs</h4>
+          ${outputsHTML}
+        </div>
+      </div>
+    `;
+    
+    testCasesList.appendChild(item);
+  });
+}
+
 const urlParams = new URLSearchParams(window.location.search);
 const initialLessonId =
   urlParams.get("lesson") || Object.keys(BASE_LESSONS)[0] || null;
 
-renderFiles(initialLessonId);
-if (initialLessonId && allLessons()[initialLessonId]) {
-  showLesson(initialLessonId);
-}
+// Initialize lessons async
+(async () => {
+  await renderFiles(initialLessonId);
+  const lessons = await allLessons();
+  if (initialLessonId && lessons[initialLessonId]) {
+    showLesson(initialLessonId);
+  }
+})();
 
 //console and reg ui
 
@@ -275,6 +416,100 @@ const cpuEditor = CodeMirror.fromTextArea(codeEl, {
   gutters: ["CodeMirror-linenumbers", "breakpoints"],
 });
 
+const memStartInput = document.getElementById("mem-start-input");
+const memGoBtn = document.getElementById("mem-go-btn");
+const memView = document.getElementById("memory-view");
+
+const MEM_CHUNK_SIZE = 128; // 128 bytes at a time max
+
+function getSafeChar(code) {
+  if (code >= 32 && code <= 126) {
+    return String.fromCharCode(code);
+  }
+
+  return ".";
+}
+
+function updateMemoryView(highlightAddr = null, highlightSize = 0) {
+  if (!cpu || !wasmReady || !memView) return;
+
+  // get address
+  let addrStr = memStartInput ? memStartInput.value : "0x10000000";
+  let startAddr = parseInt(addrStr, 16);
+
+  // default to 0x10000000 if input is empty or garbage (NaN)
+  if (isNaN(startAddr)) {
+    startAddr = 0x10000000;
+  }
+
+  // fix go button so check if number type
+  if (typeof highlightAddr === 'number') {
+      const rowStart = Math.floor(highlightAddr / 16) * 16;
+      startAddr = rowStart;
+      
+      if (memStartInput) {
+        memStartInput.value = "0x" + startAddr.toString(16).toUpperCase();
+      }
+  }
+
+  // read memory
+  let bytes;
+  try {
+    bytes = cpu.get_memory(startAddr, MEM_CHUNK_SIZE || 128);
+  } catch (e) {
+    console.error("Memory read error:", e);
+    return;
+  }
+
+  // render
+  let html = "";
+  
+  for (let i = 0; i < bytes.length; i += 16) {
+    const currentAddr = startAddr + i;
+    const slice = bytes.subarray(i, i + 16);
+
+    const addrFmt = "0x" + currentAddr.toString(16).toUpperCase().padStart(8, "0");
+
+    let hexFmt = "";
+    let asciiFmt = "";
+
+    for (let j = 0; j < 16; j++) {
+      const byteAddr = currentAddr + j;
+      let classStr = "byte-val";
+
+      if (typeof highlightAddr === 'number' && 
+          byteAddr >= highlightAddr && 
+          byteAddr < highlightAddr + highlightSize) {
+            
+        classStr += " mem-highlight";
+      }
+
+      if (j < slice.length) {
+        const val = slice[j];
+        hexFmt += `<span class="${classStr}">${val.toString(16).toUpperCase().padStart(2, "0")}</span> `;
+        asciiFmt += getSafeChar(val);
+      } else {
+        hexFmt += "   "; 
+      }
+      if (j === 7) hexFmt += " "; 
+    }
+
+    html += `
+      <div class="mem-row">
+        <span class="m-addr">${addrFmt}</span>
+        <span class="m-hex">${hexFmt}</span>
+        <span class="m-ascii">${asciiFmt}</span>
+      </div>
+    `;
+  }
+  
+  memView.innerHTML = html;
+}
+
+if (memGoBtn) {
+  memGoBtn.addEventListener("click", () => updateMemoryView());
+}
+
 //highlight current line
 function clearHighlight() {
   if (currentLineMarker != null) {
@@ -339,6 +574,14 @@ function resetEmulator() {
   breakpoints.clear();
   cpuEditor.clearGutter("breakpoints");
   clearHighlight();
+  updateMemoryView();
+
+  if (cpu && wasmReady) {
+    updateWidgets(cpu.get_mmio_state());
+    console.log("MMIO state:", cpu.get_mmio_state());
+  } else {
+    updateWidgets({});
+  }
 }
 
 function loadProgram() {
@@ -366,27 +609,48 @@ function loadProgram() {
   isProgramLoaded = true;
   cpu.set_breakpoints(Array.from(breakpoints));
   highlightCurrentLine();
+  updateWidgets(cpu.get_mmio_state());
+  console.log("MMIO state:", cpu.get_mmio_state());
+
   return true;
 }
 
 function handleWasmResult(result, { fromRun = false } = {}) {
-  const rawRegs =
-    (result && result.snapshot && result.snapshot.registers) ||
-    (result && result.registers) ||
-    null;
+  // Support both result formats (raw registers or snapshot object)
+  const rawRegs = (result && result.snapshot && result.snapshot.registers) || 
+                  (result && result.registers) || {};
+                  
   const allRegs = coerceRegs(rawRegs);
   const tabRegs = filterForTab(allRegs, lastRegs);
-
   paintRegisters(tabRegs);
+
+  // handle memory read/write
+  let hlAddr = null;
+  let hlSize = 0;
+
+  if (result && result.snapshot && 
+      typeof result.snapshot.memory_access_addr === 'number') {
+      
+      hlAddr = result.snapshot.memory_access_addr;
+      hlSize = result.snapshot.memory_access_size || 4;
+  }
+
+  updateMemoryView(hlAddr, hlSize);
+
+  if (cpu && wasmReady) {
+    updateWidgets(cpu.get_mmio_state());
+    console.log("MMIO state:", cpu.get_mmio_state());
+  }
 
   if (result && result.error) {
     // we have some kind of status / error string
     if (result.error === "Termination") {
-      // normal “finished” case
       clearHighlight();
+
       if (Object.keys(allRegs).length) {
         log("All Registers (decimal + hex):");
         log("--------------------------------");
+
         for (const [r, v] of Object.entries(allRegs).sort(([a, b]) =>
           a.localeCompare(b)
         )) {
@@ -395,22 +659,25 @@ function handleWasmResult(result, { fromRun = false } = {}) {
         log("\nProgram Finished");
       }
       isProgramLoaded = false;
+      
       if (stepBtn) stepBtn.disabled = true;
       if (runBtn) runBtn.disabled = true;
+
     } else if (result.error === "Breakpoint") {
-      // breakpoint case – don't dump everything, just pause
       log("\n--- Hit Breakpoint ---");
       highlightCurrentLine();
       isProgramLoaded = true;
       if (stepBtn) stepBtn.disabled = false;
       if (runBtn) runBtn.disabled = false;
+
     } else {
-      // some other error (e.g. invalid instruction)
       clearHighlight();
+
       log(`\n--- ${result.error} ---`);
       if (Object.keys(allRegs).length) {
         log("All Registers (decimal + hex):");
         log("--------------------------------");
+
         for (const [r, v] of Object.entries(allRegs).sort(([a, b]) =>
           a.localeCompare(b)
         )) {
@@ -418,11 +685,13 @@ function handleWasmResult(result, { fromRun = false } = {}) {
         }
       }
       isProgramLoaded = false;
+
       if (stepBtn) stepBtn.disabled = true;
       if (runBtn) runBtn.disabled = true;
     }
   } else if (fromRun) {
     clearHighlight();
+
     if (Object.keys(allRegs).length) {
       log("All Registers (decimal + hex):");
       log("--------------------------------");
@@ -432,9 +701,12 @@ function handleWasmResult(result, { fromRun = false } = {}) {
         log(`  ${r}: ${fmt(v)}`);
       }
     }
+
     isProgramLoaded = false;
+
     if (stepBtn) stepBtn.disabled = true;
     if (runBtn) runBtn.disabled = true;
+
     log("\nProgram Finished");
   }
 
@@ -508,6 +780,60 @@ if (stopBtn) {
   });
 }
 
+function updateWidgets(mmioMap) {
+  const widgetsDiv = document.getElementById("widgets");
+  if (!widgetsDiv) return;
+
+  let entries = [];
+  if (mmioMap instanceof Map) {
+    entries = Array.from(mmioMap.entries());
+  } else if (Array.isArray(mmioMap)) {
+    entries = mmioMap;
+  } else if (mmioMap && typeof mmioMap === "object") {
+    entries = Object.entries(mmioMap);
+  }
+
+  if (entries.length === 0) {
+    widgetsDiv.innerHTML = `<div style="padding:15px; color:#aaa; font-size:11px; text-align:center;">No active MMIO peripherals</div>`;
+    return;
+  }
+
+  let html = "";
+  for (const [addrKey, device] of entries) {
+    const address = typeof addrKey === "string" ? parseInt(addrKey, 10) : addrKey;
+    const hexAddr = "0x" + address.toString(16).toUpperCase();
+
+    if (device && device.type === "Led") {
+      const isOn = (device.data?.value ?? 0) !== 0;
+      const colorInt = device.data?.color ?? 0x00FF00; 
+      const colorHex = colorInt.toString(16).toUpperCase().padStart(6, "0");
+      
+      const dotColor = isOn ? `#${colorHex}` : "#444444";
+      const glow = isOn ? `0 0 8px #${colorHex}AA` : "inset 0 1px 2px rgba(0,0,0,0.5)";
+
+      html += `
+        <div class="widget-item">
+          <div class="led-status-dot" style="background: ${dotColor}; box-shadow: ${glow};"></div>
+          
+          <div class="widget-main">
+            <span class="widget-label">LED Indicator</span>
+            <span class="widget-meta">${hexAddr}</span>
+          </div>
+
+          <div class="widget-right">
+            <span class="hex-chip" style="color: ${isOn ? `#${colorHex}` : '#888'};">#${colorHex}</span>
+            <span class="status-text" style="color: ${isOn ? '#2e7d32' : '#757575'};">
+              ${isOn ? "ACTIVE" : "OFF"}
+            </span>
+          </div>
+        </div>
+      `;
+    }
+  }
+
+  widgetsDiv.innerHTML = html;
+}
+
 //init wasm
 
 init()
@@ -521,4 +847,3 @@ init()
     console.error("Error initializing WASM:", err);
     log("Error initializing WASM: " + err);
   });
-

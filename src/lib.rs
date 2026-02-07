@@ -5,6 +5,7 @@ pub mod lexer;
 pub mod memory;
 pub mod parser;
 pub mod program;
+pub mod mmio;
 
 use cpu::CPU;
 use program::Program;
@@ -12,6 +13,7 @@ use wasm_bindgen::prelude::*;
 use serde::{Serialize, Deserialize};
 use program::EmuError;
 use std::collections::{HashMap, HashSet};
+use mmio::DeviceState; 
 
 //https://github.com/insou22/mipsy partial code used since its a rough outline of the code 
 // only li add and sub; shows register history as lineis entered (as changed) 
@@ -19,6 +21,9 @@ use std::collections::{HashMap, HashSet};
 #[derive(Serialize, Deserialize, Default)]
 pub struct Snapshot {
     pub registers: HashMap<String, u32>,
+    pub memory_access_addr: Option<u32>,
+    pub memory_access_size: Option<u32>,
+    pub mmio: Option<HashMap<u32, DeviceState>> 
 }
 
 #[derive(Serialize, Deserialize)]
@@ -152,7 +157,7 @@ impl WasmCPU {
         "---".to_string()
     }
 
-    //gets the current line number using $PC register (due to mapping)
+    // gets the current line number using $PC register (due to mapping)
     #[wasm_bindgen]
     pub fn get_current_line(&self) -> i32 {
         let pc = self.cpu.pc;
@@ -166,6 +171,17 @@ impl WasmCPU {
         }
 
         -1
+    }
+
+    // get a slice of memory from the memory module using the CPU
+    #[wasm_bindgen]
+    pub fn get_memory(&mut self, start_address: u32, size: usize) -> Vec<u8> {
+        self.cpu.memory.get_memory_slice(start_address, size)
+    }
+
+    #[wasm_bindgen]
+    pub fn get_mmio_state(&self) -> JsValue {
+        serde_wasm_bindgen::to_value(&self.cpu.memory.mmio.snapshot()).unwrap()
     }
 }
 
@@ -227,9 +243,6 @@ mod tests {
         // -5 + 2^32 = 4294967291
     }
 
-
-
-
     #[test]
     fn lw_sw_test() {
         let mut cpu = CPU::new();
@@ -251,9 +264,9 @@ mod tests {
             li $t0, 10
             li $t1, 1
             li $t2, 2
-            sw $t1, 0($t0)
-            sw $t2, 0($t0)
-            lw $t3, 0($t0)
+            sw $t1, 2($t0)
+            sw $t2, 2($t0)
+            lw $t3, 2($t0)
         "#;
     
         cpu.run_input(program).unwrap();
@@ -635,4 +648,148 @@ mod tests {
 
         assert_eq!(cpu.get_reg("$t1"), 20 >> 2);
     }
+
+    #[test]
+    fn sra_negative_test() {
+        let mut cpu = CPU::new();
+        let program = r#"
+            li $t0, -8
+            sra $t1, $t0, 1
+        "#;
+
+        cpu.run_input(program).unwrap();
+
+        assert_eq!(cpu.get_reg("$t1"), (-4i32) as u32);
+    }
+
+    #[cfg(test)]
+    mod tests_divu_multu {
+        use super::CPU;
+
+        #[test]
+        fn multu_basic_test() {
+            let mut cpu = CPU::new();
+            let program = r#"
+                li $t0, 10
+                li $t1, 20
+                multu $t0, $t1
+                mflo $t2
+                mfhi $t3
+            "#;
+
+            cpu.run_input(program).unwrap();
+
+            assert_eq!(cpu.get_reg("$t2"), 200); // LO
+            assert_eq!(cpu.get_reg("$t3"), 0);   // HI
+        }
+
+        #[test]
+        fn multu_zero_test() {
+            let mut cpu = CPU::new();
+            let program = r#"
+                li $t0, 0
+                li $t1, 12345
+                multu $t0, $t1
+                mflo $t2
+                mfhi $t3
+            "#;
+
+            cpu.run_input(program).unwrap();
+
+            assert_eq!(cpu.get_reg("$t2"), 0); // LO
+            assert_eq!(cpu.get_reg("$t3"), 0); // HI
+        }
+
+        #[test]
+        fn multu_max_unsigned_test() {
+            let mut cpu = CPU::new();
+            let program = r#"
+                li $t0, 4294967295
+                li $t1, 2
+                multu $t0, $t1
+                mflo $t2
+                mfhi $t3
+            "#;
+
+            cpu.run_input(program).unwrap();
+
+            // 4294967295 * 2 = 8589934590 → 0x1FFFFFFFE
+            // LO = lower 32 bits, HI = upper 32 bits
+            assert_eq!(cpu.get_reg("$t2"), 4294967294); // LO
+            assert_eq!(cpu.get_reg("$t3"), 1);          // HI
+        }
+
+        #[test]
+        fn divu_basic_test() {
+            let mut cpu = CPU::new();
+            let program = r#"
+                li $t0, 20
+                li $t1, 3
+                divu $t0, $t1
+                mflo $t2
+                mfhi $t3
+            "#;
+
+            cpu.run_input(program).unwrap();
+
+            assert_eq!(cpu.get_reg("$t2"), 6);  // quotient
+            assert_eq!(cpu.get_reg("$t3"), 2);  // remainder
+        }
+
+        #[test]
+        fn divu_divide_by_one_test() {
+            let mut cpu = CPU::new();
+            let program = r#"
+                li $t0, 12345
+                li $t1, 1
+                divu $t0, $t1
+                mflo $t2
+                mfhi $t3
+            "#;
+
+            cpu.run_input(program).unwrap();
+
+            assert_eq!(cpu.get_reg("$t2"), 12345); // quotient
+            assert_eq!(cpu.get_reg("$t3"), 0);     // remainder
+        }
+
+        #[test]
+        fn divu_divide_by_zero_no_change_test() {
+            let mut cpu = CPU::new();
+            let program = r#"
+                li $t0, 100
+                li $t1, 0
+                divu $t0, $t1
+                mflo $t2
+                mfhi $t3
+            "#;
+
+            // This test assumes your CPU handles divide-by-zero gracefully
+            // For example, leaves LO/HI unchanged or zeroed
+            cpu.run_input(program).unwrap();
+
+            assert_eq!(cpu.get_reg("$t2"), 0); // LO unchanged / set to 0
+            assert_eq!(cpu.get_reg("$t3"), 0); // HI unchanged / set to 0
+        }
+
+        #[test]
+        fn divu_max_unsigned_test() {
+            let mut cpu = CPU::new();
+            let program = r#"
+                li $t0, 4294967295
+                li $t1, 2
+                divu $t0, $t1
+                mflo $t2
+                mfhi $t3
+            "#;
+
+            cpu.run_input(program).unwrap();
+
+            // 4294967295 / 2 = 2147483647 remainder 1
+            assert_eq!(cpu.get_reg("$t2"), 2147483647); // quotient
+            assert_eq!(cpu.get_reg("$t3"), 1);          // remainder
+        }
+    }
+
+
 }

@@ -384,7 +384,7 @@ fn match_mnemonic(s: &str) -> bool {
     match s {
             "add" | "sub" | "or" | "addu" | "subu" | "and" |"j" | "jal" | "jr" |"li" |
             "addi" | "addiu" | "lb" | "sb" | "lh" | "sh" | "lw" | "sw" | "ori" | "beq" | "bne" | "andi" | "la" | "lui" | 
-            "move" | "mult" | "mflo" | "mfhi" | "xor" | "xori" | "div" | "nor" | "sll" | "srl" |
+            "move" | "mult" | "multu" | "mflo" | "mfhi" | "xor" | "xori" | "div" | "divu" | "nor" | "sll" | "srl" | "sra" |
             "slt" | "slti" | "sltiu" |
             "blt" | "bgt" | "ble" | "bge" => true,
             _ => false,
@@ -427,11 +427,19 @@ fn consumeTilPuncAndWs(i: usize, s: &str) -> usize {
 //     return index;
 // }
 
-fn classify_number(i: usize, s: &str) -> (Option<TokenType>, usize)  {
+fn classify_number(i: usize, s: &str) -> (Option<TokenType>, usize) {
     let mut index = i;
     let mut is_integer = true;
-    let mut is_real = true;
     let mut decimal_seen = false;
+    let chars: Vec<char> = s.chars().collect();
+
+    if index + 1 < chars.len() && chars[index] == '0' && (chars[index + 1] == 'x' || chars[index + 1] == 'X') {
+        index += 2;
+        while index < chars.len() && (chars[index].is_ascii_hexdigit()) {
+            index += 1;
+        }
+        return (Some(TokenType::Integer), index);
+    }
 
     for c in s.chars().skip(i) {
         if c.is_ascii_digit() {
@@ -445,9 +453,9 @@ fn classify_number(i: usize, s: &str) -> (Option<TokenType>, usize)  {
         }
     }
 
-    if is_integer && s[i..index].parse::<i64>().is_ok() {
+    if is_integer && index > i {
         (Some(TokenType::Integer), index)
-    } else if is_real && s[i..index].parse::<f64>().is_ok() {
+    } else if !is_integer && index > i {
         (Some(TokenType::RealNumber), index)
     } else {
         (None, index)
