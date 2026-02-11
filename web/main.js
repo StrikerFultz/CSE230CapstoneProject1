@@ -136,13 +136,17 @@ function renderTestCases(testCases) {
     item.className = "test-case-item";
     
     // Support both naming conventions: inputs/initialRegisters and expected/expectedRegisters
-    const inputs = testCase.inputs || testCase.initialRegisters || {};
-    const expected = testCase.expected || testCase.expectedRegisters || {};
+    const initialRegs = testCase.inputs || testCase.initialRegisters || {};
+    const expectedRegs = testCase.expected || testCase.expectedRegisters || {};
+    const initialMem = testCase.initialMemory || {};
+    const expectedMem = testCase.expectedMemory || {};
     
-    // Build inputs table
+    // Build inputs section (registers + memory)
     let inputsHTML = "";
-    if (Object.keys(inputs).length > 0) {
-      inputsHTML = `
+    
+    // Initial registers table
+    if (Object.keys(initialRegs).length > 0) {
+      inputsHTML += `
         <table class="test-case-table">
           <thead>
             <tr>
@@ -151,7 +155,7 @@ function renderTestCases(testCases) {
             </tr>
           </thead>
           <tbody>
-            ${Object.entries(inputs).map(([reg, val]) => `
+            ${Object.entries(initialRegs).map(([reg, val]) => `
               <tr>
                 <td>${reg}</td>
                 <td>${val}</td>
@@ -160,14 +164,42 @@ function renderTestCases(testCases) {
           </tbody>
         </table>
       `;
-    } else {
+    }
+    
+    // Initial memory table
+    if (Object.keys(initialMem).length > 0) {
+      inputsHTML += `
+        <table class="test-case-table" style="margin-top: 10px;">
+          <thead>
+            <tr>
+              <th>Address</th>
+              <th>Value</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${Object.entries(initialMem)
+              .sort(([a], [b]) => parseInt(a) - parseInt(b))
+              .map(([addr, val]) => `
+              <tr>
+                <td>${addr}</td>
+                <td>${val}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      `;
+    }
+    
+    if (inputsHTML === "") {
       inputsHTML = '<p style="font-size: 12px; color: #666;">No input values</p>';
     }
     
-    // Build expected outputs table
+    // Build expected outputs section (registers + memory)
     let outputsHTML = "";
-    if (Object.keys(expected).length > 0) {
-      outputsHTML = `
+    
+    // Expected registers table
+    if (Object.keys(expectedRegs).length > 0) {
+      outputsHTML += `
         <table class="test-case-table">
           <thead>
             <tr>
@@ -176,7 +208,7 @@ function renderTestCases(testCases) {
             </tr>
           </thead>
           <tbody>
-            ${Object.entries(expected).map(([reg, val]) => `
+            ${Object.entries(expectedRegs).map(([reg, val]) => `
               <tr>
                 <td>${reg}</td>
                 <td>${val}</td>
@@ -185,7 +217,33 @@ function renderTestCases(testCases) {
           </tbody>
         </table>
       `;
-    } else {
+    }
+    
+    // Expected memory table
+    if (Object.keys(expectedMem).length > 0) {
+      outputsHTML += `
+        <table class="test-case-table" style="margin-top: 10px;">
+          <thead>
+            <tr>
+              <th>Address</th>
+              <th>Expected Value</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${Object.entries(expectedMem)
+              .sort(([a], [b]) => parseInt(a) - parseInt(b))
+              .map(([addr, val]) => `
+              <tr>
+                <td>${addr}</td>
+                <td>${val}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      `;
+    }
+    
+    if (outputsHTML === "") {
       outputsHTML = '<p style="font-size: 12px; color: #666;">No expected outputs</p>';
     }
     
