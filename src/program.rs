@@ -29,6 +29,9 @@ pub enum EmuError {
     /// indicates a MIPS calling convention violation
     CallingConventionViolation(String),
 
+    /// indicates the program exceeded maximum instruction execution limit
+    ExecutionLimitExceeded(u64),
+
     /// indicates emulation termination
     Termination,
 
