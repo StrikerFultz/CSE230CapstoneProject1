@@ -1,4 +1,151 @@
 export const LESSONS = {
+  "lab-1-0": {
+    title: "1.0 Tutorial: Using the MIPS Emulator",
+    starter_code: `# Tutorial Starter Code
+# Initialize Registers
+li $t0, 10      # Load immediate 10 into $t0
+li $t1, 20      # Load immediate 20 into $t1
+
+# Arithmetic Operation
+add $t2, $t0, $t1  # $t2 = 10 + 20 = 30
+
+# Memory Operation
+li $s0, 0x10000000 # Load base address
+sw $t2, 0($s0)     # Store 30 into memory at 0x10000000
+
+# End
+# (The emulator stops automatically when instructions run out)
+`,
+    html: `
+<div style="max-width: 800px; margin: 0 auto;">
+  <h3>Welcome to the MIPS Emulator</h3>
+  <p>
+    This environment is designed to help you write, debug, and test MIPS assembly code. 
+    Before starting the assignments, please familiarize yourself with the interface controls below.
+  </p>
+
+  <h4>1. The Interface Controls</h4>
+  <ul>
+    <li><strong>Run:</strong> Assembles the code and executes it until completion or error.</li>
+    <li><strong>Step:</strong> Executes the code one line at a time. This is useful for debugging to see how registers change.</li>
+    <li><strong>Stop:</strong> Resets the emulator, clears registers, and wipes memory.</li>
+    <li><strong>Registers Panel:</strong> Shows the current state of the CPU. <br><em>Tip: You can click inside the value box of a register to manually edit it between steps!</em></li>
+    <li><strong>Memory Panel:</strong> Shows the hex and ASCII representation of memory. Use the "Address" input and "Go" button to jump to specific regions (default is <code>0x10000000</code>).</li>
+  </ul>
+
+  <h4>2. Using Breakpoints</h4>
+  <p>
+    You can pause execution at a specific line without stepping through the whole program manually:
+  </p>
+  <ol>
+    <li>Click the <strong>gutter</strong> (the space to the left of the line numbers) in the code editor.</li>
+    <li>A <span style="color:red; font-weight:bold">red dot</span> will appear.</li>
+    <li>Press <strong>Run</strong>. The program will execute at full speed and pause automatically when it hits that line.</li>
+  </ol>
+
+  <h4>3. Supported Instruction Set</h4>
+  <p>
+    This emulator supports the following subset of the MIPS instruction set. 
+    Ensure you only use these instructions in your labs.
+  </p>
+
+  <div class="center-table">
+    <table>
+      <thead>
+        <tr><th>Category</th><th>Instructions</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>Arithmetic</strong></td>
+          <td>
+            <code>add</code>, <code>addu</code>, <code>sub</code>, <code>subu</code>, 
+            <code>addi</code>, <code>addiu</code>, <code>mult</code>, <code>multu</code>, 
+            <code>div</code>, <code>divu</code>
+          </td>
+        </tr>
+        <tr>
+          <td><strong>Logical</strong></td>
+          <td>
+            <code>and</code>, <code>andi</code>, <code>or</code>, <code>ori</code>, 
+            <code>xor</code>, <code>xori</code>, <code>nor</code>
+          </td>
+        </tr>
+        <tr>
+          <td><strong>Data Transfer</strong></td>
+          <td>
+            <code>lw</code> (load word), <code>sw</code> (store word), <br>
+            <code>lb</code> (load byte), <code>sb</code> (store byte), <br>
+            <code>lh</code> (load half), <code>sh</code> (store half), <br>
+            <code>lui</code> (load upper imm), <code>mfhi</code>, <code>mflo</code>
+          </td>
+        </tr>
+        <tr>
+          <td><strong>Branch & Jump</strong></td>
+          <td>
+            <code>beq</code>, <code>bne</code>, <code>j</code>, <code>jal</code>, <code>jr</code>
+          </td>
+        </tr>
+        <tr>
+          <td><strong>Comparison (Set)</strong></td>
+          <td>
+            <code>slt</code>, <code>slti</code>, <code>sltiu</code>, <code>sltu</code>
+          </td>
+        </tr>
+        <tr>
+          <td><strong>Shifting</strong></td>
+          <td>
+            <code>sll</code> (shift left logical), <br>
+            <code>srl</code> (shift right logical), <br>
+            <code>sra</code> (shift right arithmetic)
+          </td>
+        </tr>
+        <tr>
+          <td><strong>Pseudo-Instructions</strong></td>
+          <td>
+            <code>li</code> (load immediate), <br>
+            <code>la</code> (load address), <br>
+            <code>move</code> (copy register), <br>
+            <code>blt</code>, <code>bgt</code>, <code>ble</code>, <code>bge</code> (branch comparisons)
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h4>4. Tutorial Exercise</h4>
+  <p>
+    To complete this tutorial lab, follow these steps:
+  </p>
+  <ol>
+    <li>Review the code in the <strong>Assembler</strong> panel.</li>
+    <li>Click the <strong>Step</strong> button repeatedly to watch <code>$t0</code>, <code>$t1</code>, and <code>$t2</code> change.</li>
+    <li>Observe the <strong>Memory</strong> panel. After the <code>sw</code> instruction executes, the value <code>30</code> (hex <code>1E</code>) will appear at address <code>0x10000000</code>.</li>
+    <li>Check the <strong>Test Cases</strong> below to see if your execution matches the requirements.</li>
+  </ol>
+</div>
+`,
+    testCases: [
+      {
+        name: "Tutorial Check: Register Values",
+        points: 5,
+        initialRegisters: {}, 
+        expectedRegisters: {
+          "$t0": 10,
+          "$t1": 20,
+          "$t2": 30,
+          "$s0": 268435456 // Decimal for 0x10000000
+        }
+      },
+      {
+        name: "Tutorial Check: Memory Storage",
+        points: 5,
+        initialRegisters: {},
+        expectedMemory: {
+          268435456: 30 
+        }
+      }
+    ]
+  },
   "lab-12-2": {
     title: "12.2 LAB: Arithmetic expression - add/sub",
     html: `
