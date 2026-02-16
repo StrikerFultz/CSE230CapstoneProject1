@@ -375,6 +375,17 @@ sw $t2, 0($s0)     # Store 30 into memory at 0x10000000
 
 "lab-12-11": {
     title: "12.11 LAB: Arithmetic Expressions",
+    starter_code: `add $t1, $s1, $s3
+    
+addi $t0, $zero, 13
+lw $t0, 0($t0)
+
+sub $t1, $s4, $s2
+sub $t2, $s5, $s1
+add $t1, $t1, $t2
+
+add $s0, $t0, $t1
+`,
     html: `
 <p style="text-align:center">
   Given the mapping of registers to variables below, write a program to implement the following expression:
