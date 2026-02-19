@@ -27,6 +27,9 @@ pub struct CPU {
 
     // record the last memory read/write to update memory UI
     pub last_mem_access: Option<(u32, u32)>,
+
+    // maximum number of instructions before halting
+    pub max_instructions: u64
 }
 
 impl CPU {
@@ -42,7 +45,8 @@ impl CPU {
             memory: Memory::new(),
             breakpoints: HashSet::new(),
             validation_stack: Vec::new(),
-            last_mem_access: None
+            last_mem_access: None,
+            max_instructions: 10_000
         }
     }
 
@@ -145,10 +149,6 @@ impl CPU {
                 let r2 = self.get_reg(rt) as u32;
 
                 self.set_reg(rd, r1.wrapping_sub(r2) as u32);
-                let r1 = self.get_reg(rs);
-                let r2 = self.get_reg(rt);
-
-                self.set_reg(rd, r1.wrapping_sub(r2));
             },
 
             CoreInstruction::Lw { rt, rs, imm } => {
@@ -502,35 +502,22 @@ impl CPU {
 
     /// launches the emulator instance and executes line-by-line using a `Program`
     pub fn run(&mut self) -> Result<(), EmuError> {
+        let mut instruction_count: u64 = 0;
+
         loop {
+            if self.max_instructions > 0 && instruction_count >= self.max_instructions {
+                return Err(EmuError::ExecutionLimitExceeded(instruction_count));
+            }
+
             match self.next() {
                 Ok(_) => {},
-                Err(EmuError::Termination) => {
-                    println!("Finished execution!");
-
-                    for (reg, val) in &self.registers {
-                        println!("{}: {}", reg, *val as i32);
-                    }
-
-                    break;
-                },
+                Err(EmuError::Termination) => break,
                 Err(EmuError::Breakpoint) => return Err(EmuError::Breakpoint),
                 Err(e) => return Err(e)
             }
-            
-            // check if the current instruction line contains a breakpoint in the set
-            if let Some(program) = self.program.as_ref() {
-                if let Some(index) = program.pc_to_index(self.pc) {
-                    if index < program.line_numbers.len() {
-                        let current_line = program.line_numbers[index] - 1;
 
-                        if self.breakpoints.contains(&current_line) {
-                            return Err(EmuError::Breakpoint);
-                        }
-                    }
-                }
-            }
-            
+            instruction_count += 1;
+
             // check if the current instruction line contains a breakpoint in the set
             if let Some(program) = self.program.as_ref() {
                 if let Some(index) = program.pc_to_index(self.pc) {
@@ -565,8 +552,6 @@ impl CPU {
         self.registers = Self::create_register_map();
         self.memory = Memory::new();
         self.pc = DEFAULT_TEXT_BASE_ADDRESS;
-        self.lo = 0;
-        self.hi = 0;
 
         self.lo = 0;
         self.hi = 0;

@@ -183,6 +183,16 @@ impl WasmCPU {
     pub fn get_mmio_state(&self) -> JsValue {
         serde_wasm_bindgen::to_value(&self.cpu.memory.mmio.snapshot()).unwrap()
     }
+
+    #[wasm_bindgen]
+    pub fn set_register(&mut self, name: &str, value: u32) {
+        self.cpu.set_reg(name, value);
+    }
+
+    #[wasm_bindgen]
+    pub fn set_memory_word(&mut self, address: u32, value: i32) {
+        self.cpu.memory.set_word(address, value);
+    }
 }
 
 #[cfg(test)]

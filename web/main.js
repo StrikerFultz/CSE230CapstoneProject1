@@ -71,6 +71,56 @@ async function renderFiles(selectedId) {
     });
 }
 
+function applyInitialValues(labData) {
+  if (!cpu || !wasmReady) return;
+
+  // lab-level initial_values (from DB or lessons.js)
+  const labInitial = labData.initial_values || labData.initialValues || {};
+
+  const testCases = labData.test_cases || labData.testCases || [];
+  const tcInitial = testCases.length > 0
+    ? (testCases[0].inputs || testCases[0].initialRegisters || {})
+    : {};
+
+  const merged = { ...tcInitial, ...labInitial };
+
+  for (const [reg, val] of Object.entries(merged)) {
+    try {
+      cpu.set_register(reg, Number(val));
+    } catch (e) {
+      console.warn(`Could not set initial register ${reg}:`, e);
+    }
+  }
+
+  // Also apply initial memory values if present
+  const labMem = labData.initial_memory || labData.initialMemory || {};
+  const tcMem = testCases.length > 0
+    ? (testCases[0].initialMemory || {})
+    : {};
+  const mergedMem = { ...tcMem, ...labMem };
+
+  for (const [addr, val] of Object.entries(mergedMem)) {
+    try {
+      cpu.set_memory_word(Number(addr), Number(val));
+    } catch (e) {
+      console.warn(`Could not set initial memory at ${addr}:`, e);
+    }
+  }
+
+  // Update the UI to reflect the new state
+  if (Object.keys(merged).length > 0) {
+    const display = {};
+    for (const [reg, val] of Object.entries(merged)) {
+      display[reg] = Number(val) >>> 0;
+    }
+    paintRegisters(display);
+    lastRegs = display;
+    log(`Loaded initial values for ${Object.keys(merged).length} register(s).`);
+  }
+
+  updateMemoryView();
+}
+
 async function showLesson(id) {
   const lessons = await allLessons();
   const data = lessons[id];
@@ -86,16 +136,25 @@ async function showLesson(id) {
     });
   }
 
-  // Load starter code if available
-  if (data.starter_code && cpuEditor) {
-    cpuEditor.setValue(data.starter_code);
+  // Reset emulator state when switching labs
+  if (cpu && wasmReady) {
+    resetEmulator();
   }
 
-  // Render test cases if available - support both field names
+  // Load starter code if available
+  if (cpuEditor) {
+      cpuEditor.setValue(data.starter_code || "");
+  }
+
+  currentLabData = data;
+
+  // Apply initial register values from lab-level config
+  applyInitialValues(data);
+
+  // Render test cases - support both field names
   const testCases = data.test_cases || data.testCases;
   renderTestCases(testCases);
 
-  //keeps page stable (scrolls to top so can see lesson when u click on lab)
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
@@ -311,8 +370,9 @@ function hex32(n) {
 }
 
 function fmt(n) {
-  const d = toNumber(n);
-  return `${d} (${hex32(d)})`;
+  const d = toNumber(n) >>> 0;
+  const signed = d > 0x7FFFFFFF ? d - 0x100000000 : d;
+  return `${signed} (${hex32(d)})`;
 }
 
 function coerceRegs(raw) {
@@ -384,6 +444,7 @@ function paintRegisters(regObj) {
 
   for (const [name, val] of entries) {
     const d = toNumber(val);
+    const signed = d >>> 0 > 0x7FFFFFFF ? d - 0x100000000 : d;
 
     html += `
       <tr>
@@ -393,7 +454,7 @@ function paintRegisters(regObj) {
             class="reg-edit"
             data-reg="${name}"
             type="number"
-            value="${d}"
+            value="${signed}"
             style="width:80px"
           >
         </td>
@@ -439,6 +500,7 @@ let isProgramLoaded = false;
 let lastRegs = {};
 let breakpoints = new Set();
 let currentLineMarker = null;
+let currentLabData = null;
 
 //uses coldmirror
 
@@ -665,10 +727,15 @@ function loadProgram() {
 
   log("Program loaded successfully.");
   isProgramLoaded = true;
+
+  // Re-apply initial values since load_source resets the CPU
+  if (currentLabData) {
+    applyInitialValues(currentLabData);
+  }
+
   cpu.set_breakpoints(Array.from(breakpoints));
   highlightCurrentLine();
   updateWidgets(cpu.get_mmio_state());
-  console.log("MMIO state:", cpu.get_mmio_state());
 
   return true;
 }
@@ -805,8 +872,8 @@ if (stepBtn) {
     }
 
     if (!isProgramLoaded) {
-      if (!loadProgram())
-        loadProgram();
+      if (!loadProgram()) return;
+      return;
     }
 
     cpu.set_breakpoints(Array.from(breakpoints));
