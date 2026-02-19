@@ -376,7 +376,7 @@ sw $t2, 0($s0)     # Store 30 into memory at 0x10000000
 "lab-12-11": {
     title: "12.11 LAB: Arithmetic Expressions",
     starter_code: `add $t1, $s1, $s3
-    
+
 addi $t0, $zero, 13
 lw $t0, 0($t0)
 

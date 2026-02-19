@@ -1,5 +1,4 @@
-# Paul's Branch
-In the root crate, lib.rs, the class MIPSProgram serves as the entrance class. Where any interaction with mips is done through this class. Like the CPU, assembler, global variables, etc.
+# Angel's branch
 
 ## MIPS32 Emulator - WASM Port
 
