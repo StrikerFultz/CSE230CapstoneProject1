@@ -1,6 +1,3 @@
-# Paul's Branch
-In the root crate, lib.rs, the class MIPSProgram serves as the entrance class. Where any interaction with mips is done through this class. Like the CPU, assembler, global variables, etc.
-
 ## MIPS32 Emulator - WASM Port
 
 This project is a lab suite and web IDE (similar to ZyBooks), featuring a MIPS32 emulator written in Rust. The Rust code is compiled to WASM so the IDE may integrate the emulator component.
@@ -113,4 +110,5 @@ cargo test
 * Matthew: Emulator Dev
 * Ethan: Emulator / Frontend (ALU Visual)
 * Paul: Emulator Dev (Memory)
+
 * Jenna: Frontend / UI Dev
