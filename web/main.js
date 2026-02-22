@@ -869,7 +869,7 @@ if (stepBtn) {
     if (!wasmReady || !cpu) {
       log("WASM not initialized yet.");
       return;
-    }
+    }m 
 
     if (!isProgramLoaded) {
       if (!loadProgram()) return;
@@ -903,6 +903,107 @@ if (stopBtn) {
   stopBtn.addEventListener("click", () => {
     resetEmulator();
   });
+}
+
+document.getElementById('grade-button')?.addEventListener('click', async () => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const currentLessonId = urlParams.get('lesson');
+    
+    if (!currentLessonId) {
+        alert('Please open a lesson first!\n\nAdd ?lesson=lab-12-2 to the URL');
+        return;
+    }
+    
+    // Get the student's MIPS source code from the editor
+    const sourceCode = cpuEditor.getValue();
+    
+    if (!sourceCode || sourceCode.trim().length === 0) {
+        alert('Please write some code first!');
+        return;
+    }
+    
+    console.log('DEBUG: Submitting source code:', sourceCode);
+    
+    // Submit for grading
+    const resultsDiv = document.getElementById('grade-results');
+    resultsDiv.innerHTML = '<p style="text-align:center; padding: 20px;">⏳ Grading...</p>';
+    
+    try {
+        const response = await fetch('/api/grade/submit', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                lab_id: currentLessonId,
+                student_id: 'student123',
+                source_code: sourceCode  //either this or cod below
+                //  source_code: cpuEditor.getValue()
+            })
+        });
+        
+        const result = await response.json();
+        console.log('DEBUG: Server response:', result);
+        
+        if (result.success) {
+            displayGradeReport(result.grade_report);
+        } else {
+            resultsDiv.innerHTML = '<p style="color:red; padding: 20px;">Error: ' + result.error + '</p>';
+        }
+    } catch (error) {
+        console.error('Grading error:', error);
+        resultsDiv.innerHTML = '<p style="color:red; padding: 20px;">Network error: ' + error.message + '</p>';
+    }
+});
+
+
+function displayGradeReport(report) {
+    const resultsDiv = document.getElementById('grade-results');
+    
+    let html = `
+        <div style="background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+            <h3>Grade Report</h3>
+            <div style="font-size: 2em; font-weight: bold; margin: 10px 0;">
+                ${report.earned_points} / ${report.total_points}
+            </div>
+            <div style="font-size: 1.5em; color: ${report.percentage >= 70 ? '#27ae60' : '#e74c3c'};">
+                ${report.percentage}%
+            </div>
+            <div style="margin: 15px 0;">
+                <span style="color: #27ae60;">✓ ${report.passed} Passed</span> | 
+                <span style="color: #e74c3c;">✗ ${report.failed} Failed</span>
+            </div>
+            <hr>
+            <h4>Test Results:</h4>
+    `;
+    
+    report.results.forEach(test => {
+        const statusColor = test.status === 'PASS' ? '#27ae60' : '#e74c3c';
+        const statusIcon = test.status === 'PASS' ? '✓' : '✗';
+        
+        html += `
+            <div style="padding: 10px; margin: 10px 0; background: #f8f9fa; border-left: 4px solid ${statusColor};">
+                <div style="font-weight: bold;">
+                    <span style="color: ${statusColor};">${statusIcon}</span>
+                    ${test.name}
+                    <span style="float: right;">${test.earned}/${test.points} pts</span>
+                </div>
+                <div style="color: #666; font-size: 0.9em;">${test.message}</div>
+        `;
+        
+        if (test.mismatches && test.mismatches.length > 0) {
+            html += '<div style="margin-top: 8px; font-family: monospace; font-size: 0.9em;">';
+            test.mismatches.forEach(m => {
+                html += `<div style="color: #e74c3c;">
+                    ${m.register}: expected ${m.expected}, got ${m.actual}
+                </div>`;
+            });
+            html += '</div>';
+        }
+        
+        html += '</div>';
+    });
+    
+    html += '</div>';
+    resultsDiv.innerHTML = html;
 }
 
 function updateWidgets(mmioMap) {

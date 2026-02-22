@@ -6,8 +6,12 @@ import json
 from datetime import datetime
 import uuid
 import secrets
+from simple_autograder import simple_autograder_bp
+
 
 app = Flask(__name__, static_folder='.')
+app.register_blueprint(simple_autograder_bp)
+
 app.secret_key = secrets.token_hex(32)
 
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
