@@ -1,3 +1,4 @@
 /target/
 /pkg/
 /web/pkg
+/web/__pycache__/

@@ -141,17 +141,23 @@ async function showLesson(id) {
     resetEmulator();
   }
 
+  // clear grade view
+  document.getElementById('grade-results').innerHTML = '';
+
   // Load starter code if available
   if (cpuEditor) {
       cpuEditor.setValue(data.starter_code || "");
   }
 
   currentLabData = data;
+  currentLessonId = id;
 
-  // Apply initial register values from lab-level config
+  const url = new URL(window.location);
+  url.searchParams.set('lesson', id);
+  window.history.replaceState({}, '', url);
+
   applyInitialValues(data);
 
-  // Render test cases - support both field names
   const testCases = data.test_cases || data.testCases;
   renderTestCases(testCases);
 
@@ -501,6 +507,7 @@ let lastRegs = {};
 let breakpoints = new Set();
 let currentLineMarker = null;
 let currentLabData = null;
+let currentLessonId = null;
 
 //uses coldmirror
 
@@ -869,7 +876,7 @@ if (stepBtn) {
     if (!wasmReady || !cpu) {
       log("WASM not initialized yet.");
       return;
-    }m 
+    }
 
     if (!isProgramLoaded) {
       if (!loadProgram()) return;
@@ -906,11 +913,8 @@ if (stopBtn) {
 }
 
 document.getElementById('grade-button')?.addEventListener('click', async () => {
-    const urlParams = new URLSearchParams(window.location.search);
-    const currentLessonId = urlParams.get('lesson');
-    
     if (!currentLessonId) {
-        alert('Please open a lesson first!\n\nAdd ?lesson=lab-12-2 to the URL');
+        alert('Please open a lesson first!');
         return;
     }
     

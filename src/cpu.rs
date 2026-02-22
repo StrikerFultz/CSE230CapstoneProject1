@@ -110,7 +110,6 @@ impl CPU {
 
     pub fn execute(&mut self, insn: &CoreInstruction) -> Result<(), EmuError> {
         let mut is_branch = false;
-        println!("{:?}", insn);
         
         // handle instruction based on type
         match insn {

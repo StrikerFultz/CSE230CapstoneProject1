@@ -6,14 +6,14 @@ This project is a lab suite and web IDE (similar to ZyBooks), featuring a MIPS32
 
 ### Feature Completion:
 **Emulator**:
-- Core Emulator [ ]
+- Core Emulator [x]
 - ISA Specifications [x]
-- Memory Manager [ ]
-- MMIO Spec [ ]
+- Memory Manager [x]
+- MMIO Spec [x]
 
 **Frontend**:
 - Lab Suite [ ]
-- Web IDE [ ]
+- Web IDE [x]
 - WASM Integration [x]
 - Canvas Integration [ ]
 
@@ -40,20 +40,20 @@ cargo install wasm-pack
 ```
 
 
-**Option 1: Run Web Server**
+**Run Web Server**
 1. Build (WASM) from root directory
 ```sh
 wasm-pack build --target web --release --out-dir web/pkg
 ```
 2. Run web server from `web/` directory
 ```sh
-python3 -m http.server
+python3 server.py
 ```
 
-**Option 2: Build local binary**
+**Build emulator binary**
 1. Compile and run the program
 ```sh
-cargo run
+cargo run --release
 ```
 2. Run test cases
 ```sh
@@ -83,7 +83,7 @@ cargo install wasm-pack
 ```
 
 
-**Option 1 Run web server**
+**Run web server**
 ```sh
 wasm-pack build --target web --release --out-dir web/pkg
 ```
@@ -91,14 +91,14 @@ wasm-pack build --target web --release --out-dir web/pkg
 cd web
 ```
 ```sh
-python3 -m http.server
+python3 server.py
 ```
-**open http://localhost:8000 in browser**
+**open http://localhost:5000 in browser**
 **remember to kill the pid if still running**
 
-**Option 2: Build local binary**
+**Option 2: Build emulator binary**
 ```sh
-cargo run
+cargo run --release
 ```
 ```sh
 cargo test
@@ -111,5 +111,7 @@ cargo test
 * Angel: Emulator Dev (WASM and MMIO)
 * Matthew: Emulator Dev
 * Ethan: Emulator / Frontend (ALU Visual)
+
+**Additional Members**:
 * Paul: Emulator Dev (Memory)
 * Jenna: Frontend / UI Dev

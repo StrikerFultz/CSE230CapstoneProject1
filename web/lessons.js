@@ -148,6 +148,11 @@ sw $t2, 0($s0)     # Store 30 into memory at 0x10000000
   },
   "lab-12-2": {
     title: "12.2 LAB: Arithmetic expression - add/sub",
+    starter_code:
+`add $t0, $s0, $s1
+add $t0, $t0, $s2
+sub $s4, $t0, $s3
+`,
     html: `
 <p style="text-align:center">
   Given the mapping of registers to variables below, write a program to implement the following expression:
