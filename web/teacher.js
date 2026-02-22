@@ -130,85 +130,16 @@ const libraryEl = document.getElementById("library");
 
 let currentId = null;
 
-// Login and UI
+// Logout handler
 document.addEventListener("DOMContentLoaded", () => {
-  const overlay = document.getElementById("login-overlay");
-  const userInput = document.getElementById("login-username");
-  const passInput = document.getElementById("login-password");
-  const submitBtn = document.getElementById("login-submit");
-  const errorEl = document.getElementById("login-error");
   const logoutBtn = document.getElementById("logout-prof");
-
-  if (!overlay || !userInput || !passInput || !submitBtn) {
-    console.warn("Login UI not found on page");
-    return;
-  }
-
-  function syncOverlayWithAuth() {
-    if (localStorage.getItem(AUTH_KEY) === "true") {
-      overlay.style.display = "none";
-    } else {
-      overlay.style.display = "flex";
-    }
-  }
-
-  syncOverlayWithAuth();
-
-  // Handle login
-  submitBtn.addEventListener("click", async () => {
-    const username = userInput.value.trim();
-    const password = passInput.value;
-
-    // Try API login first
-    try {
-      const result = await apiRequest('/auth/login', {
-        method: 'POST',
-        body: JSON.stringify({ username, password })
-      });
-      
-      if (result.user) {
-        localStorage.setItem(AUTH_KEY, "true");
-        overlay.style.display = "none";
-        errorEl.textContent = "";
-        console.log('✓ Logged in as:', result.user.username);
-        alert(`Welcome, ${result.user.first_name || username}!`);
-        renderList(null);
-        return;
-      }
-    } catch (apiError) {
-      console.warn('API login failed, trying local auth:', apiError);
-    }
-
-    // Fallback to local auth (username: 1, password: 1)
-    if (username === "1" && password === "1") {
-      localStorage.setItem(AUTH_KEY, "true");
-      overlay.style.display = "none";
-      errorEl.textContent = "";
-      console.log('✓ Logged in locally');
-    } else {
-      errorEl.textContent = "Incorrect username or password.";
-    }
-  });
-
-  // Enter key support
-  [userInput, passInput].forEach((input) => {
-    input.addEventListener("keydown", (e) => {
-      if (e.key === "Enter") {
-        submitBtn.click();
-      }
-    });
-  });
-
-  // Logout
   if (logoutBtn) {
     logoutBtn.addEventListener("click", async () => {
       try {
         await apiRequest('/auth/logout', { method: 'POST' });
-      } catch (error) {
-        console.warn('API logout failed:', error);
-      }
+      } catch (_) {}
       localStorage.removeItem(AUTH_KEY);
-      window.location.href = "index.html";
+      window.location.href = "login.html";
     });
   }
 });

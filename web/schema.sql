@@ -413,3 +413,7 @@ ALTER TABLE ONLY public.user_preferences
 
 ALTER TABLE ONLY public.user_sessions
     ADD CONSTRAINT user_sessions_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(user_id) ON DELETE CASCADE;
+
+ALTER TABLE public.users
+    ADD COLUMN IF NOT EXISTS full_name character varying(255),
+    ADD COLUMN IF NOT EXISTS asu_id character varying(20);

@@ -6,13 +6,17 @@ import json
 from datetime import datetime
 import uuid
 import secrets
+
 from simple_autograder import simple_autograder_bp
+from auth import auth_bp
 
 
 app = Flask(__name__, static_folder='.')
-app.register_blueprint(simple_autograder_bp)
 
-app.secret_key = secrets.token_hex(32)
+app.register_blueprint(simple_autograder_bp)
+app.register_blueprint(auth_bp)
+
+app.secret_key = "angel-was-here"
 
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 app.config['SESSION_COOKIE_SECURE'] = False
@@ -303,6 +307,10 @@ if __name__ == '__main__':
     print("  POST /api/labs")
     print("  PUT  /api/labs/<lab_id>")
     print("  DELETE /api/labs/<lab_id>")
+    print("  POST /api/auth/signup")
+    print("  POST /api/auth/login")
+    print("  POST /api/auth/logout")
+    print("  GET  /api/auth/me")
     print("\n")
     
     app.run(debug=True, host='0.0.0.0', port=5000)

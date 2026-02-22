@@ -185,6 +185,13 @@ if (testCasesToggle) {
 
 function renderTestCases(testCases) {
   if (!testCasesSection || !testCasesList) return;
+
+  // only display for teachers/TA
+  const user = window.__currentUser;
+  if (user && user.role === 'student') {
+    testCasesSection.classList.add("hidden");
+    return;
+  }
   
   // Hide section if no test cases
   if (!testCases || testCases.length === 0) {
