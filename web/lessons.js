@@ -216,42 +216,6 @@ sw $t2, 0($s0)     # Store 30 into memory at 0x10000000
           "$s3": 5,
           "$s4": 7
         }
-      },
-      {
-        name: "Test 2: Compare storage (3 points)",
-        points: 3,
-        initialRegisters: {
-          "$s0": 1,
-          "$s1": 2,
-          "$s2": 3,
-          "$s3": 10
-        },
-        expectedRegisters: {
-          "$t0": 6,
-          "$s0": 1,
-          "$s1": 2,
-          "$s2": 3,
-          "$s3": 10,
-          "$s4": -4
-        }
-      },
-      {
-        name: "Test 3: Compare storage (3 points)",
-        points: 3,
-        initialRegisters: {
-          "$s0": 1,
-          "$s1": 1,
-          "$s2": 1,
-          "$s3": 3
-        },
-        expectedRegisters: {
-          "$t0": 3,
-          "$s0": 1,
-          "$s1": 1,
-          "$s2": 1,
-          "$s3": 3,
-          "$s4": 0
-        }
       }
     ]
   },
@@ -334,40 +298,6 @@ sw $t2, 0($s0)     # Store 30 into memory at 0x10000000
           "$s2": 6,
           "$s3": 3,
           "$s4": 18
-        }
-      },
-      {
-        name: "Test 2: Compare storage (3 points)",
-        points: 3,
-        initialRegisters: {
-          "$s0": 3,
-          "$s1": 6,
-          "$s2": 3,
-          "$s3": 6
-        },
-        expectedRegisters: {
-          "$s0": 3,
-          "$s1": 6,
-          "$s2": 3,
-          "$s3": 6,
-          "$s4": -27
-        }
-      },
-      {
-        name: "Test 3: Compare storage (3 points)",
-        points: 3,
-        initialRegisters: {
-          "$s0": 5,
-          "$s1": 5,
-          "$s2": 5,
-          "$s3": 5
-        },
-        expectedRegisters: {
-          "$s0": 5,
-          "$s1": 5,
-          "$s2": 5,
-          "$s3": 5,
-          "$s4": 0
         }
       }
     ]
@@ -487,52 +417,6 @@ add $s0, $t0, $t1
           "$s5": -3,
           "$s6": -1,
           "$s7": 0
-        }
-      },
-      {
-        name: "Test 2: Compare storage (5 points)",
-        points: 5,
-        initialRegisters: {
-          "$s1": 3,
-          "$s2": 4,
-          "$s3": 0,
-          "$s4": 6,
-          "$s5": -4,
-          "$s6": -1,
-          "$s7": 8
-        },
-        expectedRegisters: {
-          "$s0": 9,
-          "$s1": 3,
-          "$s2": 4,
-          "$s3": 0,
-          "$s4": 6,
-          "$s5": -4,
-          "$s6": -1,
-          "$s7": 8
-        }
-      },
-      {
-        name: "Test 3: Compare storage (5 points)",
-        points: 5,
-        initialRegisters: {
-          "$s1": 0,
-          "$s2": -10,
-          "$s3": 10,
-          "$s4": -15,
-          "$s5": 15,
-          "$s6": 5,
-          "$s7": 20
-        },
-        expectedRegisters: {
-          "$s0": 30,
-          "$s1": 0,
-          "$s2": -10,
-          "$s3": 10,
-          "$s4": -15,
-          "$s5": 15,
-          "$s6": 5,
-          "$s7": 20
         }
       }
     ]
@@ -661,75 +545,6 @@ A[3] = (A[0] + A[1] - 100) - (A[2] + A[4] - A[5]);
         4016: 20,
         4020: 0,
         4024: 196688
-      }
-    },
-    {
-      name: "Test 2: Compare storage (1 point)",
-      points: 1,
-      initialRegisters: {
-        "$s0": 13804
-      },
-      initialMemory: {
-        13804: -8,
-        13808: -4
-      },
-      expectedRegisters: {
-        "$s0": 13804
-      },
-      expectedMemory: {
-        13804: -8,
-        13808: -4,
-        13812: -12,
-        13816: -13,
-        13820: 32,
-        13824: 0,
-        13828: 196736
-      }
-    },
-    {
-      name: "Test 3: Compare storage (1 point)",
-      points: 1,
-      initialRegisters: {
-        "$s0": 8016
-      },
-      initialMemory: {
-        8016: -5,
-        8020: 8
-      },
-      expectedRegisters: {
-        "$s0": 8016
-      },
-      expectedMemory: {
-        8016: -5,
-        8020: 8,
-        8024: 7,
-        8028: -64,
-        8032: -4,
-        8036: 0,
-        8040: -160
-      }
-    },
-    {
-      name: "Test 4: Compare storage (1 point)",
-      points: 1,
-      initialRegisters: {
-        "$s0": 2304
-      },
-      initialMemory: {
-        2304: 5,
-        2308: -8
-      },
-      expectedRegisters: {
-        "$s0": 2304
-      },
-      expectedMemory: {
-        2304: 5,
-        2308: -8,
-        2312: 4,
-        2316: -67,
-        2320: -4,
-        2324: 0,
-        2328: -160
       }
     }
   ]
@@ -910,82 +725,6 @@ while (i < size) {
         4004: 8,
         4008: -13,
         4012: 0
-      }
-    },
-    {
-      name: "Test 2: Compare storage (1 point)",
-      points: 1,
-      initialRegisters: {
-        "$s0": 13804,
-        "$s1": 4
-      },
-      initialMemory: {
-        13804: -8,
-        13808: -4,
-        13812: 4,
-        13816: 8
-      },
-      expectedRegisters: {
-        "$s0": 13804,
-        "$s1": 4
-      },
-      expectedMemory: {
-        13804: -8,
-        13808: -4,
-        13812: 4,
-        13816: 8
-      }
-    },
-    {
-      name: "Test 3: Compare storage (1 point)",
-      points: 1,
-      initialRegisters: {
-        "$s0": 8016,
-        "$s1": 9
-      },
-      initialMemory: {
-        8016: -50,
-        8020: 80,
-        8024: 100,
-        8028: 0,
-        8032: -80,
-        8036: -50,
-        8040: -100,
-        8048: 0
-      },
-      expectedRegisters: {
-        "$s0": 8016,
-        "$s1": 6
-      },
-      expectedMemory: {
-        8016: -50,
-        8020: 80,
-        8024: 100,
-        8028: 0,
-        8032: -80,
-        8036: -100
-      }
-    },
-    {
-      name: "Test 4: Compare storage (1 point)",
-      points: 1,
-      initialRegisters: {
-        "$s0": 10000,
-        "$s1": 5
-      },
-      initialMemory: {
-        10000: 230,
-        10004: 230,
-        10008: 230,
-        10012: 230,
-        10016: 230
-      },
-      expectedRegisters: {
-        "$s0": 10000,
-        "$s1": 1
-      },
-      expectedMemory: {
-        10000: 230
       }
     }
   ]
@@ -1178,98 +917,6 @@ void newElement(int* P, int k, int pow) {
         8008: 25,
         8012: -8,
         8016: 0
-      }
-    },
-    {
-      name: "Test 2: Compare storage (1 point)",
-      points: 1,
-      initialRegisters: {
-        "$s0": 13800,
-        "$s1": 1,
-        "$s2": 13804,
-        "$s3": 0
-      },
-      initialMemory: {
-        13800: -8
-      },
-      expectedRegisters: {
-        "$s2": 13804,
-        "$s3": 1
-      },
-      expectedMemory: {
-        13804: 1
-      }
-    },
-    {
-      name: "Test 3: Compare storage (1 point)",
-      points: 1,
-      initialRegisters: {
-        "$s0": 8016,
-        "$s1": 10,
-        "$s2": 8000,
-        "$s3": 0
-      },
-      initialMemory: {
-        8016: -5,
-        8020: 8,
-        8024: 4,
-        8028: -6,
-        8032: 6,
-        8036: 0,
-        8040: -3,
-        8044: -2,
-        8048: 2,
-        8052: -2
-      },
-      expectedRegisters: {
-        "$s2": 8000,
-        "$s3": 10
-      },
-      expectedMemory: {
-        8000: 1,
-        8004: 8,
-        8008: 16,
-        8012: -216,
-        8016: 1296,
-        8020: 0,
-        8024: 729,
-        8028: -128,
-        8032: 256,
-        8036: -512
-      }
-    },
-    {
-      name: "Test 4: Compare storage (1 point)",
-      points: 1,
-      initialRegisters: {
-        "$s0": 2648,
-        "$s1": 8,
-        "$s2": 2648,
-        "$s3": 0
-      },
-      initialMemory: {
-        2648: -80,
-        2652: -40,
-        2656: 25,
-        2660: 20,
-        2664: -15,
-        2668: 10,
-        2672: -8,
-        2676: -4
-      },
-      expectedRegisters: {
-        "$s2": 2648,
-        "$s3": 8
-      },
-      expectedMemory: {
-        2648: 1,
-        2652: -40,
-        2656: 625,
-        2660: 8000,
-        2664: 50625,
-        2668: 100000,
-        2672: 262144,
-        2676: -16384
       }
     }
   ]
@@ -1535,111 +1182,6 @@ node* findNode (node* head, int n) {
         8000: 230,
         8004: 6104
       }
-    },
-    {
-      name: "Test 2: Compare storage (1 point)",
-      points: 1,
-      initialRegisters: {
-        "$s0": 13804,
-        "$s1": 4000,
-        "$s2": 0,
-        "$s3": 0
-      },
-      initialMemory: {
-        13804: -8,
-        13808: 8000,
-        8000: 80,
-        8004: 0,
-        4000: -230
-      },
-      expectedRegisters: {
-        "$s0": 4000,
-        "$s1": 4000,
-        "$s2": 0,
-        "$s3": -230
-      },
-      expectedMemory: {
-        4000: -230,
-        4004: 13804,
-        8000: 80,
-        8004: 0,
-        13804: -8,
-        13808: 8000
-      }
-    },
-    {
-      name: "Test 3: Compare storage (1 point)",
-      points: 1,
-      initialRegisters: {
-        "$s0": 8016,
-        "$s1": 13000,
-        "$s2": 100,
-        "$s3": 0
-      },
-      initialMemory: {
-        8016: -50,
-        8020: 8040,
-        4024: 100,
-        4028: 6032,
-        6032: -80,
-        6036: 0,
-        8040: -100,
-        8044: 4024,
-        13000: 0
-      },
-      expectedRegisters: {
-        "$s0": 8016,
-        "$s1": 13000,
-        "$s2": 100,
-        "$s3": 0
-      },
-      expectedMemory: {
-        4024: 100,
-        4028: 6032,
-        6032: -80,
-        6036: 13000,
-        8016: -50,
-        8020: 8040,
-        8040: -100,
-        8044: 4024,
-        13000: 0,
-        13004: 0
-      }
-    },
-    {
-      name: "Test 4: Compare storage (1 point)",
-      points: 1,
-      initialRegisters: {
-        "$s0": 10000,
-        "$s1": 4024,
-        "$s2": 3,
-        "$s3": 0
-      },
-      initialMemory: {
-        10000: 23,
-        10004: 5008,
-        5008: -5,
-        5012: 8016,
-        8016: 20,
-        8020: 0,
-        4024: 30
-      },
-      expectedRegisters: {
-        "$s0": 10000,
-        "$s1": 4024,
-        "$s2": 3,
-        "$s3": 30
-      },
-      expectedMemory: {
-        4024: 30,
-        4028: 0,
-        5008: -5,
-        5012: 8016,
-        8016: 20,
-        8020: 4024,
-        10000: 23,
-        10004: 5008
-      }
     }
   ]
 },
@@ -1760,48 +1302,6 @@ int recursion(int x, int y) {
         "$s0": 1,
         "$s1": 2,
         "$s2": -7
-      }
-    },
-    {
-      name: "Test 2: Compare storage (1 point)",
-      points: 1,
-      initialRegisters: {
-        "$s0": 4,
-        "$s1": 2,
-        "$s2": 0
-      },
-      expectedRegisters: {
-        "$s0": 4,
-        "$s1": 2,
-        "$s2": 128
-      }
-    },
-    {
-      name: "Test 3: Compare storage (1 point)",
-      points: 1,
-      initialRegisters: {
-        "$s0": 230,
-        "$s1": 230,
-        "$s2": 0
-      },
-      expectedRegisters: {
-        "$s0": 230,
-        "$s1": 230,
-        "$s2": 0
-      }
-    },
-    {
-      name: "Test 4: Compare storage (1 point)",
-      points: 1,
-      initialRegisters: {
-        "$s0": 4,
-        "$s1": 0,
-        "$s2": 0
-      },
-      expectedRegisters: {
-        "$s0": 4,
-        "$s1": 0,
-        "$s2": 448
       }
     }
   ]
@@ -1962,48 +1462,6 @@ int recursion(int p, int md, int m, int n) {
         "$s0": 120000000,
         "$s1": 8000,
         "$s2": 15000
-      }
-    },
-    {
-      name: "Test 2: Compare storage (1 point)",
-      points: 1,
-      initialRegisters: {
-        "$s0": 0,
-        "$s1": -230,
-        "$s2": 11012
-      },
-      expectedRegisters: {
-        "$s0": -2532760,
-        "$s1": -230,
-        "$s2": 11012
-      }
-    },
-    {
-      name: "Test 3: Compare storage (1 point)",
-      points: 1,
-      initialRegisters: {
-        "$s0": 0,
-        "$s1": -23011,
-        "$s2": -23012
-      },
-      expectedRegisters: {
-        "$s0": 529529132,
-        "$s1": -23011,
-        "$s2": -23012
-      }
-    },
-    {
-      name: "Test 4: Compare storage (1 point)",
-      points: 1,
-      initialRegisters: {
-        "$s0": 0,
-        "$s1": 23012,
-        "$s2": -11023
-      },
-      expectedRegisters: {
-        "$s0": -253661276,
-        "$s1": 23012,
-        "$s2": -11023
       }
     }
   ]
@@ -2169,83 +1627,6 @@ int nSum(int* A, int k) {
         8008: 10,
         8012: 8,
         8016: 8
-      }
-    },
-    {
-      name: "Test 2: Compare storage (1 point)",
-      points: 1,
-      initialRegisters: {
-        "$s0": 13800,
-        "$s1": 13804,
-        "$s2": 1
-      },
-      initialMemory: {
-        13800: -8
-      },
-      expectedMemory: {
-        13804: -8
-      }
-    },
-    {
-      name: "Test 3: Compare storage (1 point)",
-      points: 1,
-      initialRegisters: {
-        "$s0": 8016,
-        "$s1": 8000,
-        "$s2": 10
-      },
-      initialMemory: {
-        8016: -5,
-        8020: 8,
-        8024: 4,
-        8028: -6,
-        8032: 6,
-        8036: -10,
-        8040: -8,
-        8044: 2,
-        8048: 8,
-        8052: -8
-      },
-      expectedMemory: {
-        8000: -5,
-        8004: 3,
-        8008: 7,
-        8012: 1,
-        8016: 7,
-        8020: -3,
-        8024: -11,
-        8028: -9,
-        8032: -1,
-        8036: -9
-      }
-    },
-    {
-      name: "Test 4: Compare storage (1 point)",
-      points: 1,
-      initialRegisters: {
-        "$s0": 2648,
-        "$s1": 2648,
-        "$s2": 8
-      },
-      initialMemory: {
-        2648: -8,
-        2652: 4,
-        2656: 15,
-        2660: 12,
-        2664: 12,
-        2668: 10,
-        2672: 8,
-        2676: 14
-      },
-      expectedMemory: {
-        2648: -8,
-        2652: -4,
-        2656: 11,
-        2660: 23,
-        2664: 35,
-        2668: 45,
-        2672: 53,
-        2676: 67
       }
     }
   ]
