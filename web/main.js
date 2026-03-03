@@ -1,13 +1,9 @@
 import init, { WasmCPU } from "./pkg/mips_emu_wasm.js";
-import { LESSONS as BASE_LESSONS } from "./lessons.js";
 
 // API Configuration
 const API_BASE = 'http://localhost:5000/api';
 
-//for the lesson and files
-const STORAGE_KEY = "customLessons";
-
-// Fetch lessons from API
+// Fetch lessons from API (database only)
 async function fetchLessonsFromAPI() {
   try {
     const response = await fetch(`${API_BASE}/labs`, {
@@ -19,23 +15,32 @@ async function fetchLessonsFromAPI() {
       return labs;
     }
   } catch (error) {
-    console.warn('Could not fetch labs from API, using local storage:', error);
+    console.warn('Could not fetch labs from API:', error);
   }
   return {};
 }
 
-function getCustomLessons() {
-  try {
-    return JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}");
-  } catch (_) {
-    return {};
-  }
+async function allLessons() {
+  return await fetchLessonsFromAPI();
 }
 
-async function allLessons() {
-  const apiLessons = await fetchLessonsFromAPI();
-  const customLessons = getCustomLessons();
-  return { ...BASE_LESSONS, ...apiLessons, ...customLessons };
+function normalizeTestCases(raw) {
+  if (!raw || !Array.isArray(raw) || raw.length === 0) return [];
+
+  return raw.map((tc, i) => {
+    const inp = tc.input_data     || {};
+    const exp = tc.expected_output || {};
+
+    return {
+      name:           tc.test_name || tc.name || `Test Case ${i + 1}`,
+      points:         tc.points || 0,
+      inputs:         inp.registers || {},
+      initialMemory:  inp.memory    || {},
+      expected:       exp.registers || {},
+      expectedMemory: exp.memory    || {},
+      is_hidden:      tc.is_hidden  || false,
+    };
+  });
 }
 
 // lesson underlined in hedder
@@ -74,13 +79,14 @@ async function renderFiles(selectedId) {
 function applyInitialValues(labData) {
   if (!cpu || !wasmReady) return;
 
-  // lab-level initial_values (from DB or lessons.js)
+  // lab-level initial_values (from DB)
   const labInitial = labData.initial_values || labData.initialValues || {};
 
-  const testCases = labData.test_cases || labData.testCases || [];
-  const tcInitial = testCases.length > 0
-    ? (testCases[0].inputs || testCases[0].initialRegisters || {})
-    : {};
+  // Normalize test cases so we can pull from the first one
+  const rawCases = labData.test_cases || labData.testCases || [];
+  const testCases = normalizeTestCases(rawCases);
+
+  const tcInitial = testCases.length > 0 ? (testCases[0].inputs || {}) : {};
 
   const merged = { ...tcInitial, ...labInitial };
 
@@ -94,9 +100,7 @@ function applyInitialValues(labData) {
 
   // Also apply initial memory values if present
   const labMem = labData.initial_memory || labData.initialMemory || {};
-  const tcMem = testCases.length > 0
-    ? (testCases[0].initialMemory || {})
-    : {};
+  const tcMem = testCases.length > 0 ? (testCases[0].initialMemory || {}) : {};
   const mergedMem = { ...tcMem, ...labMem };
 
   for (const [addr, val] of Object.entries(mergedMem)) {
@@ -127,7 +131,8 @@ async function showLesson(id) {
   if (!data) return;
 
   lessonTitle.textContent = data.title || id;
-  lessonBody.innerHTML = data.html || "";
+
+  lessonBody.innerHTML = data.html || data.instructions || "";
   lessonContainer.classList.remove("hidden");
 
   if (filesListEl) {
@@ -158,8 +163,9 @@ async function showLesson(id) {
 
   applyInitialValues(data);
 
-  const testCases = data.test_cases || data.testCases;
-  renderTestCases(testCases);
+  // Normalize before rendering
+  const rawCases = data.test_cases || data.testCases || [];
+  renderTestCases(normalizeTestCases(rawCases));
 
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
@@ -183,33 +189,31 @@ if (testCasesToggle) {
   });
 }
 
+// testCases here are already normalized via normalizeTestCases()
 function renderTestCases(testCases) {
   if (!testCasesSection || !testCasesList) return;
 
-  // only display for teachers/TA
+  // 1. Get the current user role
   const user = window.__currentUser;
-  if (user && user.role === 'student') {
+  const isTeacher = user && (user.role === 'instructor' || user.role === 'ta');
+  
+  // 2. Hide section if no test cases OR if the user is a student
+  if (!testCases || testCases.length === 0 || !isTeacher) {
     testCasesSection.classList.add("hidden");
     return;
   }
   
-  // Hide section if no test cases
-  if (!testCases || testCases.length === 0) {
-    testCasesSection.classList.add("hidden");
-    return;
-  }
-  
-  // Show section and render test cases
+  // 3. Only if isTeacher is true, the code reaches here to show the section
   testCasesSection.classList.remove("hidden");
   testCasesList.innerHTML = "";
-  
+
   testCases.forEach((testCase, index) => {
     const item = document.createElement("div");
     item.className = "test-case-item";
     
-    // Support both naming conventions: inputs/initialRegisters and expected/expectedRegisters
-    const initialRegs = testCase.inputs || testCase.initialRegisters || {};
-    const expectedRegs = testCase.expected || testCase.expectedRegisters || {};
+    // These are now the normalized keys
+    const initialRegs = testCase.inputs || {};
+    const expectedRegs = testCase.expected || {};
     const initialMem = testCase.initialMemory || {};
     const expectedMem = testCase.expectedMemory || {};
     
@@ -220,19 +224,9 @@ function renderTestCases(testCases) {
     if (Object.keys(initialRegs).length > 0) {
       inputsHTML += `
         <table class="test-case-table">
-          <thead>
-            <tr>
-              <th>Register</th>
-              <th>Value</th>
-            </tr>
-          </thead>
+          <thead><tr><th>Register</th><th>Value</th></tr></thead>
           <tbody>
-            ${Object.entries(initialRegs).map(([reg, val]) => `
-              <tr>
-                <td>${reg}</td>
-                <td>${val}</td>
-              </tr>
-            `).join('')}
+            ${Object.entries(initialRegs).map(([reg, val]) => `<tr><td>${reg}</td><td>${val}</td></tr>`).join('')}
           </tbody>
         </table>
       `;
@@ -242,21 +236,9 @@ function renderTestCases(testCases) {
     if (Object.keys(initialMem).length > 0) {
       inputsHTML += `
         <table class="test-case-table" style="margin-top: 10px;">
-          <thead>
-            <tr>
-              <th>Address</th>
-              <th>Value</th>
-            </tr>
-          </thead>
+          <thead><tr><th>Address</th><th>Value</th></tr></thead>
           <tbody>
-            ${Object.entries(initialMem)
-              .sort(([a], [b]) => parseInt(a) - parseInt(b))
-              .map(([addr, val]) => `
-              <tr>
-                <td>${addr}</td>
-                <td>${val}</td>
-              </tr>
-            `).join('')}
+            ${Object.entries(initialMem).sort(([a], [b]) => parseInt(a) - parseInt(b)).map(([addr, val]) => `<tr><td>${addr}</td><td>${val}</td></tr>`).join('')}
           </tbody>
         </table>
       `;
@@ -273,19 +255,9 @@ function renderTestCases(testCases) {
     if (Object.keys(expectedRegs).length > 0) {
       outputsHTML += `
         <table class="test-case-table">
-          <thead>
-            <tr>
-              <th>Register</th>
-              <th>Expected Value</th>
-            </tr>
-          </thead>
+          <thead><tr><th>Register</th><th>Expected Value</th></tr></thead>
           <tbody>
-            ${Object.entries(expectedRegs).map(([reg, val]) => `
-              <tr>
-                <td>${reg}</td>
-                <td>${val}</td>
-              </tr>
-            `).join('')}
+            ${Object.entries(expectedRegs).map(([reg, val]) => `<tr><td>${reg}</td><td>${val}</td></tr>`).join('')}
           </tbody>
         </table>
       `;
@@ -295,28 +267,22 @@ function renderTestCases(testCases) {
     if (Object.keys(expectedMem).length > 0) {
       outputsHTML += `
         <table class="test-case-table" style="margin-top: 10px;">
-          <thead>
-            <tr>
-              <th>Address</th>
-              <th>Expected Value</th>
-            </tr>
-          </thead>
+          <thead><tr><th>Address</th><th>Expected Value</th></tr></thead>
           <tbody>
-            ${Object.entries(expectedMem)
-              .sort(([a], [b]) => parseInt(a) - parseInt(b))
-              .map(([addr, val]) => `
-              <tr>
-                <td>${addr}</td>
-                <td>${val}</td>
-              </tr>
-            `).join('')}
+            ${Object.entries(expectedMem).sort(([a], [b]) => parseInt(a) - parseInt(b)).map(([addr, val]) => `<tr><td>${addr}</td><td>${val}</td></tr>`).join('')}
           </tbody>
         </table>
       `;
     }
     
+    // Check if we should show a hidden message (student view)
     if (outputsHTML === "") {
-      outputsHTML = '<p style="font-size: 12px; color: #666;">No expected outputs</p>';
+       if (user && user.role === 'student') {
+          // If it's a student, the server probably stripped the data
+          outputsHTML = '<p style="font-size: 12px; color: #666;">Hidden (Student View)</p>';
+       } else {
+          outputsHTML = '<p style="font-size: 12px; color: #666;">No expected outputs</p>';
+       }
     }
     
     item.innerHTML = `
@@ -340,20 +306,7 @@ function renderTestCases(testCases) {
   });
 }
 
-const urlParams = new URLSearchParams(window.location.search);
-const initialLessonId =
-  urlParams.get("lesson") || Object.keys(BASE_LESSONS)[0] || null;
-
-// Initialize lessons async
-(async () => {
-  await renderFiles(initialLessonId);
-  const lessons = await allLessons();
-  if (initialLessonId && lessons[initialLessonId]) {
-    showLesson(initialLessonId);
-  }
-})();
-
-//console and reg ui
+// console and reg ui
 
 const consoleOut = document.getElementById("console-output");
 const runBtn = document.getElementById("run");
@@ -362,7 +315,7 @@ const stopBtn = document.getElementById("stop");
 const registersDiv = document.getElementById("registers");
 const codeEl = document.querySelector(".assembler textarea");
 
-//emultor stuff
+// emultor stuff
 function log(msg) {
   if (!consoleOut) return;
   consoleOut.textContent += msg + "\n";
@@ -396,11 +349,11 @@ function coerceRegs(raw) {
   return {};
 }
 
-//filters to show the used regs
+// filters to show the used regs
 
-//show in tab
+// show in tab
 const INTERESTING = /^\$(?:s[0-7]|t[0-9]|a[0-3]|v[0-1])$/i;
-//hide unless changed
+// hide unless changed
 const SYSTEM = /^\$(?:zero|gp|sp|fp|ra|at|k0|k1|lo|hi)$/i;
 
 function filterForTab(curr, prev) {
@@ -409,8 +362,8 @@ function filterForTab(curr, prev) {
   for (const [name, val] of Object.entries(curr)) {
     const now = toNumber(val);
 
-    //if don't have a previous snapshot treat it as "same as now"
-    //so changed will be false on first run
+    // if don't have a previous snapshot treat it as "same as now"
+    // so changed will be false on first run
     const hadPrev = Object.prototype.hasOwnProperty.call(prev, name);
     const was = hadPrev ? toNumber(prev[name]) : now;
 
@@ -426,14 +379,14 @@ function filterForTab(curr, prev) {
       if (changed) out[name] = now;
       continue;
     }
-    //other regs show only if nonzero or changed
+    // other regs show only if nonzero or changed
     if (nonZero || changed) out[name] = now;
   }
 
   return out;
 }
 
-//add 11/14 (make reg table editable)
+// add 11/14 (make reg table editable)
 
 function paintRegisters(regObj) {
   if (!registersDiv) return;
@@ -479,13 +432,13 @@ function paintRegisters(regObj) {
   html += "</tbody></table>";
   registersDiv.innerHTML = html;
 
-  //hook up "change" handlers: editing input changes register value
+  // hook up "change" handlers: editing input changes register value
   registersDiv.querySelectorAll(".reg-edit").forEach((input) => {
     input.addEventListener("change", () => {
       const regName = input.dataset.reg;
       const newVal = Number(input.value) || 0;
 
-      //updates the CPU if API supports it
+      // updates the CPU if API supports it
       try {
         if (cpu && typeof cpu.set_register === "function") {
           cpu.set_register(regName, newVal);
@@ -498,14 +451,14 @@ function paintRegisters(regObj) {
         log("Error setting register: " + e.message);
       }
 
-      //keeps local snapshots in sync until next run/step
+      // keeps local snapshots in sync until next run/step
       regObj[regName] = newVal;
       lastRegs[regName] = newVal;
     });
   });
 }
 
-//easm and cpu
+// easm and cpu
 
 let cpu = null;
 let wasmReady = false;
@@ -516,18 +469,18 @@ let currentLineMarker = null;
 let currentLabData = null;
 let currentLessonId = null;
 
-//uses coldmirror
+// uses coldmirror
 
 CodeMirror.defineSimpleMode("mips-custom", {
   start: [
     {
-      //instructions
+      // instructions
       regex:
         /(?:add|addu|addi|addiu|sub|subu|li|sw|lw|sb|lb|sh|lh|lui|la|j|jal|jr|or|ori|and|andi|beq|bne|slt|slti|sltiu|sltu|blt|bgt|ble|bge|move|mult|multu|mflo|mfhi|xor|xori|div|divu|nor|sll|srl|sra)\b/i,
       token: "keyword",
     },
     {
-      //registers
+      // registers
       regex: /\$(?:zero|at|v[01]|a[0-3]|t[0-9]|s[0-7]|k[01]|gp|sp|fp|ra)\b/,
       token: "variable-2",
     },
@@ -644,7 +597,7 @@ if (memGoBtn) {
   memGoBtn.addEventListener("click", () => updateMemoryView());
 }
 
-//highlight current line
+// highlight current line
 function clearHighlight() {
   if (currentLineMarker != null) {
     cpuEditor.removeLineClass(
@@ -670,7 +623,7 @@ function highlightCurrentLine() {
   }
 }
 
-//breakpoints via gutter click
+// breakpoints via gutter click
 cpuEditor.on("gutterClick", (cm, lineIndex, gutter) => {
   if (gutter !== "breakpoints") return;
 
@@ -690,7 +643,7 @@ cpuEditor.on("gutterClick", (cm, lineIndex, gutter) => {
   }
 });
 
-//control for the emulator
+// control for the emulator
 
 function resetEmulator() {
   if (cpu && wasmReady) {
@@ -854,7 +807,7 @@ function handleWasmResult(result, { fromRun = false } = {}) {
 }
 
 
-//buttons
+// buttons
 if (runBtn) {
   runBtn.addEventListener("click", async () => {
     if (!wasmReady || !cpu) {
@@ -942,12 +895,12 @@ document.getElementById('grade-button')?.addEventListener('click', async () => {
     try {
         const response = await fetch('/api/grade/submit', {
             method: 'POST',
+            credentials: 'include',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 lab_id: currentLessonId,
-                student_id: 'student123',
-                source_code: sourceCode  //either this or cod below
-                //  source_code: cpuEditor.getValue()
+                student_id: window.__currentUser?.username || 'anonymous',
+                source_code: sourceCode
             })
         });
         
@@ -1071,7 +1024,24 @@ function updateWidgets(mmioMap) {
   widgetsDiv.innerHTML = html;
 }
 
-//init wasm
+// init wasm
+
+const urlParams = new URLSearchParams(window.location.search);
+const requestedLessonId = urlParams.get("lesson") || null;
+
+// Initialize lessons async — pick first from DB if no ?lesson= param
+(async () => {
+  const lessons = await allLessons();
+  const sortedIds = Object.keys(lessons).sort();
+  const initialLessonId = (requestedLessonId && lessons[requestedLessonId])
+    ? requestedLessonId
+    : (sortedIds[0] || null);
+
+  await renderFiles(initialLessonId);
+  if (initialLessonId && lessons[initialLessonId]) {
+    showLesson(initialLessonId);
+  }
+})();
 
 init()
   .then(() => {

@@ -41,6 +41,42 @@ def get_db_connection():
         return None
 
 
+# fetch test cases for a single lab
+def _fetch_test_cases(cursor, lab_id):
+    """Query lab_test_cases for a given lab_id and return a list of dicts
+    in the shape the front-end expects (DB JSONB preserved as-is)."""
+    cursor.execute("""
+        SELECT test_case_id, test_name, test_type, description,
+               input_data, expected_output, points, is_hidden, timeout_seconds
+        FROM lab_test_cases
+        WHERE lab_id = %s
+        ORDER BY test_name
+    """, (lab_id,))
+    rows = cursor.fetchall()
+
+    test_cases = []
+    for row in rows:
+        inp = row.get('input_data') or {}
+        exp = row.get('expected_output') or {}
+        if isinstance(inp, str):
+            inp = json.loads(inp)
+        if isinstance(exp, str):
+            exp = json.loads(exp)
+
+        test_cases.append({
+            'test_case_id':   str(row['test_case_id']),
+            'test_name':      row['test_name'],
+            'test_type':      row.get('test_type', 'register'),
+            'description':    row.get('description'),
+            'input_data':     inp,
+            'expected_output': exp,
+            'points':         row.get('points', 10),
+            'is_hidden':      row.get('is_hidden', False),
+            'timeout_seconds': row.get('timeout_seconds', 5),
+        })
+    return test_cases
+
+
 @app.route('/')
 def index():
     return send_from_directory('.', 'index.html')
@@ -76,28 +112,44 @@ def get_labs():
     if not conn:
         return jsonify({'error': 'Database connection failed'}), 500
     
+    # Identify the user's role from the session
+    role = session.get('role', 'student')
+    is_teacher = role in ('instructor', 'ta')
+
     try:
         cursor = conn.cursor(cursor_factory=RealDictCursor)
         cursor.execute("SELECT * FROM labs ORDER BY lab_id")
         labs = cursor.fetchall()
-        cursor.close()
-        conn.close()
         
         result = {}
         for lab in labs:
-            result[lab['lab_id']] = {
-                'title': lab['title'],
-                'html': lab['instructions'] or '',
-                'description': lab.get('description'),
-                'starter_code': lab.get('starter_code'),
-                'difficulty': lab.get('difficulty'),
-                'points': lab.get('total_points'),
-                'due_date': lab['due_date'].isoformat() if lab.get('due_date') else None,
-                'register_mapping': lab.get('register_mapping'),
-                'initial_values': lab.get('initial_values'),
-                'test_cases': lab.get('test_cases') or []
+            lab_id = lab['lab_id']
+
+            # If the user is a teacher, fetch full test cases with answers
+            if is_teacher:
+                test_cases = _fetch_test_cases(cursor, lab_id)
+            else:
+                # For students, we provide NO test cases in the lab list
+                test_cases = [] 
+
+            # Parse JSONB fields correctly
+            reg_map = lab.get('register_mapping') or {}
+            init_vals = lab.get('initial_values') or {}
+
+            result[lab_id] = {
+                'title':            lab['title'],
+                'html':             lab.get('instructions') or '',
+                'description':      lab.get('description'),
+                'starter_code':     lab.get('starter_code'),
+                'difficulty':       lab.get('difficulty'),
+                'points':           lab.get('total_points'),
+                'register_mapping': reg_map,
+                'initial_values':   init_vals,
+                'test_cases':       test_cases, 
             }
         
+        cursor.close()
+        conn.close()
         return jsonify(result)
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -268,6 +320,33 @@ def delete_lab(lab_id):
         return jsonify({'error': str(e)}), 500
 
 
+@app.route('/api/labs/<lab_id>/test-cases', methods=['GET'])
+def get_lab_test_cases(lab_id):
+    """Teacher-only: GET all test cases for a lab WITH full expected_output.
+    Used by teacher.html so professors can review answers."""
+    # Only allow instructor / ta
+    role = session.get('role', '')
+    if role not in ('instructor', 'ta'):
+        return jsonify({'error': 'Unauthorized — instructors only'}), 403
+
+    conn = get_db_connection()
+    if not conn:
+        return jsonify({'error': 'Database connection failed'}), 500
+
+    try:
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+        test_cases = _fetch_test_cases(cursor, lab_id)
+        cursor.close()
+        conn.close()
+
+        return jsonify({
+            'lab_id': lab_id,
+            'test_cases': test_cases
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
 if __name__ == '__main__':
     print("=" * 50)
     print("MIPS Emulator - Flask Server")
@@ -302,11 +381,14 @@ if __name__ == '__main__':
     print("\n" + "=" * 50)
     print("Starting Flask server on http://localhost:5000")
     print("=" * 50)
-    print("\nAPI Endpoints (AUTH DISABLED FOR TESTING):")
+    print("\nAPI Endpoints:")
     print("  GET  /api/labs")
     print("  POST /api/labs")
     print("  PUT  /api/labs/<lab_id>")
     print("  DELETE /api/labs/<lab_id>")
+    print("  GET  /api/labs/<lab_id>/test-cases")
+    print("  POST /api/grade/submit")
+    print("  GET  /api/grade/test-cases/<lab_id>")
     print("  POST /api/auth/signup")
     print("  POST /api/auth/login")
     print("  POST /api/auth/logout")

@@ -1,5 +1,3 @@
-import { LESSONS as BASE_LESSONS } from "./lessons.js";
-
 // API Configuration
 const API_BASE = 'http://localhost:5000/api';
 
@@ -106,7 +104,8 @@ const setCustom = (obj) => {
 const allLessons = async () => {
   const apiLessons = await fetchLessonsFromAPI();
   const customLessons = getCustom();
-  return { ...BASE_LESSONS, ...apiLessons, ...customLessons };
+  // DB is the source of truth; local overrides only add unsaved drafts
+  return { ...apiLessons, ...customLessons };
 };
 
 // DOM elements
@@ -146,19 +145,18 @@ document.addEventListener("DOMContentLoaded", () => {
 
 // Helper functions
 async function updateCount() {
-  const baseCount = Object.keys(BASE_LESSONS).length;
   const customCount = Object.keys(getCustom()).length;
   
   try {
     const apiLessons = await fetchLessonsFromAPI();
-    const apiCount = Object.keys(apiLessons).length;
+    const dbCount = Object.keys(apiLessons).length;
     
     if (countEl) {
-      countEl.textContent = `Base: ${baseCount} · Database: ${apiCount} · Local: ${customCount}`;
+      countEl.textContent = `Database: ${dbCount} lab(s) · Local drafts: ${customCount}`;
     }
   } catch (error) {
     if (countEl) {
-      countEl.textContent = `Base: ${baseCount} · Custom: ${customCount}`;
+      countEl.textContent = `Local drafts: ${customCount}`;
     }
   }
 }
@@ -408,13 +406,16 @@ if (titleEl) {
   });
 }
 
-// Initial render
+// pick first lab from DB
 (async () => {
-  await renderList(null);
+  const lessons = await allLessons();
+  const sortedIds = Object.keys(lessons).sort();
+  const firstId = sortedIds[0] || null;
+
+  await renderList(firstId);
   await updateCount();
 
-  const firstBase = Object.keys(BASE_LESSONS)[0];
-  if (firstBase) {
-    loadLesson(firstBase);
+  if (firstId) {
+    loadLesson(firstId);
   }
 })();

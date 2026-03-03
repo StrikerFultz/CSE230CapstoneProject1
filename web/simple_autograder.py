@@ -27,91 +27,9 @@ DB_CONFIG = {
     'port': '5432'
 }
 
-# TEMPORARY UNTIL the test cases are added to the PostgreSQL database
-HARDCODED_TEST_CASES = {
-    'lab-1-0': [
-        {
-            'name': 'Tutorial Check: Register Values',
-            'points': 5,
-            'initial_registers': {},
-            'expected_registers': {
-                '$t0': 10,
-                '$t1': 20,
-                '$t2': 30,
-                '$s0': 268435456,
-            },
-        },
-        {
-            'name': 'Tutorial Check: Memory Storage',
-            'points': 5,
-            'initial_registers': {},
-            'expected_registers': {},
-            'expected_memory': {
-                '268435456': 30,
-            },
-        },
-    ],
-    'lab-12-2': [
-        {
-            'name': 'Test 1: Compare storage (4 points)',
-            'points': 4,
-            'initial_registers': {
-                '$s0': 2,
-                '$s1': 4,
-                '$s2': 6,
-                '$s3': 5,
-            },
-            'expected_registers': {
-                '$t0': 12,
-                '$s0': 2,
-                '$s1': 4,
-                '$s2': 6,
-                '$s3': 5,
-                '$s4': 7,
-            },
-        },
-        {
-            'name': 'Test 2: Compare storage (3 points)',
-            'points': 3,
-            'initial_registers': {
-                '$s0': 1,
-                '$s1': 2,
-                '$s2': 3,
-                '$s3': 10,
-            },
-            'expected_registers': {
-                '$t0': 6,
-                '$s0': 1,
-                '$s1': 2,
-                '$s2': 3,
-                '$s3': 10,
-                '$s4': -4,
-            },
-        },
-        {
-            'name': 'Test 3: Compare storage (3 points)',
-            'points': 3,
-            'initial_registers': {
-                '$s0': 1,
-                '$s1': 1,
-                '$s2': 1,
-                '$s3': 3,
-            },
-            'expected_registers': {
-                '$t0': 3,
-                '$s0': 1,
-                '$s1': 1,
-                '$s2': 1,
-                '$s3': 3,
-                '$s4': 0,
-            },
-        },
-    ],
-}
-
 def run_mips_native(source_code, initial_registers=None, initial_memory=None, check_memory=None):
     """
-    run student code using the compiled emulator binary
+    Run student code using the compiled emulator binary.
     """
 
     if initial_registers is None:
@@ -154,7 +72,7 @@ def run_mips_native(source_code, initial_registers=None, initial_memory=None, ch
         return {'error': str(e), 'registers': {}, 'memory': {}}
 
 def calculate_grade(test_cases, source_code):
-    # Grade by running source code with different test cases (from db)
+    """Grade by running source code against each test case via the Rust binary."""
 
     total_points = 0
     earned_points = 0
@@ -262,9 +180,10 @@ def calculate_grade(test_cases, source_code):
     }
 
 def get_test_cases_for_lab(lab_id):
-    
-    #Get test cases from database
-    
+    """
+    Get test cases from database and convert to the flat format
+    that calculate_grade() expects.
+    """
     try:
         conn = psycopg2.connect(**DB_CONFIG)
         cursor = conn.cursor(cursor_factory=RealDictCursor)
@@ -273,43 +192,48 @@ def get_test_cases_for_lab(lab_id):
             SELECT test_name, description, input_data, expected_output, points, is_hidden
             FROM lab_test_cases
             WHERE lab_id = %s
-            ORDER BY test_case_id
-        """, (lab_id,)) # may need to change due to names/changes/ MAY be security issue (maybe, not 100%) 
+            ORDER BY test_name
+        """, (lab_id,))
         
         test_cases = cursor.fetchall()
         cursor.close()
         conn.close()
+
+        if not test_cases:
+            return None
         
-        # Convert to format expected by grader
+        # Convert DB JSONB → flat format for the grader
         result = []
         for tc in test_cases:
+            # Parse JSONB (psycopg2 usually returns dicts, but guard against strings)
+            inp = tc.get('input_data') or {}
+            exp = tc.get('expected_output') or {}
+            if isinstance(inp, str):
+                inp = json.loads(inp)
+            if isinstance(exp, str):
+                exp = json.loads(exp)
+
             result.append({
-                'name': tc['test_name'],
-                'description': tc.get('description'),
-                'points': tc.get('points', 10),
-                'initial_registers': tc.get('input_data', {}),  # hidden in DB
-                'expected_registers': tc.get('expected_output', {}),
-                'is_hidden': tc.get('is_hidden', False)
+                'name':               tc['test_name'],
+                'description':        tc.get('description'),
+                'points':             tc.get('points', 10),
+                'initial_registers':  inp.get('registers', {}),
+                'initial_memory':     inp.get('memory', {}),
+                'expected_registers': exp.get('registers', {}),
+                'expected_memory':    exp.get('memory', {}),
+                'is_hidden':          tc.get('is_hidden', False),
             })
         
         return result
         
     except Exception as e:
-        print(f"Database error: {e}")
+        print(f"[AUTOGRADER] Database error fetching test cases for {lab_id}: {e}")
         return None
 
 @simple_autograder_bp.route('/submit', methods=['POST'])
 def grade_submission():
-    #below is example of what it would send to backend to store; 
     """
     POST /api/grade/submit
-    
-    Body: #how setup woroks
-    {
-        "lab_id": "lab-12-2", # get lab type (named in db)
-        "student_id": "student123", # takes student name (somehow depedning on pwd form canvas -> our db)
-        "source_code": "add $t0, $s0, $s1\\n..." 
-    }
     """
     try:
         data = request.get_json()
@@ -323,16 +247,13 @@ def grade_submission():
         if not source_code:
             return jsonify({'error': 'Missing source_code'}), 400
         
-        # Get test cases from DB
+        # Pull strict from DB
         test_cases = get_test_cases_for_lab(lab_id)
         
         if not test_cases:
-            test_cases = HARDCODED_TEST_CASES.get(lab_id)
+            return jsonify({'error': f'No test cases found in database for lab {lab_id}'}), 404
         
-        if not test_cases:
-            return jsonify({'error': f'No test cases found for lab {lab_id}'}), 404
-        
-        # Grade by running code with each test case
+        # Grade by running code with each test case via the Rust binary
         grade_report = calculate_grade(test_cases, source_code)
         
         return jsonify({
@@ -342,16 +263,15 @@ def grade_submission():
         })
         
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
 @simple_autograder_bp.route('/test-cases/<lab_id>', methods=['GET'])
 def get_test_cases_endpoint(lab_id):
-    #returns test cases WO anseers 
+    """Returns test cases WITHOUT expected answers (safe for students)."""
     test_cases = get_test_cases_for_lab(lab_id)
 
-    if not test_cases:
-        test_cases = HARDCODED_TEST_CASES.get(lab_id)
-    
     if not test_cases:
         return jsonify({'error': f'No test cases found for {lab_id}'}), 404
     
@@ -368,10 +288,3 @@ def get_test_cases_endpoint(lab_id):
         'lab_id': lab_id,
         'test_cases': sanitized
     })
-
-
-# Save sumissions to database  and then change the file formt for it to be downlaoded/moved from db to canvas if no canvas API approval
-def save_submission(student_id, lab_id, answers, grade_report): # ned to change/add table in db for sponsor request of saving
-    #add save to db here; 
-    # TODO: Connect to PostgreSQL database and insert
-    pass #error handler since no code currently
