@@ -3,6 +3,7 @@
 import psycopg2
 from psycopg2.extras import RealDictCursor
 from flask import Blueprint, request, jsonify
+from flask import session
 
 import json
 import subprocess
@@ -155,7 +156,7 @@ def calculate_grade(test_cases, source_code):
                 'status': 'PASS',
                 'points': points,
                 'earned': points,
-                'message': '✓ All checks passed!'
+                'message': 'All checks passed!'
             })
         else:
             failed += 1
@@ -164,7 +165,7 @@ def calculate_grade(test_cases, source_code):
                 'status': 'FAIL',
                 'points': points,
                 'earned': 0,
-                'message': '✗ Some values incorrect',
+                'message': 'Some values incorrect',
                 'mismatches': mismatches
             })
     
@@ -230,42 +231,61 @@ def get_test_cases_for_lab(lab_id):
         print(f"[AUTOGRADER] Database error fetching test cases for {lab_id}: {e}")
         return None
 
+
 @simple_autograder_bp.route('/submit', methods=['POST'])
 def grade_submission():
     """
     POST /api/grade/submit
+    
+    Body: #how setup woroks
+    {
+        "lab_id": "lab-12-2", # get lab type (named in db)
+        "source_code": "add $t0, $s0, $s1\\n..." 
+    }
     """
+        
+    if 'user_id' not in session:
+        return jsonify({'error': 'Unauthorized'}), 401
+
     try:
-        data = request.get_json()
+        data = request.get_json() 
+        lab_id = data.get('lab_id') 
+        source_code = data.get('source_code', '') 
         
-        lab_id = data.get('lab_id')
-        source_code = data.get('source_code', '')
-        
-        if not lab_id:
-            return jsonify({'error': 'Missing lab_id'}), 400
-        
-        if not source_code:
-            return jsonify({'error': 'Missing source_code'}), 400
-        
-        # Pull strict from DB
-        test_cases = get_test_cases_for_lab(lab_id)
-        
-        if not test_cases:
-            return jsonify({'error': f'No test cases found in database for lab {lab_id}'}), 404
-        
-        # Grade by running code with each test case via the Rust binary
-        grade_report = calculate_grade(test_cases, source_code)
+        test_cases = get_test_cases_for_lab(lab_id) 
+        grade_report = calculate_grade(test_cases, source_code) 
+
+        # Save to DB
+        conn = psycopg2.connect(**DB_CONFIG) 
+        cur = conn.cursor() #
+
+        normalized_source = source_code.strip().replace('\n', '\\n')
+
+        cur.execute("""
+            INSERT INTO submissions (user_id, asurite_id, lab_id, score, total_possible, source_code, test_results)
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
+        """, (
+            session['user_id'],
+            session.get('username'), # ASU ID
+            lab_id,
+            grade_report['earned_points'],
+            grade_report['total_points'],
+            normalized_source, 
+            json.dumps(grade_report['results'])
+        ))
+
+        conn.commit()
+        cur.close()
+        conn.close()
         
         return jsonify({
             'success': True,
             'lab_id': lab_id,
             'grade_report': grade_report
-        })
-        
+        })  
+          
     except Exception as e:
-        import traceback
-        traceback.print_exc()
-        return jsonify({'error': str(e)}), 500
+        return jsonify({'error': str(e)}), 500 #
 
 @simple_autograder_bp.route('/test-cases/<lab_id>', methods=['GET'])
 def get_test_cases_endpoint(lab_id):

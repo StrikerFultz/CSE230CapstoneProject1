@@ -157,6 +157,18 @@ CREATE TABLE public.users (
     is_active boolean DEFAULT true
 );
 
+CREATE TABLE public.submissions (
+    submission_id uuid DEFAULT public.uuid_generate_v4() PRIMARY KEY,
+    user_id uuid NOT NULL REFERENCES public.users(user_id),
+    asurite_id character varying(50),
+    lab_id character varying(50) NOT NULL REFERENCES public.labs(lab_id),
+    score integer NOT NULL,
+    total_possible integer NOT NULL,
+    source_code text NOT NULL,
+    test_results jsonb, 
+    submitted_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP
+);
+
 
 ALTER TABLE public.users OWNER TO postgres;
 
