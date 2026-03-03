@@ -156,6 +156,7 @@ async function showLesson(id) {
 
   currentLabData = data;
   currentLessonId = id;
+  loadLatestSubmission(id); 
 
   const url = new URL(window.location);
   url.searchParams.set('lesson', id);
@@ -909,6 +910,7 @@ document.getElementById('grade-button')?.addEventListener('click', async () => {
         
         if (result.success) {
             displayGradeReport(result.grade_report);
+            loadLatestSubmission(currentLessonId); 
         } else {
             resultsDiv.innerHTML = '<p style="color:red; padding: 20px;">Error: ' + result.error + '</p>';
         }
@@ -968,6 +970,134 @@ function displayGradeReport(report) {
     
     html += '</div>';
     resultsDiv.innerHTML = html;
+}
+
+
+async function loadLatestSubmission(labId) {
+  const container = document.getElementById('latest-submission-container');
+  if (!container) return;
+
+  // Clear previous state
+  container.innerHTML = '';
+  container.classList.add('hidden');
+
+  try {
+    const response = await fetch(`/api/grade/latest/${labId}`, {
+      credentials: 'include'
+    });
+
+    if (!response.ok) {
+      // no submission yet
+      return; 
+    }
+
+    const data = await response.json();
+    renderLatestSubmission(data);
+    container.classList.remove('hidden');
+
+  } catch (err) {
+    console.warn("Error fetching latest submission:", err);
+  }
+}
+
+function renderLatestSubmission(data) {
+  const container = document.getElementById('latest-submission-container');
+  
+  // Format Date
+  const dateObj = new Date(data.submitted_at);
+  const dateStr = dateObj.toLocaleDateString() + ' ' + dateObj.toLocaleTimeString();
+
+  // Parse Test Results
+  let results = data.test_results;
+  if (typeof results === 'string') {
+    try { results = JSON.parse(results); } catch(e) { results = []; }
+  }
+
+  // Calculate Color
+  const isPerfect = data.score === data.total_possible;
+  const scoreClass = isPerfect ? 'score-green' : 'score-red';
+
+  let html = `
+    <div class="submission-header">
+      <div class="sub-meta">
+        <span>Latest submission - ${dateStr}</span>
+        <button id="btn-restore-code" class="btn-restore" title="Replace editor content with this submission">Load Code</button>
+      </div>
+      <div class="sub-score ${scoreClass}">
+        Total score: ${data.score} / ${data.total_possible}
+      </div>
+    </div>
+    <div class="submission-body">
+  `;
+
+  // Generate list of tests
+  results.forEach((test, index) => {
+    const icon = test.status === 'PASS' ? '&#10003;' : '&#10007;'; 
+    const color = test.status === 'PASS' ? '#2e7d32' : '#d32f2f';
+    const uniqueId = `sub-detail-${index}`;
+    let detailsHtml = '';
+    
+    // Mismatch Table
+    if (test.status !== 'PASS' && test.mismatches && test.mismatches.length > 0) {
+      detailsHtml += `
+        <div style="margin-bottom:5px; font-weight:600; color:#555;">Comparison</div>
+        <table class="diff-table">
+          <thead><tr><th>Item</th><th>Yours</th><th>Expected</th></tr></thead>
+          <tbody>
+      `;
+      test.mismatches.forEach(m => {
+        detailsHtml += `
+          <tr class="diff-row-error">
+            <td>${m.register}</td>
+            <td class="val-error">${m.actual}</td>
+            <td class="val-error">${m.expected}</td>
+          </tr>
+        `;
+      });
+      detailsHtml += `</tbody></table>`;
+    } else if (test.status !== 'PASS') {
+      detailsHtml = `<div style="color:#d32f2f;">${test.message}</div>`;
+    } else {
+        detailsHtml = `<div style="color:#2e7d32;">Test passed successfully.</div>`;
+    }
+
+    html += `
+      <div class="sub-test-item">
+        <div class="sub-test-header" onclick="toggleSubDetail('${uniqueId}')">
+          <div class="sub-test-title">
+            <span style="color: ${color}; font-weight: bold; width: 15px;">${icon}</span>
+            <span>${test.name}</span>
+          </div>
+          <div style="font-size: 12px; color: #666;">
+             ${test.earned}/${test.points} <span style="margin-left:5px;">▼</span>
+          </div>
+        </div>
+        <div id="${uniqueId}" class="sub-details">
+          ${detailsHtml}
+        </div>
+      </div>
+    `;
+  });
+
+  html += `</div>`; 
+  container.innerHTML = html;
+
+  const loadBtn = document.getElementById('btn-restore-code');
+  if (loadBtn) {
+    loadBtn.addEventListener('click', () => {
+      // confirm before overwriting
+      if (confirm("This will replace your current code with the code from this submission.\n\nAre you sure?")) {
+        if (cpuEditor && data.source_code) {
+            
+          // We must replace them with actual newline characters for the editor.
+          const formattedCode = data.source_code.replace(/\\n/g, '\n');
+          
+          cpuEditor.setValue(formattedCode);
+          if (typeof clearHighlight === 'function') clearHighlight();
+        }
+      }
+    });
+  }
 }
 
 function updateWidgets(mmioMap) {
@@ -1054,3 +1184,10 @@ init()
     console.error("Error initializing WASM:", err);
     log("Error initializing WASM: " + err);
   });
+
+window.toggleSubDetail = function(id) {
+  const detailEl = document.getElementById(id);
+  if (detailEl) {
+    detailEl.classList.toggle('open');
+  }
+};

@@ -308,3 +308,35 @@ def get_test_cases_endpoint(lab_id):
         'lab_id': lab_id,
         'test_cases': sanitized
     })
+
+
+@simple_autograder_bp.route('/latest/<lab_id>', methods=['GET'])
+def get_latest_submission(lab_id):
+    """Fetches the most recent attempt for the logged-in student."""
+    if 'user_id' not in session:
+        return jsonify({'error': 'Not logged in'}), 401
+    
+    conn = psycopg2.connect(**DB_CONFIG)
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    
+    cur.execute("""
+        SELECT score, total_possible, test_results, submitted_at, source_code
+        FROM submissions
+        WHERE user_id = %s AND lab_id = %s
+        ORDER BY submitted_at DESC LIMIT 1
+    """, (session['user_id'], lab_id))
+    
+    row = cur.fetchone()
+    cur.close()
+    conn.close()
+    
+    if not row:
+        return jsonify({'error': 'No submissions found'}), 404
+        
+    return jsonify({
+        'score': row['score'],
+        'total_possible': row['total_possible'],
+        'test_results': row['test_results'],
+        'submitted_at': row['submitted_at'].isoformat(),
+        'source_code': row['source_code']
+    })

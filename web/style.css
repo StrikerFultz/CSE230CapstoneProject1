@@ -955,3 +955,122 @@ th {
   border-radius: 2px;
   box-shadow: 0 0 2px rgba(0,0,0,0.3);
 }
+
+/* Latest Submission Box */
+.submission-container {
+  margin-top: 15px;
+  border: 1px solid #ccc;
+  background: #fff;
+  font-size: 13px;
+}
+
+.submission-container.hidden {
+  display: none;
+}
+
+.submission-header {
+  background-color: #f7f7f7;
+  padding: 10px 15px;
+  border-bottom: 1px solid #ddd;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.sub-meta {
+  color: #333;
+  font-weight: 600;
+}
+
+.sub-score {
+  font-weight: bold;
+  font-size: 14px;
+}
+
+.score-red { color: #d32f2f; }
+.score-green { color: #2e7d32; }
+
+/* Test Result Items (Accordion style) */
+.sub-test-item {
+  border-bottom: 1px solid #eee;
+}
+
+.sub-test-header {
+  padding: 8px 15px;
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  background: #fff;
+}
+
+.sub-test-header:hover {
+  background: #f9f9f9;
+}
+
+.sub-test-title {
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sub-details {
+  display: none; 
+  padding: 10px 20px;
+  background: #fafafa;
+  border-top: 1px solid #eee;
+}
+
+.sub-details.open {
+  display: block; 
+}
+
+.diff-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 5px;
+  font-family: monospace;
+  font-size: 12px;
+  background: #fff;
+  border: 1px solid #ddd;
+}
+
+.diff-table th {
+  background: #e0e0e0;
+  padding: 4px 8px;
+  text-align: center;
+  border: 1px solid #bbb;
+}
+
+.diff-table td {
+  padding: 4px 8px;
+  border: 1px solid #ddd;
+  text-align: center;
+}
+
+.diff-row-error {
+  background-color: #fff3cd; /* Light yellow highlight */
+}
+
+.val-error {
+  color: #d32f2f;
+  font-weight: bold;
+}
+
+/* Add to style.css */
+
+.btn-restore {
+  margin-left: 15px;
+  padding: 2px 8px;
+  font-size: 11px;
+  border: 1px solid #aaa;
+  background-color: #e0e0e0;
+  border-radius: 3px;
+  cursor: pointer;
+  color: #333;
+}
+
+.btn-restore:hover {
+  background-color: #d0d0d0;
+  border-color: #888;
+}
