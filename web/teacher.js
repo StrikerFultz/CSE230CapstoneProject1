@@ -103,9 +103,7 @@ const setCustom = (obj) => {
 
 const allLessons = async () => {
   const apiLessons = await fetchLessonsFromAPI();
-  const customLessons = getCustom();
-  // DB is the source of truth; local overrides only add unsaved drafts
-  return { ...apiLessons, ...customLessons };
+  return apiLessons; 
 };
 
 // DOM elements
