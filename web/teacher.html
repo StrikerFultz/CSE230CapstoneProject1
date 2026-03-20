@@ -13,6 +13,8 @@
     <nav class="nav">
       <a href="index.html">Labs</a>
       <a href="teacher.html" class="active">Professor View</a>
+      <a href="students.html">Students</a>
+      <a href="testgen.html">Test Generator</a>
       <!--the button to logout-->
       <button id="logout-prof">Log out</button>
     </nav>
@@ -72,6 +74,19 @@
 
         <div class="preview-wrap">
           <div id="preview" class="preview-surface"></div>
+        </div>
+      </div>
+
+      <!-- Starter Code Editor -->
+      <div class="starter-code-section" id="starter-code-section" style="display:none;">
+        <div class="starter-code-header">
+          <span>Starter Code (MIPS Assembly)</span>
+          <button id="btn-collapse-starter" class="btn-ghost">Hide</button>
+        </div>
+        <div id="starter-code-body" class="starter-code-body">
+          <textarea id="starter-code-editor" class="starter-code-textarea"
+                    spellcheck="false"
+                    placeholder="# Enter the starter code students will see when they open this lab&#10;# e.g.&#10;li $t0, 10&#10;li $t1, 20"></textarea>
         </div>
       </div>
 

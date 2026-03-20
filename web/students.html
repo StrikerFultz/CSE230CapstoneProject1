@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>MIPS Emulator · Students</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+  <header class="topbar">
+    <div class="brand">MIPS Emulator</div>
+    <nav class="nav">
+      <a href="index.html">Labs</a>
+      <a href="teacher.html">Professor View</a>
+      <a href="students.html" class="active">Students</a>
+      <a href="testgen.html">Test Generator</a>
+      <button id="logout-btn">Log out</button>
+    </nav>
+  </header>
+
+  <main class="two-pane students-two-pane">
+
+    <!-- Left: Student roster -->
+    <aside class="pane left-pane">
+      <div class="library-header">
+        <div>
+          <div>Students</div>
+          <small id="student-count"></small>
+        </div>
+      </div>
+
+      <div class="stu-search-wrap">
+        <input id="stu-search" class="input stu-search-input" placeholder="Search name, ASU ID, email…" />
+      </div>
+
+      <div class="stu-roster" id="stu-roster">
+        <div class="stu-loading">Loading students…</div>
+      </div>
+    </aside>
+
+    <!-- Right: Student detail -->
+    <section class="pane editor-pane stu-detail-pane">
+      <div id="stu-placeholder" class="stu-placeholder">
+        <div class="stu-placeholder-icon">👤</div>
+        <div>Select a student from the list to view their submissions</div>
+      </div>
+
+      <div id="stu-detail" class="stu-detail" style="display:none;">
+
+        <!-- Header card -->
+        <div class="stu-header-card" id="stu-header-card"></div>
+
+        <!-- Summary stats row -->
+        <div class="stu-stats-row" id="stu-stats-row"></div>
+
+        <!-- Per-lab breakdown -->
+        <div class="stu-labs-section">
+          <div class="stu-labs-title">Lab Submissions</div>
+          <div id="stu-labs-list" class="stu-labs-list"></div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script type="module">
+    import { checkAuth } from './auth-check.js';
+    window.__currentUser = await checkAuth({ requireRole: ['instructor', 'ta'] });
+  </script>
+  <script type="module" src="students.js"></script>
+</body>
+</html>

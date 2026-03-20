@@ -39,12 +39,13 @@ async function fetchLessonsFromAPI() {
   }
 }
 
-async function saveLessonToAPI(labId, title, html) {
+async function saveLessonToAPI(labId, title, html, starterCode) {
   try {
     const labData = {
       lab_id: labId,
       title: title,
       instructions: html,
+      starter_code: starterCode || null,
       is_published: true,
       difficulty: 'beginner',
       points: 100
@@ -156,6 +157,10 @@ const countEl = document.getElementById("doc-count");
 const saveStatus = document.getElementById("save-status");
 const collapseBtn = document.getElementById("btn-collapse-library");
 const libraryEl = document.getElementById("library");
+const starterCodeSection = document.getElementById("starter-code-section");
+const starterCodeEditor = document.getElementById("starter-code-editor");
+const starterCodeBody = document.getElementById("starter-code-body");
+const btnCollapseStarter = document.getElementById("btn-collapse-starter");
 
 let currentId = null;
 
@@ -216,6 +221,15 @@ async function loadLesson(id) {
   idEl.value = id;
   titleEl.value = data.title || id;
   editor.innerHTML = data.html || data.instructions || "";
+
+  // Load starter code
+  if (starterCodeEditor) {
+    starterCodeEditor.value = data.starter_code || "";
+  }
+  if (starterCodeSection) {
+    starterCodeSection.style.display = "";
+  }
+
   renderPreview();
   selectListItem(id);
   if (timeEl) {
@@ -272,13 +286,14 @@ async function saveCurrent() {
 
   const title = titleEl.value.trim() || id;
   const html = editor.innerHTML;
+  const starterCode = starterCodeEditor ? starterCodeEditor.value : "";
 
   // Save to API first
-  const apiSuccess = await saveLessonToAPI(id, title, html);
+  const apiSuccess = await saveLessonToAPI(id, title, html, starterCode);
   
   // Also save to local storage as backup
   const custom = getCustom();
-  custom[id] = { title, html };
+  custom[id] = { title, html, starter_code: starterCode };
   setCustom(custom);
 
   currentId = id;
@@ -299,6 +314,8 @@ function newLesson() {
   idEl.value = "";
   titleEl.value = "";
   editor.innerHTML = "";
+  if (starterCodeEditor) starterCodeEditor.value = "";
+  if (starterCodeSection) starterCodeSection.style.display = "";
   renderPreview();
   selectListItem(null);
   if (timeEl) timeEl.textContent = "";
@@ -339,8 +356,9 @@ function exportCurrent() {
 
   const title = titleEl.value.trim() || id;
   const html = editor.innerHTML;
+  const starter_code = starterCodeEditor ? starterCodeEditor.value : "";
 
-  const payload = { id, title, html };
+  const payload = { id, title, html, starter_code };
   const blob = new Blob([JSON.stringify(payload, null, 2)], {
     type: "application/json",
   });
@@ -363,11 +381,11 @@ async function importFromFile(file) {
 
       let toSave = {};
       if (obj && typeof obj === "object" && obj.id && obj.html) {
-        toSave[obj.id] = { title: obj.title || obj.id, html: obj.html };
+        toSave[obj.id] = { title: obj.title || obj.id, html: obj.html, starter_code: obj.starter_code || "" };
       } else {
         for (const [id, val] of Object.entries(obj)) {
           if (val && typeof val === "object" && val.html) {
-            toSave[id] = { title: val.title || id, html: val.html };
+            toSave[id] = { title: val.title || id, html: val.html, starter_code: val.starter_code || "" };
           }
         }
       }
@@ -379,7 +397,7 @@ async function importFromFile(file) {
 
       // Save to API and local storage
       for (const [id, data] of Object.entries(toSave)) {
-        await saveLessonToAPI(id, data.title, data.html);
+        await saveLessonToAPI(id, data.title, data.html, data.starter_code);
       }
 
       const custom = getCustom();
@@ -433,6 +451,33 @@ if (titleEl) {
   titleEl.addEventListener("input", () => {
     renderPreview();
     if (saveStatus) saveStatus.textContent = "Unsaved changes";
+  });
+}
+
+// Starter code collapse toggle
+if (btnCollapseStarter && starterCodeBody) {
+  btnCollapseStarter.addEventListener("click", () => {
+    const collapsed = starterCodeBody.classList.toggle("collapsed");
+    btnCollapseStarter.textContent = collapsed ? "Show" : "Hide";
+  });
+}
+
+// Track unsaved changes in starter code
+if (starterCodeEditor) {
+  starterCodeEditor.addEventListener("input", () => {
+    if (saveStatus) saveStatus.textContent = "Unsaved changes";
+  });
+
+  // Allow Tab key to insert a tab character instead of leaving the textarea
+  starterCodeEditor.addEventListener("keydown", (e) => {
+    if (e.key === "Tab") {
+      e.preventDefault();
+      const start = starterCodeEditor.selectionStart;
+      const end = starterCodeEditor.selectionEnd;
+      starterCodeEditor.value =
+        starterCodeEditor.value.substring(0, start) + "\t" + starterCodeEditor.value.substring(end);
+      starterCodeEditor.selectionStart = starterCodeEditor.selectionEnd = start + 1;
+    }
   });
 }
 

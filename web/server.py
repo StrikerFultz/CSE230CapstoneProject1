@@ -301,6 +301,9 @@ def delete_lab(lab_id):
     
     try:
         cursor = conn.cursor()
+        # Delete child rows that reference this lab
+        cursor.execute("DELETE FROM submissions WHERE lab_id = %s", (lab_id,))
+        cursor.execute("DELETE FROM lab_test_cases WHERE lab_id = %s", (lab_id,))
         cursor.execute("DELETE FROM labs WHERE lab_id = %s RETURNING lab_id", (lab_id,))
         
         if cursor.rowcount == 0:
@@ -409,8 +412,8 @@ def create_test_case(lab_id):
 def update_test_case(lab_id, test_case_id):
     """Teacher-only: update an existing test case."""
     role = session.get('role', '')
-    if role not in ('instructor'):
-        return jsonify({'error': 'Unauthorized'}), 403
+    if role not in ('instructor', 'ta'):
+        return jsonify({'error': 'Unauthorized — instructors only'}), 403
 
     data = request.get_json()
     if not data:
@@ -468,8 +471,8 @@ def update_test_case(lab_id, test_case_id):
 def delete_test_case(lab_id, test_case_id):
     """Teacher-only: delete a test case."""
     role = session.get('role', '')
-    if role not in ('instructor'):
-        return jsonify({'error': 'Unauthorized'}), 403
+    if role not in ('instructor', 'ta'):
+        return jsonify({'error': 'Unauthorized — instructors only'}), 403
 
     conn = get_db_connection()
     if not conn:
@@ -495,6 +498,178 @@ def delete_test_case(lab_id, test_case_id):
 
     except Exception as e:
         conn.rollback()
+        return jsonify({'error': str(e)}), 500
+
+
+# ─── Student browsing (teacher-only) ───
+
+@app.route('/api/students', methods=['GET'])
+def list_students():
+    """Teacher-only: list all students with aggregate submission stats."""
+    role = session.get('role', '')
+    if role not in ('instructor', 'ta'):
+        return jsonify({'error': 'Unauthorized — instructors only'}), 403
+
+    conn = get_db_connection()
+    if not conn:
+        return jsonify({'error': 'Database connection failed'}), 500
+
+    try:
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+
+        cursor.execute("""
+            SELECT
+                u.user_id,
+                u.username,
+                u.full_name,
+                u.email,
+                u.asu_id,
+                u.created_at,
+                u.last_login,
+                COUNT(DISTINCT s.lab_id)        AS labs_attempted,
+                COUNT(s.submission_id)           AS total_submissions,
+                COALESCE(
+                  ROUND(AVG(
+                    CASE WHEN s.total_possible > 0
+                         THEN s.score * 100.0 / s.total_possible
+                         ELSE NULL END
+                  ), 1), 0
+                )                                AS avg_score_pct,
+                MAX(s.submitted_at)              AS last_submission
+            FROM users u
+            LEFT JOIN submissions s ON s.user_id = u.user_id
+            WHERE u.role = 'student' AND u.is_active = true
+            GROUP BY u.user_id
+            ORDER BY u.full_name, u.username
+        """)
+
+        students = cursor.fetchall()
+
+        # Get total published labs for the completion denominator
+        cursor.execute("SELECT COUNT(*) AS cnt FROM labs WHERE is_published = true")
+        total_labs = cursor.fetchone()['cnt']
+
+        result = []
+        for s in students:
+            result.append({
+                'user_id':           str(s['user_id']),
+                'username':          s['username'],
+                'full_name':         s['full_name'],
+                'email':             s['email'],
+                'asu_id':            s['asu_id'],
+                'created_at':        s['created_at'].isoformat() if s['created_at'] else None,
+                'last_login':        s['last_login'].isoformat() if s['last_login'] else None,
+                'labs_attempted':    s['labs_attempted'],
+                'total_labs':        total_labs,
+                'total_submissions': s['total_submissions'],
+                'avg_score_pct':     float(s['avg_score_pct']),
+                'last_submission':   s['last_submission'].isoformat() if s['last_submission'] else None,
+            })
+
+        cursor.close()
+        conn.close()
+        return jsonify(result)
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/students/<user_id>', methods=['GET'])
+def get_student_detail(user_id):
+    """Teacher-only: get a single student's profile + per-lab submission breakdown."""
+    role = session.get('role', '')
+    if role not in ('instructor', 'ta'):
+        return jsonify({'error': 'Unauthorized — instructors only'}), 403
+
+    conn = get_db_connection()
+    if not conn:
+        return jsonify({'error': 'Database connection failed'}), 500
+
+    try:
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+
+        # Student info
+        cursor.execute("""
+            SELECT user_id, username, full_name, email, asu_id,
+                   created_at, last_login
+            FROM users WHERE user_id = %s
+        """, (user_id,))
+        student = cursor.fetchone()
+        if not student:
+            cursor.close()
+            conn.close()
+            return jsonify({'error': 'Student not found'}), 404
+
+        # All published labs
+        cursor.execute("""
+            SELECT lab_id, title, total_points, difficulty
+            FROM labs WHERE is_published = true
+            ORDER BY lab_id
+        """)
+        all_labs = cursor.fetchall()
+
+        # All submissions for this student
+        cursor.execute("""
+            SELECT submission_id, lab_id, score, total_possible,
+                   test_results, submitted_at, source_code
+            FROM submissions
+            WHERE user_id = %s
+            ORDER BY submitted_at DESC
+        """, (user_id,))
+        submissions = cursor.fetchall()
+
+        cursor.close()
+        conn.close()
+
+        # Group submissions by lab_id
+        subs_by_lab = {}
+        for sub in submissions:
+            lid = sub['lab_id']
+            if lid not in subs_by_lab:
+                subs_by_lab[lid] = []
+            subs_by_lab[lid].append({
+                'submission_id': str(sub['submission_id']),
+                'score':         sub['score'],
+                'total_possible': sub['total_possible'],
+                'test_results':  sub['test_results'],
+                'submitted_at':  sub['submitted_at'].isoformat() if sub['submitted_at'] else None,
+                'source_code':   sub['source_code'],
+            })
+
+        # Build per-lab summary
+        lab_details = []
+        for lab in all_labs:
+            lid = lab['lab_id']
+            lab_subs = subs_by_lab.get(lid, [])
+            best_score = max((s['score'] for s in lab_subs), default=None)
+            best_possible = lab_subs[0]['total_possible'] if lab_subs else lab['total_points']
+
+            lab_details.append({
+                'lab_id':           lid,
+                'title':            lab['title'],
+                'difficulty':       lab['difficulty'],
+                'total_points':     lab['total_points'],
+                'attempt_count':    len(lab_subs),
+                'best_score':       best_score,
+                'best_possible':    best_possible,
+                'latest_submission': lab_subs[0] if lab_subs else None,
+                'submissions':      lab_subs,
+            })
+
+        return jsonify({
+            'student': {
+                'user_id':    str(student['user_id']),
+                'username':   student['username'],
+                'full_name':  student['full_name'],
+                'email':      student['email'],
+                'asu_id':     student['asu_id'],
+                'created_at': student['created_at'].isoformat() if student['created_at'] else None,
+                'last_login': student['last_login'].isoformat() if student['last_login'] else None,
+            },
+            'labs': lab_details,
+        })
+
+    except Exception as e:
         return jsonify({'error': str(e)}), 500
 
 
@@ -541,6 +716,8 @@ if __name__ == '__main__':
     print("  POST /api/labs/<lab_id>/test-cases")
     print("  PUT  /api/labs/<lab_id>/test-cases/<test_case_id>")
     print("  DELETE /api/labs/<lab_id>/test-cases/<test_case_id>")
+    print("  GET  /api/students")
+    print("  GET  /api/students/<user_id>")
     print("  POST /api/grade/submit")
     print("  GET  /api/grade/test-cases/<lab_id>")
     print("  POST /api/auth/signup")
