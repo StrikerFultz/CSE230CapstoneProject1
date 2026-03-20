@@ -347,6 +347,157 @@ def get_lab_test_cases(lab_id):
         return jsonify({'error': str(e)}), 500
 
 
+@app.route('/api/labs/<lab_id>/test-cases', methods=['POST'])
+def create_test_case(lab_id):
+    """Teacher-only: create a new test case for a lab."""
+    role = session.get('role', '')
+    if role not in ('instructor', 'ta'):
+        return jsonify({'error': 'Unauthorized — instructors only'}), 403
+
+    data = request.get_json()
+    if not data or 'test_name' not in data:
+        return jsonify({'error': 'Missing required field: test_name'}), 400
+
+    conn = get_db_connection()
+    if not conn:
+        return jsonify({'error': 'Database connection failed'}), 500
+
+    try:
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+
+        # Verify the lab exists
+        cursor.execute("SELECT lab_id FROM labs WHERE lab_id = %s", (lab_id,))
+        if not cursor.fetchone():
+            cursor.close()
+            conn.close()
+            return jsonify({'error': 'Lab not found'}), 404
+
+        input_data = data.get('input_data', {})
+        expected_output = data.get('expected_output', {})
+
+        cursor.execute("""
+            INSERT INTO lab_test_cases (
+                lab_id, test_name, test_type, description,
+                input_data, expected_output, points, is_hidden, timeout_seconds
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+            RETURNING test_case_id
+        """, (
+            lab_id,
+            data['test_name'],
+            data.get('test_type', 'register'),
+            data.get('description'),
+            json.dumps(input_data),
+            json.dumps(expected_output),
+            data.get('points', 10),
+            data.get('is_hidden', False),
+            data.get('timeout_seconds', 5),
+        ))
+
+        new_id = str(cursor.fetchone()['test_case_id'])
+        conn.commit()
+        cursor.close()
+        conn.close()
+
+        return jsonify({'message': 'Test case created', 'test_case_id': new_id}), 201
+
+    except Exception as e:
+        conn.rollback()
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/labs/<lab_id>/test-cases/<test_case_id>', methods=['PUT'])
+def update_test_case(lab_id, test_case_id):
+    """Teacher-only: update an existing test case."""
+    role = session.get('role', '')
+    if role not in ('instructor'):
+        return jsonify({'error': 'Unauthorized'}), 403
+
+    data = request.get_json()
+    if not data:
+        return jsonify({'error': 'No data provided'}), 400
+
+    conn = get_db_connection()
+    if not conn:
+        return jsonify({'error': 'Database connection failed'}), 500
+
+    try:
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+
+        cursor.execute("""
+            UPDATE lab_test_cases SET
+                test_name        = COALESCE(%s, test_name),
+                test_type        = COALESCE(%s, test_type),
+                description      = COALESCE(%s, description),
+                input_data       = COALESCE(%s, input_data),
+                expected_output  = COALESCE(%s, expected_output),
+                points           = COALESCE(%s, points),
+                is_hidden        = COALESCE(%s, is_hidden),
+                timeout_seconds  = COALESCE(%s, timeout_seconds)
+            WHERE test_case_id = %s AND lab_id = %s
+            RETURNING test_case_id
+        """, (
+            data.get('test_name'),
+            data.get('test_type'),
+            data.get('description'),
+            json.dumps(data['input_data']) if 'input_data' in data else None,
+            json.dumps(data['expected_output']) if 'expected_output' in data else None,
+            data.get('points'),
+            data.get('is_hidden'),
+            data.get('timeout_seconds'),
+            test_case_id,
+            lab_id,
+        ))
+
+        if cursor.rowcount == 0:
+            cursor.close()
+            conn.close()
+            return jsonify({'error': 'Test case not found'}), 404
+
+        conn.commit()
+        cursor.close()
+        conn.close()
+
+        return jsonify({'message': 'Test case updated', 'test_case_id': test_case_id})
+
+    except Exception as e:
+        conn.rollback()
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/labs/<lab_id>/test-cases/<test_case_id>', methods=['DELETE'])
+def delete_test_case(lab_id, test_case_id):
+    """Teacher-only: delete a test case."""
+    role = session.get('role', '')
+    if role not in ('instructor'):
+        return jsonify({'error': 'Unauthorized'}), 403
+
+    conn = get_db_connection()
+    if not conn:
+        return jsonify({'error': 'Database connection failed'}), 500
+
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            "DELETE FROM lab_test_cases WHERE test_case_id = %s AND lab_id = %s RETURNING test_case_id",
+            (test_case_id, lab_id)
+        )
+
+        if cursor.rowcount == 0:
+            cursor.close()
+            conn.close()
+            return jsonify({'error': 'Test case not found'}), 404
+
+        conn.commit()
+        cursor.close()
+        conn.close()
+
+        return jsonify({'message': 'Test case deleted'})
+
+    except Exception as e:
+        conn.rollback()
+        return jsonify({'error': str(e)}), 500
+
+
 if __name__ == '__main__':
     print("=" * 50)
     print("MIPS Emulator - Flask Server")
@@ -387,6 +538,9 @@ if __name__ == '__main__':
     print("  PUT  /api/labs/<lab_id>")
     print("  DELETE /api/labs/<lab_id>")
     print("  GET  /api/labs/<lab_id>/test-cases")
+    print("  POST /api/labs/<lab_id>/test-cases")
+    print("  PUT  /api/labs/<lab_id>/test-cases/<test_case_id>")
+    print("  DELETE /api/labs/<lab_id>/test-cases/<test_case_id>")
     print("  POST /api/grade/submit")
     print("  GET  /api/grade/test-cases/<lab_id>")
     print("  POST /api/auth/signup")

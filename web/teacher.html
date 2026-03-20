@@ -74,6 +74,80 @@
           <div id="preview" class="preview-surface"></div>
         </div>
       </div>
+
+      <!-- Test Cases Manager -->
+      <div class="tc-manager" id="tc-manager" style="display:none;">
+        <div class="tc-manager-header">
+          <span>Test Cases</span>
+          <div class="tc-manager-actions">
+            <button id="btn-add-tc">+ Add Test Case</button>
+            <button id="btn-collapse-tc" class="btn-ghost">Hide</button>
+          </div>
+        </div>
+
+        <div id="tc-list" class="tc-list">
+          <div class="tc-empty">Select a lab to view test cases</div>
+        </div>
+      </div>
+
+      <!-- Add / Edit Test Case Modal -->
+      <div id="tc-modal-overlay" class="tc-modal-overlay" style="display:none;">
+        <div class="tc-modal">
+          <div class="tc-modal-title" id="tc-modal-title">Add Test Case</div>
+
+          <label>
+            Name
+            <input id="tc-name" class="input tc-input" placeholder="e.g. Check register values" />
+          </label>
+          <label>
+            Points
+            <input id="tc-points" class="input tc-input" type="number" min="0" value="10" />
+          </label>
+          <label>
+            Description (optional)
+            <input id="tc-desc" class="input tc-input" placeholder="Brief description" />
+          </label>
+
+          <div class="tc-row">
+            <label class="tc-half">
+              <input id="tc-hidden" type="checkbox" /> Hidden from students
+            </label>
+            <label class="tc-half">
+              Timeout (s)
+              <input id="tc-timeout" class="input tc-input-sm" type="number" min="1" value="5" />
+            </label>
+          </div>
+
+          <fieldset class="tc-fieldset">
+            <legend>Initial Registers (input)</legend>
+            <div id="tc-init-regs" class="tc-kv-list"></div>
+            <button type="button" class="btn-ghost tc-add-row" data-target="tc-init-regs" data-placeholder-key="$t0" data-placeholder-val="0">+ register</button>
+          </fieldset>
+
+          <fieldset class="tc-fieldset">
+            <legend>Initial Memory (input)</legend>
+            <div id="tc-init-mem" class="tc-kv-list"></div>
+            <button type="button" class="btn-ghost tc-add-row" data-target="tc-init-mem" data-placeholder-key="268435456" data-placeholder-val="0">+ address</button>
+          </fieldset>
+
+          <fieldset class="tc-fieldset">
+            <legend>Expected Registers (output)</legend>
+            <div id="tc-exp-regs" class="tc-kv-list"></div>
+            <button type="button" class="btn-ghost tc-add-row" data-target="tc-exp-regs" data-placeholder-key="$t0" data-placeholder-val="30">+ register</button>
+          </fieldset>
+
+          <fieldset class="tc-fieldset">
+            <legend>Expected Memory (output)</legend>
+            <div id="tc-exp-mem" class="tc-kv-list"></div>
+            <button type="button" class="btn-ghost tc-add-row" data-target="tc-exp-mem" data-placeholder-key="268435456" data-placeholder-val="30">+ address</button>
+          </fieldset>
+
+          <div class="tc-modal-buttons">
+            <button id="tc-modal-cancel">Cancel</button>
+            <button id="tc-modal-save">Save Test Case</button>
+          </div>
+        </div>
+      </div>
     </section>
   </main>
 

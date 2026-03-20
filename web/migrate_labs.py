@@ -23,9 +23,6 @@ def seed_database():
     cur = conn.cursor()
 
     try:
-        cur.execute("DELETE FROM lab_test_cases")
-        cur.execute("DELETE FROM labs")
-
         cur.execute("SELECT course_id FROM courses LIMIT 1")
         course = cur.fetchone()
         if not course:
