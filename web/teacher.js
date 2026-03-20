@@ -88,6 +88,38 @@ async function deleteLessonFromAPI(labId) {
   }
 }
 
+// ─── Test Case API helpers ───
+
+async function fetchTestCases(labId) {
+  try {
+    const data = await apiRequest(`/labs/${labId}/test-cases`);
+    return data.test_cases || [];
+  } catch (error) {
+    console.warn('Could not fetch test cases:', error);
+    return [];
+  }
+}
+
+async function createTestCase(labId, payload) {
+  return apiRequest(`/labs/${labId}/test-cases`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+async function updateTestCase(labId, tcId, payload) {
+  return apiRequest(`/labs/${labId}/test-cases/${tcId}`, {
+    method: 'PUT',
+    body: JSON.stringify(payload),
+  });
+}
+
+async function deleteTestCase(labId, tcId) {
+  return apiRequest(`/labs/${labId}/test-cases/${tcId}`, {
+    method: 'DELETE',
+  });
+}
+
 // Local storage fallback
 const getCustom = () => {
   try {
@@ -403,6 +435,282 @@ if (titleEl) {
     if (saveStatus) saveStatus.textContent = "Unsaved changes";
   });
 }
+
+// ─── Test Case Manager ───
+
+const tcManager    = document.getElementById('tc-manager');
+const tcListEl     = document.getElementById('tc-list');
+const btnAddTC     = document.getElementById('btn-add-tc');
+const btnCollapseTC = document.getElementById('btn-collapse-tc');
+const tcModal      = document.getElementById('tc-modal-overlay');
+const tcModalTitle = document.getElementById('tc-modal-title');
+const tcModalSave  = document.getElementById('tc-modal-save');
+const tcModalCancel = document.getElementById('tc-modal-cancel');
+
+let editingTestCaseId = null;   // null = creating new, string = editing existing
+
+// Show / hide test case list
+if (btnCollapseTC) {
+  btnCollapseTC.addEventListener('click', () => {
+    const collapsed = tcListEl.classList.toggle('collapsed');
+    btnCollapseTC.textContent = collapsed ? 'Show' : 'Hide';
+  });
+}
+
+// ─ Key-value row helpers (used inside modal) ─
+
+function addKVRow(containerId, keyPH, valPH, keyVal, valVal) {
+  const container = document.getElementById(containerId);
+  if (!container) return;
+  const row = document.createElement('div');
+  row.className = 'tc-kv-row';
+  row.innerHTML = `
+    <input placeholder="${keyPH}" value="${keyVal || ''}" />
+    <input placeholder="${valPH}" value="${valVal || ''}" />
+    <button type="button" class="tc-remove-row" title="Remove">×</button>
+  `;
+  row.querySelector('.tc-remove-row').addEventListener('click', () => row.remove());
+  container.appendChild(row);
+}
+
+// Wire the "+ register" / "+ address" buttons
+document.querySelectorAll('.tc-add-row').forEach(btn => {
+  btn.addEventListener('click', () => {
+    addKVRow(
+      btn.dataset.target,
+      btn.dataset.placeholderKey || 'key',
+      btn.dataset.placeholderVal || 'value',
+      '', ''
+    );
+  });
+});
+
+function readKV(containerId) {
+  const container = document.getElementById(containerId);
+  const obj = {};
+  if (!container) return obj;
+  container.querySelectorAll('.tc-kv-row').forEach(row => {
+    const inputs = row.querySelectorAll('input');
+    const k = inputs[0].value.trim();
+    const v = inputs[1].value.trim();
+    if (k) {
+      // Try to parse as number; keep as string if it's not numeric
+      const num = Number(v);
+      obj[k] = isNaN(num) ? v : num;
+    }
+  });
+  return obj;
+}
+
+function clearKV(containerId) {
+  const container = document.getElementById(containerId);
+  if (container) container.innerHTML = '';
+}
+
+// ─ Rendering test case cards ─
+
+function objToMiniTable(obj, colA, colB) {
+  const entries = Object.entries(obj || {});
+  if (!entries.length) return '<em style="color:#999;font-size:11px;">none</em>';
+  let html = `<table><thead><tr><th>${colA}</th><th>${colB}</th></tr></thead><tbody>`;
+  entries.forEach(([k, v]) => { html += `<tr><td>${k}</td><td>${v}</td></tr>`; });
+  html += '</tbody></table>';
+  return html;
+}
+
+function renderTestCaseCards(testCases) {
+  if (!tcListEl) return;
+  if (!testCases || !testCases.length) {
+    tcListEl.innerHTML = '<div class="tc-empty">No test cases for this lab</div>';
+    return;
+  }
+
+  tcListEl.innerHTML = '';
+  testCases.forEach(tc => {
+    const inp = tc.input_data   || {};
+    const exp = tc.expected_output || {};
+    const initRegs = inp.registers || {};
+    const initMem  = inp.memory    || {};
+    const expRegs  = exp.registers || {};
+    const expMem   = exp.memory    || {};
+
+    const card = document.createElement('div');
+    card.className = 'tc-card';
+    card.dataset.tcId = tc.test_case_id;
+
+    const hiddenBadge = tc.is_hidden
+      ? '<span class="tc-badge tc-badge-hidden">hidden</span>' : '';
+
+    card.innerHTML = `
+      <div class="tc-card-header">
+        <span class="tc-card-name">${tc.test_name}</span>
+        <span class="tc-card-meta">
+          <span class="tc-badge">${tc.points} pts</span>
+          ${hiddenBadge}
+          <span>▾</span>
+        </span>
+      </div>
+      <div class="tc-card-body">
+        <div class="tc-card-body-grid">
+          <div class="tc-card-section">
+            <h5>Initial Registers</h5>
+            ${objToMiniTable(initRegs, 'Register', 'Value')}
+          </div>
+          <div class="tc-card-section">
+            <h5>Expected Registers</h5>
+            ${objToMiniTable(expRegs, 'Register', 'Value')}
+          </div>
+          <div class="tc-card-section">
+            <h5>Initial Memory</h5>
+            ${objToMiniTable(initMem, 'Address', 'Value')}
+          </div>
+          <div class="tc-card-section">
+            <h5>Expected Memory</h5>
+            ${objToMiniTable(expMem, 'Address', 'Value')}
+          </div>
+        </div>
+        ${tc.description ? `<div style="font-size:11px;color:#666;margin-bottom:6px;">${tc.description}</div>` : ''}
+        <div class="tc-card-actions">
+          <button class="tc-btn-edit" data-tc-id="${tc.test_case_id}">Edit</button>
+          <button class="tc-btn-delete" data-tc-id="${tc.test_case_id}">Delete</button>
+        </div>
+      </div>
+    `;
+
+    // Toggle body open/close on header click
+    card.querySelector('.tc-card-header').addEventListener('click', () => {
+      card.querySelector('.tc-card-body').classList.toggle('open');
+    });
+
+    // Edit
+    card.querySelector('.tc-btn-edit').addEventListener('click', (e) => {
+      e.stopPropagation();
+      openModalForEdit(tc);
+    });
+
+    // Delete
+    card.querySelector('.tc-btn-delete').addEventListener('click', async (e) => {
+      e.stopPropagation();
+      if (!confirm(`Delete test case "${tc.test_name}"?`)) return;
+      try {
+        await deleteTestCase(currentId, tc.test_case_id);
+        await refreshTestCases();
+      } catch (err) {
+        alert('Failed to delete: ' + err.message);
+      }
+    });
+
+    tcListEl.appendChild(card);
+  });
+}
+
+async function refreshTestCases() {
+  if (!currentId) return;
+  const cases = await fetchTestCases(currentId);
+  renderTestCaseCards(cases);
+}
+
+// ─ Modal open / close / save ─
+
+function resetModal() {
+  editingTestCaseId = null;
+  document.getElementById('tc-name').value = '';
+  document.getElementById('tc-points').value = '10';
+  document.getElementById('tc-desc').value = '';
+  document.getElementById('tc-hidden').checked = false;
+  document.getElementById('tc-timeout').value = '5';
+  clearKV('tc-init-regs');
+  clearKV('tc-init-mem');
+  clearKV('tc-exp-regs');
+  clearKV('tc-exp-mem');
+}
+
+function openModalForNew() {
+  resetModal();
+  tcModalTitle.textContent = 'Add Test Case';
+  tcModal.style.display = 'flex';
+}
+
+function openModalForEdit(tc) {
+  resetModal();
+  editingTestCaseId = tc.test_case_id;
+  tcModalTitle.textContent = 'Edit Test Case';
+
+  document.getElementById('tc-name').value   = tc.test_name || '';
+  document.getElementById('tc-points').value = tc.points ?? 10;
+  document.getElementById('tc-desc').value   = tc.description || '';
+  document.getElementById('tc-hidden').checked = !!tc.is_hidden;
+  document.getElementById('tc-timeout').value  = tc.timeout_seconds ?? 5;
+
+  const inp = tc.input_data      || {};
+  const exp = tc.expected_output || {};
+
+  Object.entries(inp.registers || {}).forEach(([k, v]) => addKVRow('tc-init-regs', '$t0', '0', k, v));
+  Object.entries(inp.memory    || {}).forEach(([k, v]) => addKVRow('tc-init-mem',  '268435456', '0', k, v));
+  Object.entries(exp.registers || {}).forEach(([k, v]) => addKVRow('tc-exp-regs',  '$t0', '30', k, v));
+  Object.entries(exp.memory    || {}).forEach(([k, v]) => addKVRow('tc-exp-mem',   '268435456', '30', k, v));
+
+  tcModal.style.display = 'flex';
+}
+
+function closeModal() {
+  tcModal.style.display = 'none';
+}
+
+async function saveModal() {
+  const name = document.getElementById('tc-name').value.trim();
+  if (!name) { alert('Test case name is required.'); return; }
+  if (!currentId) { alert('No lab selected.'); return; }
+
+  const payload = {
+    test_name:       name,
+    test_type:       'register',
+    description:     document.getElementById('tc-desc').value.trim() || null,
+    points:          parseInt(document.getElementById('tc-points').value) || 10,
+    is_hidden:       document.getElementById('tc-hidden').checked,
+    timeout_seconds: parseInt(document.getElementById('tc-timeout').value) || 5,
+    input_data: {
+      registers: readKV('tc-init-regs'),
+      memory:    readKV('tc-init-mem'),
+    },
+    expected_output: {
+      registers: readKV('tc-exp-regs'),
+      memory:    readKV('tc-exp-mem'),
+    },
+  };
+
+  try {
+    if (editingTestCaseId) {
+      await updateTestCase(currentId, editingTestCaseId, payload);
+    } else {
+      await createTestCase(currentId, payload);
+    }
+    closeModal();
+    await refreshTestCases();
+  } catch (err) {
+    alert('Error saving test case: ' + err.message);
+  }
+}
+
+if (btnAddTC)     btnAddTC.addEventListener('click', openModalForNew);
+if (tcModalSave)  tcModalSave.addEventListener('click', saveModal);
+if (tcModalCancel) tcModalCancel.addEventListener('click', closeModal);
+
+// Close modal on overlay click
+if (tcModal) {
+  tcModal.addEventListener('click', (e) => {
+    if (e.target === tcModal) closeModal();
+  });
+}
+
+// ─ Hook into lesson selection to load test cases ─
+
+const _origLoadLesson = loadLesson;
+loadLesson = async function(id) {
+  await _origLoadLesson(id);
+  if (tcManager) tcManager.style.display = '';
+  await refreshTestCases();
+};
 
 // pick first lab from DB
 (async () => {
