@@ -3,6 +3,8 @@ import init, { WasmCPU } from "./pkg/mips_emu_wasm.js";
 // API Configuration
 const API_BASE = 'http://localhost:5000/api';
 
+const MAX_ATTEMPTS = 5;
+
 // Fetch lessons from API (database only)
 async function fetchLessonsFromAPI() {
   try {
@@ -125,6 +127,60 @@ function applyInitialValues(labData) {
   updateMemoryView();
 }
 
+// ── Attempts display ──────────────────────────────────────────────────────────
+
+async function updateAttemptsDisplay(labId) {
+  const gradeBtn = document.getElementById('grade-button');
+  const attemptsEl = document.getElementById('attempts-display');
+
+  // Reset display while loading
+  if (attemptsEl) attemptsEl.textContent = '';
+  if (gradeBtn) {
+    gradeBtn.disabled = false;
+    gradeBtn.style.background = '#27ae60';
+    gradeBtn.textContent = 'Grade Me';
+  }
+
+  try {
+    const res = await fetch(`${API_BASE}/grade/attempts/${labId}`, { credentials: 'include' });
+    if (!res.ok) return;
+    const data = await res.json();
+
+    const used = data.attempts_used;
+    const remaining = data.attempts_remaining;
+    const limitReached = data.limit_reached;
+
+    if (attemptsEl) {
+      attemptsEl.textContent = `Attempts: ${used} / ${MAX_ATTEMPTS}`;
+      if (limitReached) {
+        attemptsEl.style.color = '#e74c3c';
+      } else if (remaining === 1) {
+        attemptsEl.style.color = '#e67e22';
+      } else {
+        attemptsEl.style.color = '#27ae60';
+      }
+    }
+
+    if (gradeBtn) {
+      if (limitReached) {
+        gradeBtn.disabled = true;
+        gradeBtn.textContent = 'No Attempts Remaining';
+        gradeBtn.style.background = '#95a5a6';
+      } else {
+        gradeBtn.disabled = false;
+        gradeBtn.textContent = `Grade Me (${remaining} left)`;
+        gradeBtn.style.background = '#27ae60';
+      }
+    }
+
+    return data;
+  } catch (err) {
+    console.warn('Could not fetch attempts:', err);
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
 async function showLesson(id) {
   const lessons = await allLessons();
   const data = lessons[id];
@@ -157,6 +213,9 @@ async function showLesson(id) {
   currentLabData = data;
   currentLessonId = id;
   loadLatestSubmission(id); 
+
+  // Update attempts counter for the newly selected lab
+  updateAttemptsDisplay(id);
 
   const url = new URL(window.location);
   url.searchParams.set('lesson', id);
@@ -907,10 +966,22 @@ document.getElementById('grade-button')?.addEventListener('click', async () => {
         
         const result = await response.json();
         console.log('DEBUG: Server response:', result);
+
+        // Handle limit-reached rejection from server
+        if (response.status === 403 && result.limit_reached) {
+            resultsDiv.innerHTML = `<p style="color: #e74c3c; padding: 20px; font-weight: bold;">
+                ${result.error}
+            </p>`;
+            // Refresh attempts display to make sure UI is in sync
+            updateAttemptsDisplay(currentLessonId);
+            return;
+        }
         
         if (result.success) {
             displayGradeReport(result.grade_report);
             loadLatestSubmission(currentLessonId); 
+            // Update the attempts counter after a successful submission
+            updateAttemptsDisplay(currentLessonId);
         } else {
             resultsDiv.innerHTML = '<p style="color:red; padding: 20px;">Error: ' + result.error + '</p>';
         }

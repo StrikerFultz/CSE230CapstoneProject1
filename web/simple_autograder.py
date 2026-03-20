@@ -28,6 +28,8 @@ DB_CONFIG = {
     'port': '5432'
 }
 
+MAX_SUBMISSIONS = 5
+
 def run_mips_native(source_code, initial_registers=None, initial_memory=None, check_memory=None):
     """
     Run student code using the compiled emulator binary.
@@ -112,7 +114,7 @@ def calculate_grade(test_cases, source_code):
                 'status': 'ERROR',
                 'points': points,
                 'earned': 0,
-                'message': f'✗ Runtime error: {run_result["error"]}'
+                'message': f'Runtime error: {run_result["error"]}'
             })
             continue
         
@@ -232,32 +234,60 @@ def get_test_cases_for_lab(lab_id):
         return None
 
 
+def get_submission_count(user_id, lab_id):
+    """Returns the number of submissions a user has made for a given lab."""
+    try:
+        conn = psycopg2.connect(**DB_CONFIG)
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT COUNT(*) FROM submissions
+            WHERE user_id = %s AND lab_id = %s
+        """, (user_id, lab_id))
+        count = cur.fetchone()[0]
+        cur.close()
+        conn.close()
+        return int(count)
+    except Exception as e:
+        print(f"[AUTOGRADER] Error fetching submission count: {e}")
+        return 0
+
+
 @simple_autograder_bp.route('/submit', methods=['POST'])
 def grade_submission():
     """
     POST /api/grade/submit
-    
-    Body: #how setup woroks
+
+    Body:
     {
-        "lab_id": "lab-12-2", # get lab type (named in db)
-        "source_code": "add $t0, $s0, $s1\\n..." 
+        "lab_id": "lab-12-2",
+        "source_code": "add $t0, $s0, $s1\\n..."
     }
     """
-        
+
     if 'user_id' not in session:
         return jsonify({'error': 'Unauthorized'}), 401
 
     try:
-        data = request.get_json() 
-        lab_id = data.get('lab_id') 
-        source_code = data.get('source_code', '') 
-        
-        test_cases = get_test_cases_for_lab(lab_id) 
-        grade_report = calculate_grade(test_cases, source_code) 
+        data = request.get_json()
+        lab_id = data.get('lab_id')
+        source_code = data.get('source_code', '')
+
+        # Check submission count before doing anything else
+        submission_count = get_submission_count(session['user_id'], lab_id)
+        if submission_count >= MAX_SUBMISSIONS:
+            return jsonify({
+                'error': f'Submission limit reached. You have used all {MAX_SUBMISSIONS} attempts for this lab.',
+                'attempts_used': submission_count,
+                'attempts_allowed': MAX_SUBMISSIONS,
+                'limit_reached': True
+            }), 403
+
+        test_cases = get_test_cases_for_lab(lab_id)
+        grade_report = calculate_grade(test_cases, source_code)
 
         # Save to DB
-        conn = psycopg2.connect(**DB_CONFIG) 
-        cur = conn.cursor() #
+        conn = psycopg2.connect(**DB_CONFIG)
+        cur = conn.cursor()
 
         normalized_source = source_code.strip().replace('\n', '\\n')
 
@@ -266,26 +296,50 @@ def grade_submission():
             VALUES (%s, %s, %s, %s, %s, %s, %s)
         """, (
             session['user_id'],
-            session.get('username'), # ASU ID
+            session.get('username'),
             lab_id,
             grade_report['earned_points'],
             grade_report['total_points'],
-            normalized_source, 
+            normalized_source,
             json.dumps(grade_report['results'])
         ))
 
         conn.commit()
         cur.close()
         conn.close()
-        
+
+        # Return updated attempt info alongside the grade report
+        new_count = submission_count + 1
         return jsonify({
             'success': True,
             'lab_id': lab_id,
-            'grade_report': grade_report
-        })  
-          
+            'grade_report': grade_report,
+            'attempts_used': new_count,
+            'attempts_remaining': max(0, MAX_SUBMISSIONS - new_count),
+            'attempts_allowed': MAX_SUBMISSIONS,
+            'limit_reached': new_count >= MAX_SUBMISSIONS
+        })
+
     except Exception as e:
-        return jsonify({'error': str(e)}), 500 #
+        return jsonify({'error': str(e)}), 500
+
+
+@simple_autograder_bp.route('/attempts/<lab_id>', methods=['GET'])
+def get_attempts(lab_id):
+    """Returns how many submissions the student has made for a lab."""
+    if 'user_id' not in session:
+        return jsonify({'error': 'Not logged in'}), 401
+
+    count = get_submission_count(session['user_id'], lab_id)
+
+    return jsonify({
+        'lab_id': lab_id,
+        'attempts_used': count,
+        'attempts_remaining': max(0, MAX_SUBMISSIONS - count),
+        'attempts_allowed': MAX_SUBMISSIONS,
+        'limit_reached': count >= MAX_SUBMISSIONS
+    })
+
 
 @simple_autograder_bp.route('/test-cases/<lab_id>', methods=['GET'])
 def get_test_cases_endpoint(lab_id):
