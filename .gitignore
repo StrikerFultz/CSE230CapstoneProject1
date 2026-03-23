@@ -1,4 +1,7 @@
-/target/
-/pkg/
-/web/pkg
-/web/__pycache__/
+target/
+web/pkg/
+__pycache__/
+web/__pycache__/
+*.pyc
+.env
+.venv/

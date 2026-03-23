@@ -16,16 +16,15 @@ simple_autograder_bp = Blueprint('simple_autograder', __name__, url_prefix='/api
 _binary_name = 'mips-emu-wasm.exe' if platform.system() == 'Windows' else 'mips-emu-wasm'
 GRADER_BINARY = os.path.join(
     os.path.dirname(os.path.abspath(__file__)),
-    '..', 'target', 'release',
-    _binary_name
+    'mips-emu-wasm'  # sits next to server.py after Docker copies it
 )
 
 DB_CONFIG = {
-    'dbname': 'capstone',
-    'user': 'postgres',
-    'password': 'postgres',
-    'host': 'localhost',
-    'port': '5432'
+    'dbname':   os.environ.get('DB_NAME', 'capstone'),
+    'user':     os.environ.get('DB_USER', 'postgres'),
+    'password': os.environ.get('DB_PASSWORD', ''),
+    'host':     os.environ.get('DB_HOST', 'localhost'),
+    'port':     os.environ.get('DB_PORT', '5432'),
 }
 
 MAX_SUBMISSIONS = 5

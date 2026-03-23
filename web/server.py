@@ -6,6 +6,7 @@ import json
 from datetime import datetime
 import uuid
 import secrets
+import os
 
 from simple_autograder import simple_autograder_bp
 from auth import auth_bp
@@ -16,20 +17,21 @@ app = Flask(__name__, static_folder='.')
 app.register_blueprint(simple_autograder_bp)
 app.register_blueprint(auth_bp)
 
-app.secret_key = "angel-was-here"
+app.secret_key = os.environ.get('FLASK_SECRET_KEY', 'dev-fallback-only')
 
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
-app.config['SESSION_COOKIE_SECURE'] = False
+app.config['SESSION_COOKIE_SECURE'] = os.environ.get('FLASK_ENV') == 'production'
 app.config['SESSION_COOKIE_HTTPONLY'] = True
 
-CORS(app, supports_credentials=True, origins=['http://localhost:5000', 'http://127.0.0.1:5000'])
+allowed_origins = os.environ.get('ALLOWED_ORIGINS', 'http://localhost:5000').split(',')
+CORS(app, supports_credentials=True, origins=allowed_origins)
 
 DB_CONFIG = {
-    'dbname': 'capstone',
-    'user': 'postgres',
-    'password': 'postgres',
-    'host': 'localhost',
-    'port': '5432'
+    'dbname':   os.environ.get('DB_NAME', 'capstone'),
+    'user':     os.environ.get('DB_USER', 'postgres'),
+    'password': os.environ.get('DB_PASSWORD', ''),
+    'host':     os.environ.get('DB_HOST', 'localhost'),
+    'port':     os.environ.get('DB_PORT', '5432'),
 }
 
 def get_db_connection():
