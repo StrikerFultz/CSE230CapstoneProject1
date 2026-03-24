@@ -212,6 +212,8 @@ async function showLesson(id) {
 
   currentLabData = data;
   currentLessonId = id;
+  labOpenedAt = Date.now();   // start the clock for this lab session
+  runCount = 0;               // reset run counter
   loadLatestSubmission(id); 
 
   // Update attempts counter for the newly selected lab
@@ -528,6 +530,8 @@ let breakpoints = new Set();
 let currentLineMarker = null;
 let currentLabData = null;
 let currentLessonId = null;
+let labOpenedAt = null;   // timestamp when student opened/switched to this lab
+let runCount = 0;         // number of Run/Step clicks since opening the lab
 
 // uses coldmirror
 
@@ -884,6 +888,7 @@ if (runBtn) {
     }
 
     log("Running program...");
+    runCount++;
     await new Promise(requestAnimationFrame);
     const result = cpu.run();
     handleWasmResult(result, { fromRun: true });
@@ -906,6 +911,7 @@ if (stepBtn) {
     cpu.set_breakpoints(Array.from(breakpoints));
 
     const nextInsn = cpu.next_instruction();
+    runCount++;
     log(`\n${nextInsn}`);
 
     if (nextInsn === "---") {
@@ -960,7 +966,10 @@ document.getElementById('grade-button')?.addEventListener('click', async () => {
             body: JSON.stringify({
                 lab_id: currentLessonId,
                 student_id: window.__currentUser?.username || 'anonymous',
-                source_code: sourceCode
+                source_code: sourceCode,
+                duration_seconds: labOpenedAt ? Math.round((Date.now() - labOpenedAt) / 1000) : null,
+                run_count: runCount,
+                started_at: labOpenedAt ? new Date(labOpenedAt).toISOString() : null
             })
         });
         
@@ -982,6 +991,9 @@ document.getElementById('grade-button')?.addEventListener('click', async () => {
             loadLatestSubmission(currentLessonId); 
             // Update the attempts counter after a successful submission
             updateAttemptsDisplay(currentLessonId);
+            // Reset session tracking for the next attempt
+            labOpenedAt = Date.now();
+            runCount = 0;
         } else {
             resultsDiv.innerHTML = '<p style="color:red; padding: 20px;">Error: ' + result.error + '</p>';
         }

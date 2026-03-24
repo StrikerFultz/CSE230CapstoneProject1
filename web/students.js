@@ -155,6 +155,16 @@ function renderDetail(data) {
 
   const perfect = scoresWithAttempts.filter(l => l.best_score === l.best_possible).length;
 
+  // Compute average time per attempt across all submissions
+  const allSubs = labs.flatMap(l => l.submissions || []);
+  const subsWithTime = allSubs.filter(s => s.duration_seconds != null);
+  const avgTimeSec = subsWithTime.length
+    ? Math.round(subsWithTime.reduce((a, s) => a + s.duration_seconds, 0) / subsWithTime.length)
+    : null;
+  const avgRuns = subsWithTime.length
+    ? (subsWithTime.reduce((a, s) => a + (s.run_count || 0), 0) / subsWithTime.length).toFixed(1)
+    : null;
+
   statsRow.innerHTML = `
     <div class="stu-stat">
       <div class="stu-stat-num">${attempted}<small>/${totalLabs}</small></div>
@@ -171,6 +181,14 @@ function renderDetail(data) {
     <div class="stu-stat">
       <div class="stu-stat-num">${perfect}</div>
       <div class="stu-stat-label">Perfect scores</div>
+    </div>
+    <div class="stu-stat">
+      <div class="stu-stat-num">${avgTimeSec != null ? formatDuration(avgTimeSec) : '—'}</div>
+      <div class="stu-stat-label">Avg time / attempt</div>
+    </div>
+    <div class="stu-stat">
+      <div class="stu-stat-num">${avgRuns != null ? avgRuns : '—'}</div>
+      <div class="stu-stat-label">Avg runs / attempt</div>
     </div>
   `;
 
@@ -266,10 +284,12 @@ function renderSubmissionTable(lab) {
         <td>${date}</td>
         <td>${sub.score}/${sub.total_possible}</td>
         <td style="font-weight:600;">${pct}%</td>
+        <td>${formatDuration(sub.duration_seconds)}</td>
+        <td>${sub.run_count != null ? sub.run_count : '—'}</td>
         <td><button class="btn-ghost stu-expand-btn" data-target="${uniqueId}">Details</button></td>
       </tr>
       <tr class="stu-sub-detail-row" id="${uniqueId}">
-        <td colspan="5">${detailHTML}</td>
+        <td colspan="7">${detailHTML}</td>
       </tr>
     `;
   });
@@ -277,7 +297,7 @@ function renderSubmissionTable(lab) {
   return `
     <table class="stu-sub-table">
       <thead>
-        <tr><th>#</th><th>Submitted</th><th>Score</th><th>%</th><th></th></tr>
+        <tr><th>#</th><th>Submitted</th><th>Score</th><th>%</th><th>Time Spent</th><th>Runs</th><th></th></tr>
       </thead>
       <tbody>${rows}</tbody>
     </table>
@@ -288,6 +308,17 @@ function escapeHTML(str) {
   const div = document.createElement('div');
   div.textContent = str;
   return div.innerHTML;
+}
+
+function formatDuration(seconds) {
+  if (seconds == null) return '—';
+  if (seconds < 60) return `${seconds}s`;
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  if (m < 60) return s > 0 ? `${m}m ${s}s` : `${m}m`;
+  const h = Math.floor(m / 60);
+  const rm = m % 60;
+  return rm > 0 ? `${h}h ${rm}m` : `${h}h`;
 }
 
 // Delegate detail expand buttons

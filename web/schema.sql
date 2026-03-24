@@ -166,7 +166,10 @@ CREATE TABLE public.submissions (
     total_possible integer NOT NULL,
     source_code text NOT NULL,
     test_results jsonb, 
-    submitted_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP
+    submitted_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
+    duration_seconds integer,
+    run_count integer DEFAULT 0,
+    started_at timestamp with time zone
 );
 
 

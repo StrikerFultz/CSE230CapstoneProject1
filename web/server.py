@@ -617,7 +617,8 @@ def get_student_detail(user_id):
         # All submissions for this student
         cursor.execute("""
             SELECT submission_id, lab_id, score, total_possible,
-                   test_results, submitted_at, source_code
+                   test_results, submitted_at, source_code,
+                   duration_seconds, run_count, started_at
             FROM submissions
             WHERE user_id = %s
             ORDER BY submitted_at DESC
@@ -640,6 +641,9 @@ def get_student_detail(user_id):
                 'test_results':  sub['test_results'],
                 'submitted_at':  sub['submitted_at'].isoformat() if sub['submitted_at'] else None,
                 'source_code':   sub['source_code'],
+                'duration_seconds': sub.get('duration_seconds'),
+                'run_count':        sub.get('run_count'),
+                'started_at':       sub['started_at'].isoformat() if sub.get('started_at') else None,
             })
 
         # Build per-lab summary

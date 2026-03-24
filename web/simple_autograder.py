@@ -44,6 +44,7 @@ def _strip_expected_for_student(results_list):
         sanitized.append(t)
     return sanitized
 
+
 def run_mips_native(source_code, initial_registers=None, initial_memory=None, check_memory=None):
     """
     Run student code using the compiled emulator binary.
@@ -286,6 +287,11 @@ def grade_submission():
         lab_id = data.get('lab_id')
         source_code = data.get('source_code', '')
 
+        # Session tracking sent by the client
+        duration_seconds = data.get('duration_seconds')
+        run_count = data.get('run_count', 0)
+        started_at = data.get('started_at')
+
         # Check submission count before doing anything else
         submission_count = get_submission_count(session['user_id'], lab_id)
         if submission_count >= MAX_SUBMISSIONS:
@@ -306,8 +312,9 @@ def grade_submission():
         normalized_source = source_code.strip().replace('\n', '\\n')
 
         cur.execute("""
-            INSERT INTO submissions (user_id, asurite_id, lab_id, score, total_possible, source_code, test_results)
-            VALUES (%s, %s, %s, %s, %s, %s, %s)
+            INSERT INTO submissions (user_id, asurite_id, lab_id, score, total_possible,
+                                     source_code, test_results, duration_seconds, run_count, started_at)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         """, (
             session['user_id'],
             session.get('username'),
@@ -315,7 +322,10 @@ def grade_submission():
             grade_report['earned_points'],
             grade_report['total_points'],
             normalized_source,
-            json.dumps(grade_report['results'])
+            json.dumps(grade_report['results']),
+            duration_seconds,
+            run_count,
+            started_at
         ))
 
         conn.commit()
