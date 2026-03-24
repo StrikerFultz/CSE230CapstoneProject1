@@ -164,6 +164,7 @@ function renderDetail(data) {
   const avgRuns = subsWithTime.length
     ? (subsWithTime.reduce((a, s) => a + (s.run_count || 0), 0) / subsWithTime.length).toFixed(1)
     : null;
+  const flaggedCount = allSubs.filter(s => s.timing_flagged).length;
 
   statsRow.innerHTML = `
     <div class="stu-stat">
@@ -190,6 +191,10 @@ function renderDetail(data) {
       <div class="stu-stat-num">${avgRuns != null ? avgRuns : '—'}</div>
       <div class="stu-stat-label">Avg runs / attempt</div>
     </div>
+    ${flaggedCount > 0 ? `<div class="stu-stat">
+      <div class="stu-stat-num" style="color:#e53935;">&#9873; ${flaggedCount}</div>
+      <div class="stu-stat-label">Timing flagged</div>
+    </div>` : ''}
   `;
 
   // ── Per-lab list ──
@@ -280,13 +285,17 @@ function renderSubmissionTable(lab) {
       <pre class="stu-sub-code">${escapeHTML(codeTruncated)}</pre>
     </details>`;
 
+    const flagIcon = sub.timing_flagged
+      ? ' <span title="Timing data was adjusted by the server — client values were inconsistent" style="color:#e53935;cursor:help;">&#9873;</span>'
+      : '';
+
     rows += `
       <tr class="${rowClass}">
         <td>${isBest ? '★ ' : ''}#${lab.submissions.length - idx}</td>
         <td>${date}</td>
         <td>${sub.score}/${sub.total_possible}</td>
         <td style="font-weight:600;">${pct}%</td>
-        <td>${formatDuration(sub.duration_seconds)}</td>
+        <td>${formatDuration(sub.duration_seconds)}${flagIcon}</td>
         <td>${sub.run_count != null ? sub.run_count : '—'}</td>
         <td><button class="btn-ghost stu-expand-btn" data-target="${uniqueId}">Details</button></td>
       </tr>

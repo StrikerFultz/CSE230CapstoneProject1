@@ -10,6 +10,7 @@ import subprocess
 import tempfile
 import os
 import platform
+from datetime import datetime, timezone
 
 simple_autograder_bp = Blueprint('simple_autograder', __name__, url_prefix='/api/grade')
 
@@ -87,7 +88,7 @@ def run_mips_native(source_code, initial_registers=None, initial_memory=None, ch
 
     except Exception as e:
         print(f"[GRADER] Error: {e}")
-        return {'error': str(e), 'registers': {}, 'memory': {}}
+        return {'error': 'Emulator execution failed', 'registers': {}, 'memory': {}}
 
 def calculate_grade(test_cases, source_code):
     """Grade by running source code against each test case via the Rust binary."""
@@ -287,10 +288,56 @@ def grade_submission():
         lab_id = data.get('lab_id')
         source_code = data.get('source_code', '')
 
-        # Session tracking sent by the client
+        # Session tracking sent by the client — validate before trusting
         duration_seconds = data.get('duration_seconds')
         run_count = data.get('run_count', 0)
         started_at = data.get('started_at')
+        timing_flagged = False
+
+        # 1. Type-check and clamp to sane ranges
+        if duration_seconds is not None:
+            try:
+                duration_seconds = int(duration_seconds)
+                duration_seconds = max(0, min(duration_seconds, 86400))  # 0s – 24h
+            except (ValueError, TypeError):
+                duration_seconds = None
+                timing_flagged = True
+
+        if run_count is not None:
+            try:
+                run_count = int(run_count)
+                run_count = max(0, min(run_count, 10000))
+            except (ValueError, TypeError):
+                run_count = 0
+                timing_flagged = True
+
+        # 2. Cross-check client timestamp against server clock
+        if started_at:
+            try:
+                client_start = datetime.fromisoformat(started_at.replace('Z', '+00:00'))
+                now = datetime.now(timezone.utc)
+                server_elapsed = (now - client_start).total_seconds()
+
+                # Flag if client start is in the future
+                if server_elapsed < -30:
+                    timing_flagged = True
+                    started_at = None
+                    duration_seconds = None
+
+                # If client duration diverges >60s from server-computed elapsed,
+                # override with the server's value and flag the mismatch
+                elif duration_seconds is not None and abs(server_elapsed - duration_seconds) > 60:
+                    print(f'[AUTOGRADER] Timing mismatch for user {session["user_id"]}: '
+                          f'client={duration_seconds}s, server={int(server_elapsed)}s')
+                    duration_seconds = int(server_elapsed)
+                    timing_flagged = True
+
+            except (ValueError, TypeError):
+                started_at = None
+                timing_flagged = True
+
+        if timing_flagged:
+            print(f'[AUTOGRADER] Timing data flagged for user {session["user_id"]} on lab {lab_id}')
 
         # Check submission count before doing anything else
         # Instructors and TAs are exempt from the limit
@@ -317,8 +364,9 @@ def grade_submission():
 
         cur.execute("""
             INSERT INTO submissions (user_id, asurite_id, lab_id, score, total_possible,
-                                     source_code, test_results, duration_seconds, run_count, started_at)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                                     source_code, test_results, duration_seconds, run_count,
+                                     started_at, timing_flagged)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         """, (
             session['user_id'],
             session.get('username'),
@@ -329,7 +377,8 @@ def grade_submission():
             json.dumps(grade_report['results']),
             duration_seconds,
             run_count,
-            started_at
+            started_at,
+            timing_flagged
         ))
 
         conn.commit()
@@ -355,7 +404,8 @@ def grade_submission():
         })
 
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        print(f'[AUTOGRADER] Submit error: {e}')
+        return jsonify({'error': 'Grading failed — please try again'}), 500
 
 
 @simple_autograder_bp.route('/attempts/<lab_id>', methods=['GET'])
@@ -419,7 +469,8 @@ def reset_attempts(lab_id, user_id):
             'deleted_count': deleted
         })
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        print(f'[AUTOGRADER] Reset error: {e}')
+        return jsonify({'error': 'Failed to reset attempts'}), 500
 
 
 @simple_autograder_bp.route('/test-cases/<lab_id>', methods=['GET'])

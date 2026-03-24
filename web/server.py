@@ -21,7 +21,15 @@ app = Flask(__name__, static_folder='.')
 app.register_blueprint(simple_autograder_bp)
 app.register_blueprint(auth_bp)
 
-app.secret_key = os.environ.get('FLASK_SECRET_KEY', 'dev-fallback-only')
+_secret = os.environ.get('FLASK_SECRET_KEY')
+if not _secret:
+    if os.environ.get('FLASK_ENV') == 'production':
+        raise RuntimeError(
+            'FLASK_SECRET_KEY must be set in production. '
+            'Generate one with: python -c "import secrets; print(secrets.token_hex(32))"'
+        )
+
+app.secret_key = _secret
 
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 app.config['SESSION_COOKIE_SECURE'] = os.environ.get('FLASK_ENV') == 'production'
@@ -45,6 +53,30 @@ def get_db_connection():
     except psycopg2.Error as e:
         print(f"Database connection error: {e}")
         return None
+
+
+def _require_login():
+    """Return (user_id, role) or abort with a JSON 401."""
+    uid = session.get('user_id')
+    if not uid:
+        return None, None
+    return uid, session.get('role', 'student')
+
+
+def _require_teacher():
+    """Return user_id or abort. Caller must check the returned value."""
+    uid, role = _require_login()
+    if not uid:
+        return None, 'not_logged_in'
+    if role not in ('instructor', 'ta'):
+        return None, 'not_teacher'
+    return uid, None
+
+
+def _safe_error(e, fallback='An internal error occurred'):
+    """Log the real error server-side, return a generic message to the client."""
+    print(f'[ERROR] {e}')
+    return fallback
 
 
 # fetch test cases for a single lab
@@ -108,23 +140,31 @@ def test_connection():
                 'version': version[0]
             })
         except Exception as e:
-            return jsonify({'status': 'error', 'message': str(e)}), 500
+            return jsonify({'status': 'error', 'message': _safe_error(e, 'Database test failed')}), 500
     return jsonify({'status': 'error', 'message': 'Could not connect to database'}), 500
 
 
 @app.route('/api/labs', methods=['GET'])
 def get_labs():
+    uid, role = _require_login()
+    if not uid:
+        return jsonify({'error': 'Not logged in'}), 401
+
     conn = get_db_connection()
     if not conn:
         return jsonify({'error': 'Database connection failed'}), 500
     
-    # Identify the user's role from the session
-    role = session.get('role', 'student')
     is_teacher = role in ('instructor', 'ta')
 
     try:
         cursor = conn.cursor(cursor_factory=RealDictCursor)
-        cursor.execute("SELECT * FROM labs ORDER BY lab_id")
+        cursor.execute("""
+            SELECT lab_id, course_id, title, description, instructions,
+                   starter_code, register_mapping, initial_values,
+                   max_memory_kb, time_limit_seconds, max_instructions,
+                   total_points, release_date, due_date, is_published, difficulty
+            FROM labs ORDER BY lab_id
+        """)
         labs = cursor.fetchall()
         
         result = {}
@@ -158,13 +198,15 @@ def get_labs():
         conn.close()
         return jsonify(result)
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        return jsonify({'error': _safe_error(e, 'Failed to load labs')}), 500
 
 
 @app.route('/api/labs', methods=['POST'])
 def create_lab():
-    print(f"[CREATE LAB] Request received")
-    
+    uid, err = _require_teacher()
+    if err:
+        return jsonify({'error': 'Unauthorized — instructors only'}), 403 if err == 'not_teacher' else 401
+
     data = request.get_json()
     
     if not data or 'lab_id' not in data or 'title' not in data:
@@ -229,18 +271,18 @@ def create_lab():
         return jsonify({'message': 'Lab created successfully', 'lab_id': data['lab_id']}), 201
     except psycopg2.IntegrityError as e:
         conn.rollback()
-        print(f"[CREATE LAB] Error: {e}")
         return jsonify({'error': 'Lab ID already exists'}), 409
     except Exception as e:
         conn.rollback()
-        print(f"[CREATE LAB] Error: {e}")
-        return jsonify({'error': str(e)}), 500
+        return jsonify({'error': _safe_error(e, 'Failed to create lab')}), 500
 
 
 @app.route('/api/labs/<lab_id>', methods=['PUT'])
 def update_lab(lab_id):
-    print(f"[UPDATE LAB] lab_id={lab_id}")
-    
+    uid, err = _require_teacher()
+    if err:
+        return jsonify({'error': 'Unauthorized — instructors only'}), 403 if err == 'not_teacher' else 401
+
     data = request.get_json()
     
     conn = get_db_connection()
@@ -293,14 +335,15 @@ def update_lab(lab_id):
         return jsonify({'message': 'Lab updated successfully'})
     except Exception as e:
         conn.rollback()
-        print(f"[UPDATE LAB] Error: {e}")
-        return jsonify({'error': str(e)}), 500
+        return jsonify({'error': _safe_error(e, 'Failed to update lab')}), 500
 
 
 @app.route('/api/labs/<lab_id>', methods=['DELETE'])
 def delete_lab(lab_id):
-    print(f"[DELETE LAB] lab_id={lab_id}")
-    
+    uid, err = _require_teacher()
+    if err:
+        return jsonify({'error': 'Unauthorized — instructors only'}), 403 if err == 'not_teacher' else 401
+
     conn = get_db_connection()
     if not conn:
         return jsonify({'error': 'Database connection failed'}), 500
@@ -325,8 +368,7 @@ def delete_lab(lab_id):
         return jsonify({'message': 'Lab deleted successfully'})
     except Exception as e:
         conn.rollback()
-        print(f"[DELETE LAB] Error: {e}")
-        return jsonify({'error': str(e)}), 500
+        return jsonify({'error': _safe_error(e, 'Failed to delete lab')}), 500
 
 
 @app.route('/api/labs/<lab_id>/test-cases', methods=['GET'])
@@ -353,7 +395,7 @@ def get_lab_test_cases(lab_id):
             'test_cases': test_cases
         })
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        return jsonify({'error': _safe_error(e, 'Failed to load test cases')}), 500
 
 
 @app.route('/api/labs/<lab_id>/test-cases', methods=['POST'])
@@ -411,7 +453,7 @@ def create_test_case(lab_id):
 
     except Exception as e:
         conn.rollback()
-        return jsonify({'error': str(e)}), 500
+        return jsonify({'error': _safe_error(e, 'Failed to create test case')}), 500
 
 
 @app.route('/api/labs/<lab_id>/test-cases/<test_case_id>', methods=['PUT'])
@@ -470,7 +512,7 @@ def update_test_case(lab_id, test_case_id):
 
     except Exception as e:
         conn.rollback()
-        return jsonify({'error': str(e)}), 500
+        return jsonify({'error': _safe_error(e, 'Failed to update test case')}), 500
 
 
 @app.route('/api/labs/<lab_id>/test-cases/<test_case_id>', methods=['DELETE'])
@@ -504,7 +546,7 @@ def delete_test_case(lab_id, test_case_id):
 
     except Exception as e:
         conn.rollback()
-        return jsonify({'error': str(e)}), 500
+        return jsonify({'error': _safe_error(e, 'Failed to delete test case')}), 500
 
 
 # ─── Student browsing (teacher-only) ───
@@ -577,7 +619,7 @@ def list_students():
         return jsonify(result)
 
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        return jsonify({'error': _safe_error(e, 'Failed to load students')}), 500
 
 
 @app.route('/api/students/<user_id>', methods=['GET'])
@@ -618,7 +660,7 @@ def get_student_detail(user_id):
         cursor.execute("""
             SELECT submission_id, lab_id, score, total_possible,
                    test_results, submitted_at, source_code,
-                   duration_seconds, run_count, started_at
+                   duration_seconds, run_count, started_at, timing_flagged
             FROM submissions
             WHERE user_id = %s
             ORDER BY submitted_at DESC
@@ -644,6 +686,7 @@ def get_student_detail(user_id):
                 'duration_seconds': sub.get('duration_seconds'),
                 'run_count':        sub.get('run_count'),
                 'started_at':       sub['started_at'].isoformat() if sub.get('started_at') else None,
+                'timing_flagged':   sub.get('timing_flagged', False),
             })
 
         # Build per-lab summary
@@ -680,7 +723,7 @@ def get_student_detail(user_id):
         })
 
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        return jsonify({'error': _safe_error(e, 'Failed to load student details')}), 500
 
 
 if __name__ == '__main__':

@@ -169,7 +169,8 @@ CREATE TABLE public.submissions (
     submitted_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
     duration_seconds integer,
     run_count integer DEFAULT 0,
-    started_at timestamp with time zone
+    started_at timestamp with time zone,
+    timing_flagged boolean DEFAULT false
 );
 
 
