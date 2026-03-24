@@ -293,8 +293,12 @@ def grade_submission():
         started_at = data.get('started_at')
 
         # Check submission count before doing anything else
+        # Instructors and TAs are exempt from the limit
+        role = session.get('role', 'student')
+        is_teacher = role in ('instructor', 'ta')
+
         submission_count = get_submission_count(session['user_id'], lab_id)
-        if submission_count >= MAX_SUBMISSIONS:
+        if not is_teacher and submission_count >= MAX_SUBMISSIONS:
             return jsonify({
                 'error': f'Submission limit reached. You have used all {MAX_SUBMISSIONS} attempts for this lab.',
                 'attempts_used': submission_count,
@@ -336,8 +340,7 @@ def grade_submission():
         new_count = submission_count + 1
 
         # Strip expected values so students only see their own output
-        role = session.get('role', 'student')
-        if role not in ('instructor', 'ta'):
+        if not is_teacher:
             grade_report['results'] = _strip_expected_for_student(grade_report['results'])
 
         return jsonify({
@@ -345,9 +348,10 @@ def grade_submission():
             'lab_id': lab_id,
             'grade_report': grade_report,
             'attempts_used': new_count,
-            'attempts_remaining': max(0, MAX_SUBMISSIONS - new_count),
-            'attempts_allowed': MAX_SUBMISSIONS,
-            'limit_reached': new_count >= MAX_SUBMISSIONS
+            'attempts_remaining': None if is_teacher else max(0, MAX_SUBMISSIONS - new_count),
+            'attempts_allowed': None if is_teacher else MAX_SUBMISSIONS,
+            'limit_reached': False if is_teacher else new_count >= MAX_SUBMISSIONS,
+            'unlimited': is_teacher
         })
 
     except Exception as e:
@@ -360,7 +364,19 @@ def get_attempts(lab_id):
     if 'user_id' not in session:
         return jsonify({'error': 'Not logged in'}), 401
 
+    role = session.get('role', 'student')
+    is_teacher = role in ('instructor', 'ta')
     count = get_submission_count(session['user_id'], lab_id)
+
+    if is_teacher:
+        return jsonify({
+            'lab_id': lab_id,
+            'attempts_used': count,
+            'attempts_remaining': None,
+            'attempts_allowed': None,
+            'limit_reached': False,
+            'unlimited': True
+        })
 
     return jsonify({
         'lab_id': lab_id,
@@ -369,6 +385,41 @@ def get_attempts(lab_id):
         'attempts_allowed': MAX_SUBMISSIONS,
         'limit_reached': count >= MAX_SUBMISSIONS
     })
+
+
+@simple_autograder_bp.route('/attempts/<lab_id>/<user_id>', methods=['DELETE'])
+def reset_attempts(lab_id, user_id):
+    """Teacher-only: delete all submissions for a student on a given lab,
+    effectively resetting their attempt counter."""
+    if 'user_id' not in session:
+        return jsonify({'error': 'Not logged in'}), 401
+
+    role = session.get('role', 'student')
+    if role not in ('instructor', 'ta'):
+        return jsonify({'error': 'Unauthorized — instructors only'}), 403
+
+    try:
+        conn = psycopg2.connect(**DB_CONFIG)
+        cur = conn.cursor()
+
+        cur.execute("""
+            DELETE FROM submissions
+            WHERE user_id = %s AND lab_id = %s
+        """, (user_id, lab_id))
+
+        deleted = cur.rowcount
+        conn.commit()
+        cur.close()
+        conn.close()
+
+        return jsonify({
+            'success': True,
+            'lab_id': lab_id,
+            'user_id': user_id,
+            'deleted_count': deleted
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 
 @simple_autograder_bp.route('/test-cases/<lab_id>', methods=['GET'])

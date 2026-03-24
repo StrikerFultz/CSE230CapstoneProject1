@@ -149,20 +149,30 @@ async function updateAttemptsDisplay(labId) {
     const used = data.attempts_used;
     const remaining = data.attempts_remaining;
     const limitReached = data.limit_reached;
+    const unlimited = data.unlimited;
 
     if (attemptsEl) {
-      attemptsEl.textContent = `Attempts: ${used} / ${MAX_ATTEMPTS}`;
-      if (limitReached) {
-        attemptsEl.style.color = '#e74c3c';
-      } else if (remaining === 1) {
-        attemptsEl.style.color = '#e67e22';
-      } else {
+      if (unlimited) {
+        attemptsEl.textContent = `Attempts: ${used} (no limit)`;
         attemptsEl.style.color = '#27ae60';
+      } else {
+        attemptsEl.textContent = `Attempts: ${used} / ${MAX_ATTEMPTS}`;
+        if (limitReached) {
+          attemptsEl.style.color = '#e74c3c';
+        } else if (remaining === 1) {
+          attemptsEl.style.color = '#e67e22';
+        } else {
+          attemptsEl.style.color = '#27ae60';
+        }
       }
     }
 
     if (gradeBtn) {
-      if (limitReached) {
+      if (unlimited) {
+        gradeBtn.disabled = false;
+        gradeBtn.textContent = 'Grade Me';
+        gradeBtn.style.background = '#27ae60';
+      } else if (limitReached) {
         gradeBtn.disabled = true;
         gradeBtn.textContent = 'No Attempts Remaining';
         gradeBtn.style.background = '#95a5a6';

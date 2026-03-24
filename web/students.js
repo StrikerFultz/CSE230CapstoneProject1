@@ -218,6 +218,7 @@ function renderDetail(data) {
         <div class="stu-lab-header-right">
           <span class="stu-lab-status ${statusClass}" style="color:${barColor}">${statusText}</span>
           <span class="stu-lab-score">${hasAttempt ? lab.best_score + '/' + lab.best_possible : '—'}</span>
+          ${hasAttempt ? `<button class="btn-ghost stu-reset-btn" data-lab-id="${lab.lab_id}" style="color:#e53935;font-size:11px;" title="Delete all submissions and reset attempt counter">Reset Attempts</button>` : ''}
           <span class="stu-lab-toggle">▾</span>
         </div>
       </div>
@@ -226,8 +227,9 @@ function renderDetail(data) {
       </div>
     `;
 
-    // Toggle expand
-    card.querySelector('.stu-lab-header').addEventListener('click', () => {
+    // Toggle expand (ignore clicks on the reset button)
+    card.querySelector('.stu-lab-header').addEventListener('click', (e) => {
+      if (e.target.classList.contains('stu-reset-btn')) return;
       card.querySelector('.stu-lab-body').classList.toggle('open');
     });
 
@@ -326,6 +328,27 @@ document.addEventListener('click', (e) => {
   if (e.target.classList.contains('stu-expand-btn')) {
     const target = document.getElementById(e.target.dataset.target);
     if (target) target.classList.toggle('open');
+  }
+});
+
+// Delegate reset-attempts buttons
+document.addEventListener('click', async (e) => {
+  if (!e.target.classList.contains('stu-reset-btn')) return;
+
+  e.stopPropagation(); // don't toggle the lab card expand
+
+  const labId = e.target.dataset.labId;
+  const userId = selectedUserId;
+  if (!labId || !userId) return;
+
+  if (!confirm(`This will permanently delete all submissions for this student on "${labId}".\n\nAre you sure?`)) return;
+
+  try {
+    await apiRequest(`/grade/attempts/${labId}/${userId}`, { method: 'DELETE' });
+    // Refresh the student detail to reflect the reset
+    selectStudent(userId);
+  } catch (err) {
+    alert('Failed to reset attempts: ' + err.message);
   }
 });
 
