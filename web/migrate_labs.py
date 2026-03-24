@@ -3,6 +3,9 @@ import psycopg2
 import os
 from psycopg2.extras import RealDictCursor
 
+from dotenv import load_dotenv
+load_dotenv()
+
 DB_CONFIG = {
     'dbname':   os.environ.get('DB_NAME', 'capstone'),
     'user':     os.environ.get('DB_USER', 'postgres'),

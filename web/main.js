@@ -1029,9 +1029,15 @@ function displayGradeReport(report) {
         if (test.mismatches && test.mismatches.length > 0) {
             html += '<div style="margin-top: 8px; font-family: monospace; font-size: 0.9em;">';
             test.mismatches.forEach(m => {
-                html += `<div style="color: #e74c3c;">
-                    ${m.register}: expected ${m.expected}, got ${m.actual}
-                </div>`;
+                if (m.expected !== undefined) {
+                    html += `<div style="color: #e74c3c;">
+                        ${m.register}: expected ${m.expected}, got ${m.actual}
+                    </div>`;
+                } else {
+                    html += `<div style="color: #e74c3c;">
+                        ${m.register}: got ${m.actual} (incorrect)
+                    </div>`;
+                }
             });
             html += '</div>';
         }
@@ -1110,22 +1116,44 @@ function renderLatestSubmission(data) {
     
     // Mismatch Table
     if (test.status !== 'PASS' && test.mismatches && test.mismatches.length > 0) {
-      detailsHtml += `
-        <div style="margin-bottom:5px; font-weight:600; color:#555;">Comparison</div>
-        <table class="diff-table">
-          <thead><tr><th>Item</th><th>Yours</th><th>Expected</th></tr></thead>
-          <tbody>
-      `;
-      test.mismatches.forEach(m => {
+      const hasExpected = test.mismatches.some(m => m.expected !== undefined);
+
+      if (hasExpected) {
+        // Teacher/TA view — show full comparison table
         detailsHtml += `
-          <tr class="diff-row-error">
-            <td>${m.register}</td>
-            <td class="val-error">${m.actual}</td>
-            <td class="val-error">${m.expected}</td>
-          </tr>
+          <div style="margin-bottom:5px; font-weight:600; color:#555;">Comparison</div>
+          <table class="diff-table">
+            <thead><tr><th>Item</th><th>Yours</th><th>Expected</th></tr></thead>
+            <tbody>
         `;
-      });
-      detailsHtml += `</tbody></table>`;
+        test.mismatches.forEach(m => {
+          detailsHtml += `
+            <tr class="diff-row-error">
+              <td>${m.register}</td>
+              <td class="val-error">${m.actual}</td>
+              <td class="val-error">${m.expected}</td>
+            </tr>
+          `;
+        });
+        detailsHtml += `</tbody></table>`;
+      } else {
+        // Student view — only show their values, not expected
+        detailsHtml += `
+          <div style="margin-bottom:5px; font-weight:600; color:#555;">Incorrect Values</div>
+          <table class="diff-table">
+            <thead><tr><th>Item</th><th>Your Value</th></tr></thead>
+            <tbody>
+        `;
+        test.mismatches.forEach(m => {
+          detailsHtml += `
+            <tr class="diff-row-error">
+              <td>${m.register}</td>
+              <td class="val-error">${m.actual}</td>
+            </tr>
+          `;
+        });
+        detailsHtml += `</tbody></table>`;
+      }
     } else if (test.status !== 'PASS') {
       detailsHtml = `<div style="color:#d32f2f;">${test.message}</div>`;
     } else {

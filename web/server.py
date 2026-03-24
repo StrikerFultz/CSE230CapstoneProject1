@@ -1,3 +1,8 @@
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
+
 from flask import Flask, jsonify, request, send_from_directory, session
 from flask_cors import CORS
 import psycopg2
@@ -6,7 +11,6 @@ import json
 from datetime import datetime
 import uuid
 import secrets
-import os
 
 from simple_autograder import simple_autograder_bp
 from auth import auth_bp

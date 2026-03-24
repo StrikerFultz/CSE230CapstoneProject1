@@ -29,6 +29,21 @@ DB_CONFIG = {
 
 MAX_SUBMISSIONS = 5
 
+
+def _strip_expected_for_student(results_list):
+    """Remove expected values from mismatches so students only see their own output.
+    Returns a new list (does not mutate the original)."""
+    sanitized = []
+    for test in results_list:
+        t = dict(test)  # shallow copy
+        if 'mismatches' in t and t['mismatches']:
+            t['mismatches'] = [
+                {'register': m['register'], 'actual': m['actual']}
+                for m in t['mismatches']
+            ]
+        sanitized.append(t)
+    return sanitized
+
 def run_mips_native(source_code, initial_registers=None, initial_memory=None, check_memory=None):
     """
     Run student code using the compiled emulator binary.
@@ -309,6 +324,12 @@ def grade_submission():
 
         # Return updated attempt info alongside the grade report
         new_count = submission_count + 1
+
+        # Strip expected values so students only see their own output
+        role = session.get('role', 'student')
+        if role not in ('instructor', 'ta'):
+            grade_report['results'] = _strip_expected_for_student(grade_report['results'])
+
         return jsonify({
             'success': True,
             'lab_id': lab_id,
@@ -385,11 +406,20 @@ def get_latest_submission(lab_id):
     
     if not row:
         return jsonify({'error': 'No submissions found'}), 404
-        
+
+    # Strip expected values for students
+    test_results = row['test_results']
+    role = session.get('role', 'student')
+    if role not in ('instructor', 'ta'):
+        if isinstance(test_results, str):
+            test_results = json.loads(test_results)
+        if isinstance(test_results, list):
+            test_results = _strip_expected_for_student(test_results)
+
     return jsonify({
         'score': row['score'],
         'total_possible': row['total_possible'],
-        'test_results': row['test_results'],
+        'test_results': test_results,
         'submitted_at': row['submitted_at'].isoformat(),
         'source_code': row['source_code']
     })
