@@ -82,6 +82,9 @@ rustup target add wasm32-unknown-unknown
 ```sh
 cargo install wasm-pack
 ```
+```
+pip3 install openpyxl
+```
 
 
 **Option 1 Run web server**

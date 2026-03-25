@@ -70,6 +70,51 @@
 
         <div class="lesson-list" id="lesson-list">
         </div>
+        <div class="export-section">
+            <h3>Download Submissions & Grades</h3>
+            <div class="export-controls">
+              <label for="export-lab-select"><strong>Select Lab:</strong></label>
+              <select id="export-lab-select">
+                <option value=""> -- Select Lab --</option>
+                <option value="ALL"> ALL LABS</option>
+                <option value="lab-12-2"> 12.2 LAB: Arithmetic</option>
+                <option value="lab-12-11"> 12.11</option>
+                <option value="lab-12-12"> 12.12</option>
+                <option value="lab-12-13"> 12.13</option>
+                <option value="lab-12-14"> 12.14</option>
+                <option value="lab-12-15"> 12.15</option>
+                <option value="lab-12-16"> 12.16</option>
+                <option value="lab-12-17"> 12.17</option>
+                <option value="lab-12-18"> 12.18</option>
+
+              </select>
+            </div>
+
+            <div class="export-grid">
+              <div class="export-card">
+                <h4>Graders (excel)</h4>
+                <p>Best submission per student with manual adjustment column</p>
+                <button id="download-grades-btn" class="btn-primary">
+                  Download Grades
+                </button>
+              </div>
+              <div class="export-card">
+                <h4> Source Code (ZIP)</h4>
+                <p> All student .asm files in one download</p>
+                <button id="download-zip-btn" class="btn-secondary">
+                  Download ZIP
+                </button>
+              </div>
+              <div class="export-card">
+                <h4> Complete Hisory (CSV) </h4>
+                <p> Every sbmissoin attempt with timestamps</p>
+                <button id="download-history-btn" class="btn-secondary">
+                  Download history
+                </button>
+              </div>
+            </div>
+            <div id="export-status"></div>
+          </div>
       </div>
     </aside>
 

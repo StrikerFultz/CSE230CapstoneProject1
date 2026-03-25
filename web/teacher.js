@@ -477,6 +477,125 @@ if (titleEl) {
   });
 }
 
+// Download Grades (Excel)
+document.getElementById('download-grades-btn')?.addEventListener('click', async () => {
+    const labId = document.getElementById('export-lab-select').value;
+    
+    if (!labId) {
+        alert('Please select a lab first');
+        return;
+    }
+    
+    const statusDiv = document.getElementById('export-status');
+    statusDiv.innerHTML = '<p>⏳ Generating Excel file...</p>';
+    
+    try {
+        const response = await fetch(`/api/grade/export/grades/${labId}`); //for actual db
+        
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Export failed');
+        }
+        
+        // Download file
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${labId}_grades.xlsx`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        window.URL.revokeObjectURL(url);
+        
+        statusDiv.innerHTML = '<p style="color: green;">✓ Grades downloaded!</p>';
+        setTimeout(() => statusDiv.innerHTML = '', 3000);
+        
+    } catch (error) {
+        console.error('Download error:', error);
+        statusDiv.innerHTML = `<p style="color: red;">✗ Error: ${error.message}</p>`;
+    }
+});
+
+// Download ZIP
+document.getElementById('download-zip-btn')?.addEventListener('click', async () => {
+    const labId = document.getElementById('export-lab-select').value;
+    
+    if (!labId) {
+        alert('Please select a lab first');
+        return;
+    }
+    
+    const statusDiv = document.getElementById('export-status');
+    statusDiv.innerHTML = '<p>⏳ Creating ZIP file...</p>';
+    
+    try {
+        const response = await fetch(`/api/grade/export/submissions-zip/${labId}`);
+        
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Export failed');
+        }
+        
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${labId}_submissions.zip`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        window.URL.revokeObjectURL(url);
+        
+        statusDiv.innerHTML = '<p style="color: green;">✓ ZIP downloaded!</p>';
+        setTimeout(() => statusDiv.innerHTML = '', 3000);
+        
+    } catch (error) {
+        console.error('Download error:', error);
+        statusDiv.innerHTML = `<p style="color: red;">✗ Error: ${error.message}</p>`;
+    }
+});
+
+// Download Complete History (CSV)
+document.getElementById('download-history-btn')?.addEventListener('click', async () => {
+    const labId = document.getElementById('export-lab-select').value;
+    
+    if (!labId) {
+        alert('Please select a lab first');
+        return;
+    }
+    
+    const statusDiv = document.getElementById('export-status');
+    statusDiv.innerHTML = '<p>⏳ Generating CSV file...</p>';
+    
+    try {
+        const response = await fetch(`/api/grade/export/submissions/${labId}`);
+        
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Export failed');
+        }
+        
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${labId}_submissions_history.csv`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        window.URL.revokeObjectURL(url);
+        
+        statusDiv.innerHTML = '<p style="color: green;">✓ History downloaded!</p>';
+        setTimeout(() => statusDiv.innerHTML = '', 3000);
+        
+    } catch (error) {
+        console.error('Download error:', error);
+        statusDiv.innerHTML = `<p style="color: red;">✗ Error: ${error.message}</p>`;
+    }
+});
+
+
 // Initial render
 (async () => {
   await renderList(null);
