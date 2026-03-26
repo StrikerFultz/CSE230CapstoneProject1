@@ -51,6 +51,36 @@
 
         <div class="lesson-list" id="lesson-list">
         </div>
+
+        <div class="export-section">
+          <h3>Download Submissions &amp; Grades</h3>
+          <div class="export-controls">
+            <label for="export-lab-select"><strong>Select Lab:</strong></label>
+            <select id="export-lab-select">
+              <option value=""> -- Select Lab --</option>
+              <option value="ALL"> ALL LABS</option>
+            </select>
+          </div>
+
+          <div class="export-grid">
+            <div class="export-card">
+              <h4>Grades (Excel)</h4>
+              <p>Best submission per student with manual adjustment column</p>
+              <button id="download-grades-btn" class="btn-primary">Download Grades</button>
+            </div>
+            <div class="export-card">
+              <h4>Source Code (ZIP)</h4>
+              <p>All student .asm files in one download</p>
+              <button id="download-zip-btn" class="btn-secondary">Download ZIP</button>
+            </div>
+            <div class="export-card">
+              <h4>Complete History (CSV)</h4>
+              <p>Every submission attempt with timestamps</p>
+              <button id="download-history-btn" class="btn-secondary">Download History</button>
+            </div>
+          </div>
+          <div id="export-status"></div>
+        </div>
       </div>
     </aside>
 

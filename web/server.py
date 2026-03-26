@@ -3,14 +3,26 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-from flask import Flask, jsonify, request, send_from_directory, session
+from flask import Flask, jsonify, request, send_from_directory, send_file, session
 from flask_cors import CORS
 import psycopg2
 from psycopg2.extras import RealDictCursor
 import json
 from datetime import datetime
+from io import BytesIO, StringIO
 import uuid
 import secrets
+import zipfile
+import csv
+
+try:
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, PatternFill, Alignment
+    EXCEL_AVAILABLE = True
+except ImportError:
+    EXCEL_AVAILABLE = False
+    print("[WARNING] openpyxl not installed. Excel exports will not work. "
+          "Install with: pip3 install openpyxl")
 
 from simple_autograder import simple_autograder_bp
 from auth import auth_bp
@@ -726,6 +738,309 @@ def get_student_detail(user_id):
         return jsonify({'error': _safe_error(e, 'Failed to load student details')}), 500
 
 
+# ──────────────────────────────────────────────
+#  Export endpoints (grades, source ZIP, history)
+# ──────────────────────────────────────────────
+
+@app.route('/api/export/grades/<lab_id>', methods=['GET'])
+def export_grades_excel(lab_id):
+    """Teacher-only: download best grades as Excel with manual adjustment column."""
+    uid, err = _require_teacher()
+    if err:
+        return jsonify({'error': 'Unauthorized'}), 401
+
+    if not EXCEL_AVAILABLE:
+        return jsonify({'error': 'Excel library not installed (pip3 install openpyxl)'}), 500
+
+    conn = get_db_connection()
+    if not conn:
+        return jsonify({'error': 'Database connection failed'}), 500
+
+    try:
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+
+        if lab_id == "ALL":
+            cursor.execute("""
+                SELECT DISTINCT ON (s.user_id, s.lab_id)
+                    u.username, u.user_id, u.email,
+                    s.lab_id,
+                    s.score,
+                    s.total_possible AS max_score,
+                    (s.score::float / NULLIF(s.total_possible, 0) * 100) AS percentage,
+                    s.submitted_at
+                FROM submissions s
+                JOIN users u ON s.user_id = u.user_id
+                ORDER BY s.user_id, s.lab_id, s.score DESC, s.submitted_at DESC
+            """)
+        else:
+            cursor.execute("""
+                SELECT DISTINCT ON (s.user_id)
+                    u.username, u.user_id, u.email,
+                    s.score,
+                    s.total_possible AS max_score,
+                    (s.score::float / NULLIF(s.total_possible, 0) * 100) AS percentage,
+                    s.submitted_at
+                FROM submissions s
+                JOIN users u ON s.user_id = u.user_id
+                WHERE s.lab_id = %s
+                ORDER BY s.user_id, s.score DESC, s.submitted_at DESC
+            """, (lab_id,))
+
+        submissions = cursor.fetchall()
+        cursor.close()
+        conn.close()
+
+        if not submissions:
+            return jsonify({'error': 'No submissions found for this lab'}), 404
+
+        # Build Excel workbook
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "Grades"
+
+        if lab_id == "ALL":
+            headers = ['Student Name', 'Student ID', 'Email', 'Lab', 'Auto Score',
+                       'Max Score', 'Auto %', 'Manual Adj', 'Final Score', 'Final %', 'Submitted']
+        else:
+            headers = ['Student Name', 'Student ID', 'Email', 'Auto Score',
+                       'Max Score', 'Auto %', 'Manual Adj', 'Final Score', 'Final %', 'Submitted']
+
+        for col_idx, header in enumerate(headers, 1):
+            cell = ws.cell(row=1, column=col_idx, value=header)
+            cell.font = Font(bold=True, color="FFFFFF")
+            cell.fill = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")
+            cell.alignment = Alignment(horizontal="center")
+
+        for row_idx, sub in enumerate(submissions, 2):
+            col = 1
+            ws.cell(row=row_idx, column=col, value=sub.get('username', 'Unknown')); col += 1
+            ws.cell(row=row_idx, column=col, value=str(sub['user_id'])); col += 1
+            ws.cell(row=row_idx, column=col, value=sub.get('email', '')); col += 1
+
+            if lab_id == "ALL":
+                ws.cell(row=row_idx, column=col, value=sub.get('lab_id', '')); col += 1
+
+            auto_score_col = col
+            ws.cell(row=row_idx, column=col, value=sub['score']); col += 1
+
+            max_score_col = col
+            ws.cell(row=row_idx, column=col, value=sub['max_score']); col += 1
+
+            # Auto %
+            pct = float(sub.get('percentage') or 0)
+            pct_cell = ws.cell(row=row_idx, column=col, value=pct)
+            if pct >= 90:
+                pct_cell.fill = PatternFill(start_color="C6EFCE", end_color="C6EFCE", fill_type="solid")
+            elif pct >= 70:
+                pct_cell.fill = PatternFill(start_color="FFEB9C", end_color="FFEB9C", fill_type="solid")
+            else:
+                pct_cell.fill = PatternFill(start_color="FFC7CE", end_color="FFC7CE", fill_type="solid")
+            col += 1
+
+            # Manual Adjustment (yellow, editable by professor)
+            adj_cell = ws.cell(row=row_idx, column=col, value=0.0)
+            adj_cell.fill = PatternFill(start_color="FFFF00", end_color="FFFF00", fill_type="solid")
+            adj_cell.font = Font(bold=True)
+            adj_col = col; col += 1
+
+            # Final Score formula
+            final_cell = ws.cell(row=row_idx, column=col)
+            final_cell.value = f"={chr(64 + auto_score_col)}{row_idx}+{chr(64 + adj_col)}{row_idx}"
+            final_cell.font = Font(bold=True)
+            final_col = col; col += 1
+
+            # Final % formula
+            final_pct_cell = ws.cell(row=row_idx, column=col)
+            final_pct_cell.value = f"=({chr(64 + final_col)}{row_idx}/{chr(64 + max_score_col)}{row_idx})*100"
+            final_pct_cell.number_format = '0.0'
+            final_pct_cell.font = Font(bold=True)
+            col += 1
+
+            ws.cell(row=row_idx, column=col, value=sub['submitted_at'].strftime('%Y-%m-%d %H:%M'))
+
+        # Auto-adjust column widths
+        for column in ws.columns:
+            column_letter = column[0].column_letter
+            max_length = max((len(str(cell.value or '')) for cell in column), default=0)
+            ws.column_dimensions[column_letter].width = min(max_length + 2, 50)
+
+        output = BytesIO()
+        wb.save(output)
+        output.seek(0)
+
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        filename = f'all_grades_{timestamp}.xlsx' if lab_id == "ALL" else f'grades_{lab_id}_{timestamp}.xlsx'
+
+        return send_file(
+            output,
+            mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            as_attachment=True,
+            download_name=filename
+        )
+
+    except Exception as e:
+        return jsonify({'error': _safe_error(e, 'Failed to export grades')}), 500
+
+
+@app.route('/api/export/submissions-zip/<lab_id>', methods=['GET'])
+def export_submissions_zip(lab_id):
+    """Teacher-only: download all student source code as a ZIP archive."""
+    uid, err = _require_teacher()
+    if err:
+        return jsonify({'error': 'Unauthorized'}), 401
+
+    conn = get_db_connection()
+    if not conn:
+        return jsonify({'error': 'Database connection failed'}), 500
+
+    try:
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+
+        if lab_id == "ALL":
+            cursor.execute("""
+                SELECT DISTINCT ON (s.user_id, s.lab_id)
+                    u.username, u.user_id, s.lab_id,
+                    s.source_code, s.score, s.submitted_at
+                FROM submissions s
+                JOIN users u ON s.user_id = u.user_id
+                ORDER BY s.user_id, s.lab_id, s.score DESC
+            """)
+        else:
+            cursor.execute("""
+                SELECT DISTINCT ON (s.user_id)
+                    u.username, u.user_id, s.lab_id,
+                    s.source_code, s.score, s.submitted_at
+                FROM submissions s
+                JOIN users u ON s.user_id = u.user_id
+                WHERE s.lab_id = %s
+                ORDER BY s.user_id, s.score DESC
+            """, (lab_id,))
+
+        submissions = cursor.fetchall()
+        cursor.close()
+        conn.close()
+
+        if not submissions:
+            return jsonify({'error': 'No submissions found'}), 404
+
+        zip_buffer = BytesIO()
+        with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zf:
+            for sub in submissions:
+                fname = f"{sub['username']}_{sub['lab_id']}_score{sub['score']}.asm"
+                content = (
+                    f"# Student: {sub['username']}\n"
+                    f"# Student ID: {sub['user_id']}\n"
+                    f"# Lab: {sub['lab_id']}\n"
+                    f"# Score: {sub['score']}\n"
+                    f"# Submitted: {sub['submitted_at']}\n"
+                    f"# ==========================================\n\n"
+                    f"{sub['source_code']}\n"
+                )
+                zf.writestr(fname, content)
+
+        zip_buffer.seek(0)
+
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        filename = f'all_submissions_{timestamp}.zip' if lab_id == "ALL" else f'submissions_{lab_id}_{timestamp}.zip'
+
+        return send_file(
+            zip_buffer,
+            mimetype='application/zip',
+            as_attachment=True,
+            download_name=filename
+        )
+
+    except Exception as e:
+        return jsonify({'error': _safe_error(e, 'Failed to create ZIP')}), 500
+
+
+@app.route('/api/export/submissions/<lab_id>', methods=['GET'])
+def export_submissions_csv(lab_id):
+    """Teacher-only: download complete submission history as CSV."""
+    uid, err = _require_teacher()
+    if err:
+        return jsonify({'error': 'Unauthorized'}), 401
+
+    conn = get_db_connection()
+    if not conn:
+        return jsonify({'error': 'Database connection failed'}), 500
+
+    try:
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+
+        if lab_id == "ALL":
+            cursor.execute("""
+                SELECT
+                    u.username, u.user_id, u.email,
+                    s.lab_id, s.score, s.total_possible,
+                    s.source_code, s.submitted_at
+                FROM submissions s
+                JOIN users u ON s.user_id = u.user_id
+                ORDER BY u.username, s.lab_id, s.submitted_at DESC
+            """)
+        else:
+            cursor.execute("""
+                SELECT
+                    u.username, u.user_id, u.email,
+                    s.score, s.total_possible,
+                    s.source_code, s.submitted_at
+                FROM submissions s
+                JOIN users u ON s.user_id = u.user_id
+                WHERE s.lab_id = %s
+                ORDER BY u.username, s.submitted_at DESC
+            """, (lab_id,))
+
+        submissions = cursor.fetchall()
+        cursor.close()
+        conn.close()
+
+        if not submissions:
+            return jsonify({'error': 'No submissions found'}), 404
+
+        output = StringIO()
+        writer = csv.writer(output)
+
+        if lab_id == "ALL":
+            writer.writerow(['Student Name', 'Student ID', 'Email', 'Lab', 'Score',
+                             'Max Score', 'Percentage', 'Submitted At', 'Source Code'])
+        else:
+            writer.writerow(['Student Name', 'Student ID', 'Email', 'Score',
+                             'Max Score', 'Percentage', 'Submitted At', 'Source Code'])
+
+        for sub in submissions:
+            pct = (sub['score'] / sub['total_possible'] * 100) if sub['total_possible'] > 0 else 0
+            row = [
+                sub.get('username', 'Unknown'),
+                str(sub['user_id']),
+                sub.get('email', ''),
+            ]
+            if lab_id == "ALL":
+                row.append(sub.get('lab_id', ''))
+            row.extend([
+                sub['score'],
+                sub['total_possible'],
+                f"{pct:.1f}%",
+                sub['submitted_at'].strftime('%Y-%m-%d %H:%M:%S'),
+                sub['source_code'].replace('\n', ' | ')
+            ])
+            writer.writerow(row)
+
+        output.seek(0)
+
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        filename = f'all_history_{timestamp}.csv' if lab_id == "ALL" else f'history_{lab_id}_{timestamp}.csv'
+
+        return send_file(
+            BytesIO(output.getvalue().encode('utf-8')),
+            mimetype='text/csv',
+            as_attachment=True,
+            download_name=filename
+        )
+
+    except Exception as e:
+        return jsonify({'error': _safe_error(e, 'Failed to export CSV')}), 500
+
+
 if __name__ == '__main__':
     print("=" * 50)
     print("MIPS Emulator - Flask Server")
@@ -771,6 +1086,9 @@ if __name__ == '__main__':
     print("  DELETE /api/labs/<lab_id>/test-cases/<test_case_id>")
     print("  GET  /api/students")
     print("  GET  /api/students/<user_id>")
+    print("  GET  /api/export/grades/<lab_id>")
+    print("  GET  /api/export/submissions-zip/<lab_id>")
+    print("  GET  /api/export/submissions/<lab_id>")
     print("  POST /api/grade/submit")
     print("  GET  /api/grade/test-cases/<lab_id>")
     print("  POST /api/auth/signup")
