@@ -927,6 +927,8 @@ def export_submissions_zip(lab_id):
         with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zf:
             for sub in submissions:
                 fname = f"{sub['username']}_{sub['lab_id']}_score{sub['score']}.asm"
+                # Source code is stored with literal \n — restore real newlines
+                code = (sub['source_code'] or '').replace('\\n', '\n')
                 content = (
                     f"# Student: {sub['username']}\n"
                     f"# Student ID: {sub['user_id']}\n"
@@ -934,7 +936,7 @@ def export_submissions_zip(lab_id):
                     f"# Score: {sub['score']}\n"
                     f"# Submitted: {sub['submitted_at']}\n"
                     f"# ==========================================\n\n"
-                    f"{sub['source_code']}\n"
+                    f"{code}\n"
                 )
                 zf.writestr(fname, content)
 
@@ -1021,7 +1023,7 @@ def export_submissions_csv(lab_id):
                 sub['total_possible'],
                 f"{pct:.1f}%",
                 sub['submitted_at'].strftime('%Y-%m-%d %H:%M:%S'),
-                sub['source_code'].replace('\n', ' | ')
+                sub['source_code'].replace('\\n', '\n').replace('\n', ' | ')
             ])
             writer.writerow(row)
 
