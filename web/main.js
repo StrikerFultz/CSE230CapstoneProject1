@@ -50,7 +50,10 @@ const lessonContainer = document.getElementById("lesson-container");
 const lessonTitle = document.getElementById("lesson-title");
 const lessonBody = document.getElementById("lesson-body");
 const lessonHide = document.getElementById("lesson-hide");
-const filesListEl = document.querySelector(".files-list");
+
+const filesListEl = document.getElementById("labs-menu-list");
+const labsMenuButton = document.getElementById("labs-menu-button");
+const labsMenu = document.getElementById("labs-menu");
 
 async function renderFiles(selectedId) {
   const lessons = await allLessons();
@@ -70,12 +73,40 @@ async function renderFiles(selectedId) {
         item.classList.add("active");
       }
 
-      item.addEventListener("click", () => {
-        showLesson(id);
+      item.addEventListener("click", async () => {
+        const nextUrl = new URL(window.location.href);
+        nextUrl.searchParams.set("lesson", id);
+        window.history.replaceState({}, "", nextUrl);
+        await showLesson(id);
+        // Close the hamburger menu after selection
+        if (labsMenu) {
+          labsMenu.classList.add("hidden");
+          labsMenuButton.setAttribute("aria-expanded", "false");
+        }
       });
 
       filesListEl.appendChild(item);
     });
+}
+
+// Hamburger menu toggle
+if (labsMenuButton && labsMenu) {
+  labsMenuButton.addEventListener("click", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    labsMenu.classList.toggle("hidden");
+    const expanded = !labsMenu.classList.contains("hidden");
+    labsMenuButton.setAttribute("aria-expanded", String(expanded));
+  });
+
+  labsMenu.addEventListener("click", (e) => {
+    e.stopPropagation();
+  });
+
+  document.addEventListener("click", () => {
+    labsMenu.classList.add("hidden");
+    labsMenuButton.setAttribute("aria-expanded", "false");
+  });
 }
 
 function applyInitialValues(labData) {
@@ -576,6 +607,64 @@ const cpuEditor = CodeMirror.fromTextArea(codeEl, {
   autoCloseBrackets: true,
   gutters: ["CodeMirror-linenumbers", "breakpoints"],
 });
+
+// Limit the vertical size of the code editor
+const editorLineHeight = cpuEditor.defaultTextHeight();
+const maxEditorHeight = editorLineHeight * 70;
+
+cpuEditor.setSize("100%", null);
+cpuEditor.getWrapperElement().style.width = "100%";
+cpuEditor.getWrapperElement().style.height = `${maxEditorHeight}px`;
+cpuEditor.getScrollerElement().style.maxHeight = `${maxEditorHeight}px`;
+cpuEditor.getScrollerElement().style.overflowY = "auto";
+cpuEditor.getScrollerElement().style.overflowX = "auto";
+cpuEditor.refresh();
+
+// Draggable vertical resizer between assembler and right panel
+(function initResizer() {
+  const resizer = document.getElementById("v-resizer");
+  const workspace = document.querySelector(".workspace");
+  const assembler = document.querySelector(".assembler");
+  const rightPanel = document.querySelector(".right-panel");
+  if (!resizer || !workspace || !assembler || !rightPanel) return;
+
+  let startX, startAsmWidth, startRightWidth, totalWidth;
+
+  resizer.addEventListener("mousedown", (e) => {
+    e.preventDefault();
+    startX = e.clientX;
+    startAsmWidth = assembler.getBoundingClientRect().width;
+    startRightWidth = rightPanel.getBoundingClientRect().width;
+    totalWidth = startAsmWidth + startRightWidth;
+
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+
+    function onMouseMove(e) {
+      const dx = e.clientX - startX;
+      let newAsm = startAsmWidth + dx;
+      let newRight = startRightWidth - dx;
+      // enforce minimums
+      if (newAsm < 250) { newAsm = 250; newRight = totalWidth - 250; }
+      if (newRight < 200) { newRight = 200; newAsm = totalWidth - 200; }
+
+      const asmFr = newAsm / totalWidth;
+      const rightFr = newRight / totalWidth;
+      workspace.style.gridTemplateColumns = `${asmFr}fr 6px ${rightFr}fr`;
+    }
+
+    function onMouseUp() {
+      document.removeEventListener("mousemove", onMouseMove);
+      document.removeEventListener("mouseup", onMouseUp);
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+      cpuEditor.refresh();
+    }
+
+    document.addEventListener("mousemove", onMouseMove);
+    document.addEventListener("mouseup", onMouseUp);
+  });
+})();
 
 const memStartInput = document.getElementById("mem-start-input");
 const memGoBtn = document.getElementById("mem-go-btn");

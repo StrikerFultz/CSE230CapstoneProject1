@@ -15,7 +15,15 @@
   </head>
   <body>
     <header class="topbar">
-      <div class="brand">MIPS Emulator</div>
+      <div class="topbar-left">
+        <div class="menu-wrap">
+          <button id="labs-menu-button" type="button" aria-expanded="false">☰</button>
+          <div id="labs-menu" class="hidden">
+            <div id="labs-menu-list"></div>
+          </div>
+        </div>
+        <div class="brand">MIPS Emulator</div>
+      </div>
       <nav class="nav">
         <a href="index.html" class="active">Labs</a>
         <a href="teacher.html">Professor View</a>
@@ -32,13 +40,6 @@
     </section>
 
     <main class="workspace">
-      <!--files-->
-      <section class="panel files-panel">
-        <h3>Labs</h3>
-        <div class="files-list">
-        </div>
-      </section>
-
       <!-- assembler and editor -->
       <section class="panel assembler">
         <h3>Assembler</h3>
@@ -46,6 +47,9 @@
           <textarea spellcheck="false"></textarea>
         </div>
       </section>
+
+      <!-- draggable divider -->
+      <div class="v-resizer" id="v-resizer"></div>
 
       <!-- right side for registers memory widgets -->
       <section class="panel right-panel">
