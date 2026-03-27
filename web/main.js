@@ -4,7 +4,7 @@ import { LESSONS as BASE_LESSONS } from "./lessons.js";
 // API Configuration
 const API_BASE = 'http://localhost:5000/api';
 
-// For lesson and files - now supports both local and API
+//for the lesson and files
 const STORAGE_KEY = "customLessons";
 
 // Fetch lessons from API
@@ -38,12 +38,15 @@ async function allLessons() {
   return { ...BASE_LESSONS, ...apiLessons, ...customLessons };
 }
 
-// Lesson UI elements
+// lesson + header menu
 const lessonContainer = document.getElementById("lesson-container");
 const lessonTitle = document.getElementById("lesson-title");
 const lessonBody = document.getElementById("lesson-body");
 const lessonHide = document.getElementById("lesson-hide");
-const filesListEl = document.querySelector(".files-list");
+
+const filesListEl = document.getElementById("labs-menu-list");
+const labsMenuButton = document.getElementById("labs-menu-button");
+const labsMenu = document.getElementById("labs-menu");
 
 async function renderFiles(selectedId) {
   const lessons = await allLessons();
@@ -63,22 +66,90 @@ async function renderFiles(selectedId) {
         item.classList.add("active");
       }
 
-      item.addEventListener("click", () => {
-        showLesson(id);
+      item.addEventListener("click", async () => {
+        const nextUrl = new URL(window.location.href);
+        nextUrl.searchParams.set("lesson", id);
+        window.history.replaceState({}, "", nextUrl);
+        await showLesson(id);
       });
 
       filesListEl.appendChild(item);
     });
 }
 
+if (labsMenuButton && labsMenu) {
+  labsMenuButton.addEventListener("click", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    labsMenu.classList.toggle("hidden");
+    const expanded = !labsMenu.classList.contains("hidden");
+    labsMenuButton.setAttribute("aria-expanded", String(expanded));
+  });
+
+  labsMenu.addEventListener("click", (e) => {
+    e.stopPropagation();
+  });
+
+  document.addEventListener("click", () => {
+    labsMenu.classList.add("hidden");
+    labsMenuButton.setAttribute("aria-expanded", "false");
+  });
+}
+
+function applyInitialValues(labData) {
+  if (!cpu || !wasmReady) return;
+
+  // lab-level initial_values (from DB or lessons.js)
+  const labInitial = labData.initial_values || labData.initialValues || {};
+
+  const testCases = labData.test_cases || labData.testCases || [];
+  const tcInitial = testCases.length > 0
+    ? (testCases[0].inputs || testCases[0].initialRegisters || {})
+    : {};
+
+  const merged = { ...tcInitial, ...labInitial };
+
+  for (const [reg, val] of Object.entries(merged)) {
+    try {
+      cpu.set_register(reg, Number(val));
+    } catch (e) {
+      console.warn(`Could not set initial register ${reg}:`, e);
+    }
+  }
+
+  // Also apply initial memory values if present
+  const labMem = labData.initial_memory || labData.initialMemory || {};
+  const tcMem = testCases.length > 0
+    ? (testCases[0].initialMemory || {})
+    : {};
+  const mergedMem = { ...tcMem, ...labMem };
+
+  for (const [addr, val] of Object.entries(mergedMem)) {
+    try {
+      cpu.set_memory_word(Number(addr), Number(val));
+    } catch (e) {
+      console.warn(`Could not set initial memory at ${addr}:`, e);
+    }
+  }
+
+  // Update the UI to reflect the new state
+  if (Object.keys(merged).length > 0) {
+    const display = {};
+    for (const [reg, val] of Object.entries(merged)) {
+      display[reg] = Number(val) >>> 0;
+    }
+    paintRegisters(display);
+    lastRegs = display;
+    log(`Loaded initial values for ${Object.keys(merged).length} register(s).`);
+  }
+
+  updateMemoryView();
+}
+
 async function showLesson(id) {
   const lessons = await allLessons();
   const data = lessons[id];
   if (!data) return;
-
-  console.log('[LESSON] Loading lesson:', id);
-  console.log('[LESSON] Lesson data:', data);
-  console.log('[LESSON] Test cases:', data.test_cases || data.testCases);
 
   lessonTitle.textContent = data.title || id;
   lessonBody.innerHTML = data.html || "";
@@ -89,18 +160,33 @@ async function showLesson(id) {
       el.classList.toggle("active", el.dataset.lesson === id);
     });
   }
-  
-  // Load starter code if available
-  if (data.starter_code && cpuEditor) {
-    cpuEditor.setValue(data.starter_code);
+
+  // Reset emulator state when switching labs
+  if (cpu && wasmReady) {
+    resetEmulator();
   }
-  
-  // Render test cases if available - support both field names
+
+  // Load starter code if available
+  if (cpuEditor) {
+    cpuEditor.setValue(data.starter_code || "");
+  }
+
+  currentLabData = data;
+
+  // Apply initial register values from lab-level config
+  applyInitialValues(data);
+
+  // Render test cases - support both field names
   const testCases = data.test_cases || data.testCases;
   renderTestCases(testCases);
-  
-  // Scroll to top to see lesson
+
   window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+if (lessonHide) {
+  lessonHide.addEventListener("click", () => {
+    lessonContainer.classList.add("hidden");
+  });
 }
 
 // Test cases rendering
@@ -117,24 +203,13 @@ if (testCasesToggle) {
 }
 
 function renderTestCases(testCases) {
-  console.log('[TEST CASES] renderTestCases called with:', testCases);
-  
-  if (!testCasesSection || !testCasesList) {
-    console.log('[TEST CASES] Missing DOM elements:', { 
-      testCasesSection: !!testCasesSection, 
-      testCasesList: !!testCasesList 
-    });
-    return;
-  }
+  if (!testCasesSection || !testCasesList) return;
   
   // Hide section if no test cases
   if (!testCases || testCases.length === 0) {
-    console.log('[TEST CASES] No test cases to display');
     testCasesSection.classList.add("hidden");
     return;
   }
-  
-  console.log('[TEST CASES] Rendering', testCases.length, 'test cases');
   
   // Show section and render test cases
   testCasesSection.classList.remove("hidden");
@@ -145,15 +220,17 @@ function renderTestCases(testCases) {
     item.className = "test-case-item";
     
     // Support both naming conventions: inputs/initialRegisters and expected/expectedRegisters
-    const inputs = testCase.inputs || testCase.initialRegisters || {};
-    const expected = testCase.expected || testCase.expectedRegisters || {};
+    const initialRegs = testCase.inputs || testCase.initialRegisters || {};
+    const expectedRegs = testCase.expected || testCase.expectedRegisters || {};
+    const initialMem = testCase.initialMemory || {};
+    const expectedMem = testCase.expectedMemory || {};
     
-    console.log(`[TEST CASES] Test ${index + 1}:`, { inputs, expected });
-    
-    // Build inputs table
+    // Build inputs section (registers + memory)
     let inputsHTML = "";
-    if (Object.keys(inputs).length > 0) {
-      inputsHTML = `
+    
+    // Initial registers table
+    if (Object.keys(initialRegs).length > 0) {
+      inputsHTML += `
         <table class="test-case-table">
           <thead>
             <tr>
@@ -162,7 +239,7 @@ function renderTestCases(testCases) {
             </tr>
           </thead>
           <tbody>
-            ${Object.entries(inputs).map(([reg, val]) => `
+            ${Object.entries(initialRegs).map(([reg, val]) => `
               <tr>
                 <td>${reg}</td>
                 <td>${val}</td>
@@ -171,14 +248,42 @@ function renderTestCases(testCases) {
           </tbody>
         </table>
       `;
-    } else {
+    }
+    
+    // Initial memory table
+    if (Object.keys(initialMem).length > 0) {
+      inputsHTML += `
+        <table class="test-case-table" style="margin-top: 10px;">
+          <thead>
+            <tr>
+              <th>Address</th>
+              <th>Value</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${Object.entries(initialMem)
+              .sort(([a], [b]) => parseInt(a) - parseInt(b))
+              .map(([addr, val]) => `
+              <tr>
+                <td>${addr}</td>
+                <td>${val}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      `;
+    }
+    
+    if (inputsHTML === "") {
       inputsHTML = '<p style="font-size: 12px; color: #666;">No input values</p>';
     }
     
-    // Build expected outputs table
+    // Build expected outputs section (registers + memory)
     let outputsHTML = "";
-    if (Object.keys(expected).length > 0) {
-      outputsHTML = `
+    
+    // Expected registers table
+    if (Object.keys(expectedRegs).length > 0) {
+      outputsHTML += `
         <table class="test-case-table">
           <thead>
             <tr>
@@ -187,7 +292,7 @@ function renderTestCases(testCases) {
             </tr>
           </thead>
           <tbody>
-            ${Object.entries(expected).map(([reg, val]) => `
+            ${Object.entries(expectedRegs).map(([reg, val]) => `
               <tr>
                 <td>${reg}</td>
                 <td>${val}</td>
@@ -196,7 +301,33 @@ function renderTestCases(testCases) {
           </tbody>
         </table>
       `;
-    } else {
+    }
+    
+    // Expected memory table
+    if (Object.keys(expectedMem).length > 0) {
+      outputsHTML += `
+        <table class="test-case-table" style="margin-top: 10px;">
+          <thead>
+            <tr>
+              <th>Address</th>
+              <th>Expected Value</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${Object.entries(expectedMem)
+              .sort(([a], [b]) => parseInt(a) - parseInt(b))
+              .map(([addr, val]) => `
+              <tr>
+                <td>${addr}</td>
+                <td>${val}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      `;
+    }
+    
+    if (outputsHTML === "") {
       outputsHTML = '<p style="font-size: 12px; color: #666;">No expected outputs</p>';
     }
     
@@ -219,20 +350,13 @@ function renderTestCases(testCases) {
     
     testCasesList.appendChild(item);
   });
-  
-  console.log('[TEST CASES] Rendering complete');
 }
 
-if (lessonHide) {
-  lessonHide.addEventListener("click", () => {
-    lessonContainer.classList.add("hidden");
-  });
-}
-
-// Initialize lessons
 const urlParams = new URLSearchParams(window.location.search);
-const initialLessonId = urlParams.get("lesson") || Object.keys(BASE_LESSONS)[0] || null;
+const initialLessonId =
+  urlParams.get("lesson") || Object.keys(BASE_LESSONS)[0] || null;
 
+// Initialize lessons async
 (async () => {
   await renderFiles(initialLessonId);
   const lessons = await allLessons();
@@ -241,7 +365,8 @@ const initialLessonId = urlParams.get("lesson") || Object.keys(BASE_LESSONS)[0] 
   }
 })();
 
-// Console and register UI
+//console and reg ui
+
 const consoleOut = document.getElementById("console-output");
 const runBtn = document.getElementById("run");
 const stepBtn = document.getElementById("step");
@@ -249,13 +374,14 @@ const stopBtn = document.getElementById("stop");
 const registersDiv = document.getElementById("registers");
 const codeEl = document.querySelector(".assembler textarea");
 
-// Emulator helpers
+//emultor stuff
 function log(msg) {
   if (!consoleOut) return;
   consoleOut.textContent += msg + "\n";
   consoleOut.scrollTop = consoleOut.scrollHeight;
 }
 
+// Helpers for numbers / registers
 function toNumber(v) {
   if (typeof v === "number") return v;
   if (typeof v === "bigint") return Number(v);
@@ -269,8 +395,9 @@ function hex32(n) {
 }
 
 function fmt(n) {
-  const d = toNumber(n);
-  return `${d} (${hex32(d)})`;
+  const d = toNumber(n) >>> 0;
+  const signed = d > 0x7FFFFFFF ? d - 0x100000000 : d;
+  return `${signed} (${hex32(d)})`;
 }
 
 function coerceRegs(raw) {
@@ -281,8 +408,11 @@ function coerceRegs(raw) {
   return {};
 }
 
-// Filter registers to show
+//filters to show the used regs
+
+//show in tab
 const INTERESTING = /^\$(?:s[0-7]|t[0-9]|a[0-3]|v[0-1])$/i;
+//hide unless changed
 const SYSTEM = /^\$(?:zero|gp|sp|fp|ra|at|k0|k1|lo|hi)$/i;
 
 function filterForTab(curr, prev) {
@@ -290,6 +420,9 @@ function filterForTab(curr, prev) {
 
   for (const [name, val] of Object.entries(curr)) {
     const now = toNumber(val);
+
+    //if don't have a previous snapshot treat it as "same as now"
+    //so changed will be false on first run
     const hadPrev = Object.prototype.hasOwnProperty.call(prev, name);
     const was = hadPrev ? toNumber(prev[name]) : now;
 
@@ -305,13 +438,15 @@ function filterForTab(curr, prev) {
       if (changed) out[name] = now;
       continue;
     }
+    //other regs show only if nonzero or changed
     if (nonZero || changed) out[name] = now;
   }
 
   return out;
 }
 
-// Editable register table
+//add 11/14 (make reg table editable)
+
 function paintRegisters(regObj) {
   if (!registersDiv) return;
 
@@ -334,6 +469,7 @@ function paintRegisters(regObj) {
 
   for (const [name, val] of entries) {
     const d = toNumber(val);
+    const signed = d >>> 0 > 0x7FFFFFFF ? d - 0x100000000 : d;
 
     html += `
       <tr>
@@ -343,7 +479,7 @@ function paintRegisters(regObj) {
             class="reg-edit"
             data-reg="${name}"
             type="number"
-            value="${d}"
+            value="${signed}"
             style="width:80px"
           >
         </td>
@@ -355,12 +491,13 @@ function paintRegisters(regObj) {
   html += "</tbody></table>";
   registersDiv.innerHTML = html;
 
-  // Hook up change handlers for editable registers
+  //hook up "change" handlers: editing input changes register value
   registersDiv.querySelectorAll(".reg-edit").forEach((input) => {
     input.addEventListener("change", () => {
       const regName = input.dataset.reg;
       const newVal = Number(input.value) || 0;
 
+      //updates the CPU if API supports it
       try {
         if (cpu && typeof cpu.set_register === "function") {
           cpu.set_register(regName, newVal);
@@ -373,29 +510,35 @@ function paintRegisters(regObj) {
         log("Error setting register: " + e.message);
       }
 
+      //keeps local snapshots in sync until next run/step
       regObj[regName] = newVal;
       lastRegs[regName] = newVal;
     });
   });
 }
 
-// CPU and editor setup
+//easm and cpu
+
 let cpu = null;
 let wasmReady = false;
 let isProgramLoaded = false;
 let lastRegs = {};
 let breakpoints = new Set();
 let currentLineMarker = null;
+let currentLabData = null;
 
-// CodeMirror syntax highlighting
+//uses coldmirror
+
 CodeMirror.defineSimpleMode("mips-custom", {
   start: [
     {
+      //instructions
       regex:
-        /(?:add|addu|addi|addiu|sub|subu|li|sw|lw|j|jal|jr|or|ori|and|andi|beq|bne|slt|slti|sltiu|sltu|blt|bgt|ble|bge|move|mult|mflo|mfhi)\b/i,
+        /(?:add|addu|addi|addiu|sub|subu|li|sw|lw|sb|lb|sh|lh|lui|la|j|jal|jr|or|ori|and|andi|beq|bne|slt|slti|sltiu|sltu|blt|bgt|ble|bge|move|mult|multu|mflo|mfhi|xor|xori|div|divu|nor|sll|srl|sra)\b/i,
       token: "keyword",
     },
     {
+      //registers
       regex: /\$(?:zero|at|v[01]|a[0-3]|t[0-9]|s[0-7]|k[01]|gp|sp|fp|ra)\b/,
       token: "variable-2",
     },
@@ -418,7 +561,112 @@ const cpuEditor = CodeMirror.fromTextArea(codeEl, {
   gutters: ["CodeMirror-linenumbers", "breakpoints"],
 });
 
-// Highlight current line
+const editorLineHeight = cpuEditor.defaultTextHeight();
+const maxEditorHeight = editorLineHeight * 70;
+
+cpuEditor.setSize("100%", null);
+cpuEditor.getWrapperElement().style.width = "100%";
+cpuEditor.getWrapperElement().style.height = `${maxEditorHeight}px`;
+cpuEditor.getScrollerElement().style.maxHeight = `${maxEditorHeight}px`;
+cpuEditor.getScrollerElement().style.overflowY = "auto";
+cpuEditor.getScrollerElement().style.overflowX = "auto";
+cpuEditor.refresh();
+
+const memStartInput = document.getElementById("mem-start-input");
+const memGoBtn = document.getElementById("mem-go-btn");
+const memView = document.getElementById("memory-view");
+
+const MEM_CHUNK_SIZE = 128; // 128 bytes at a time max
+
+function getSafeChar(code) {
+  if (code >= 32 && code <= 126) {
+    return String.fromCharCode(code);
+  }
+
+  return ".";
+}
+
+function updateMemoryView(highlightAddr = null, highlightSize = 0) {
+  if (!cpu || !wasmReady || !memView) return;
+
+  // get address
+  let addrStr = memStartInput ? memStartInput.value : "0x10000000";
+  let startAddr = parseInt(addrStr, 16);
+
+  // default to 0x10000000 if input is empty or garbage (NaN)
+  if (isNaN(startAddr)) {
+    startAddr = 0x10000000;
+  }
+
+  // fix go button so check if number type
+  if (typeof highlightAddr === 'number') {
+      const rowStart = Math.floor(highlightAddr / 16) * 16;
+      startAddr = rowStart;
+      
+      if (memStartInput) {
+        memStartInput.value = "0x" + startAddr.toString(16).toUpperCase();
+      }
+  }
+
+  // read memory
+  let bytes;
+  try {
+    bytes = cpu.get_memory(startAddr, MEM_CHUNK_SIZE || 128);
+  } catch (e) {
+    console.error("Memory read error:", e);
+    return;
+  }
+
+  // render
+  let html = "";
+  
+  for (let i = 0; i < bytes.length; i += 16) {
+    const currentAddr = startAddr + i;
+    const slice = bytes.subarray(i, i + 16);
+
+    const addrFmt = "0x" + currentAddr.toString(16).toUpperCase().padStart(8, "0");
+
+    let hexFmt = "";
+    let asciiFmt = "";
+
+    for (let j = 0; j < 16; j++) {
+      const byteAddr = currentAddr + j;
+      let classStr = "byte-val";
+
+      if (typeof highlightAddr === 'number' && 
+          byteAddr >= highlightAddr && 
+          byteAddr < highlightAddr + highlightSize) {
+            
+        classStr += " mem-highlight";
+      }
+
+      if (j < slice.length) {
+        const val = slice[j];
+        hexFmt += `<span class="${classStr}">${val.toString(16).toUpperCase().padStart(2, "0")}</span> `;
+        asciiFmt += getSafeChar(val);
+      } else {
+        hexFmt += "   "; 
+      }
+      if (j === 7) hexFmt += " "; 
+    }
+
+    html += `
+      <div class="mem-row">
+        <span class="m-addr">${addrFmt}</span>
+        <span class="m-hex">${hexFmt}</span>
+        <span class="m-ascii">${asciiFmt}</span>
+      </div>
+    `;
+  }
+  
+  memView.innerHTML = html;
+}
+
+if (memGoBtn) {
+  memGoBtn.addEventListener("click", () => updateMemoryView());
+}
+
+//highlight current line
 function clearHighlight() {
   if (currentLineMarker != null) {
     cpuEditor.removeLineClass(
@@ -444,7 +692,7 @@ function highlightCurrentLine() {
   }
 }
 
-// Breakpoints via gutter click
+//breakpoints via gutter click
 cpuEditor.on("gutterClick", (cm, lineIndex, gutter) => {
   if (gutter !== "breakpoints") return;
 
@@ -464,7 +712,8 @@ cpuEditor.on("gutterClick", (cm, lineIndex, gutter) => {
   }
 });
 
-// Emulator controls
+//control for the emulator
+
 function resetEmulator() {
   if (cpu && wasmReady) {
     cpu.reset();
@@ -481,6 +730,14 @@ function resetEmulator() {
   breakpoints.clear();
   cpuEditor.clearGutter("breakpoints");
   clearHighlight();
+  updateMemoryView();
+
+  if (cpu && wasmReady) {
+    updateWidgets(cpu.get_mmio_state());
+    console.log("MMIO state:", cpu.get_mmio_state());
+  } else {
+    updateWidgets({});
+  }
 }
 
 function loadProgram() {
@@ -506,27 +763,55 @@ function loadProgram() {
 
   log("Program loaded successfully.");
   isProgramLoaded = true;
+
+  // Re-apply initial values since load_source resets the CPU
+  if (currentLabData) {
+    applyInitialValues(currentLabData);
+  }
+
   cpu.set_breakpoints(Array.from(breakpoints));
   highlightCurrentLine();
+  updateWidgets(cpu.get_mmio_state());
+
   return true;
 }
 
 function handleWasmResult(result, { fromRun = false } = {}) {
-  const rawRegs =
-    (result && result.snapshot && result.snapshot.registers) ||
-    (result && result.registers) ||
-    null;
+  // Support both result formats (raw registers or snapshot object)
+  const rawRegs = (result && result.snapshot && result.snapshot.registers) || 
+                  (result && result.registers) || {};
+                  
   const allRegs = coerceRegs(rawRegs);
   const tabRegs = filterForTab(allRegs, lastRegs);
-
   paintRegisters(tabRegs);
 
+  // handle memory read/write
+  let hlAddr = null;
+  let hlSize = 0;
+
+  if (result && result.snapshot && 
+      typeof result.snapshot.memory_access_addr === 'number') {
+      
+      hlAddr = result.snapshot.memory_access_addr;
+      hlSize = result.snapshot.memory_access_size || 4;
+  }
+
+  updateMemoryView(hlAddr, hlSize);
+
+  if (cpu && wasmReady) {
+    updateWidgets(cpu.get_mmio_state());
+    console.log("MMIO state:", cpu.get_mmio_state());
+  }
+
   if (result && result.error) {
+    // we have some kind of status / error string
     if (result.error === "Termination") {
       clearHighlight();
+
       if (Object.keys(allRegs).length) {
         log("All Registers (decimal + hex):");
         log("--------------------------------");
+
         for (const [r, v] of Object.entries(allRegs).sort(([a, b]) =>
           a.localeCompare(b)
         )) {
@@ -535,20 +820,25 @@ function handleWasmResult(result, { fromRun = false } = {}) {
         log("\nProgram Finished");
       }
       isProgramLoaded = false;
+      
       if (stepBtn) stepBtn.disabled = true;
       if (runBtn) runBtn.disabled = true;
+
     } else if (result.error === "Breakpoint") {
       log("\n--- Hit Breakpoint ---");
       highlightCurrentLine();
       isProgramLoaded = true;
       if (stepBtn) stepBtn.disabled = false;
       if (runBtn) runBtn.disabled = false;
+
     } else {
       clearHighlight();
+
       log(`\n--- ${result.error} ---`);
       if (Object.keys(allRegs).length) {
         log("All Registers (decimal + hex):");
         log("--------------------------------");
+
         for (const [r, v] of Object.entries(allRegs).sort(([a, b]) =>
           a.localeCompare(b)
         )) {
@@ -556,11 +846,13 @@ function handleWasmResult(result, { fromRun = false } = {}) {
         }
       }
       isProgramLoaded = false;
+
       if (stepBtn) stepBtn.disabled = true;
       if (runBtn) runBtn.disabled = true;
     }
   } else if (fromRun) {
     clearHighlight();
+
     if (Object.keys(allRegs).length) {
       log("All Registers (decimal + hex):");
       log("--------------------------------");
@@ -570,16 +862,21 @@ function handleWasmResult(result, { fromRun = false } = {}) {
         log(`  ${r}: ${fmt(v)}`);
       }
     }
+
     isProgramLoaded = false;
+
     if (stepBtn) stepBtn.disabled = true;
     if (runBtn) runBtn.disabled = true;
+
     log("\nProgram Finished");
   }
 
+  // keep snapshots in sync
   lastRegs = allRegs;
 }
 
-// Button event handlers
+
+//buttons
 if (runBtn) {
   runBtn.addEventListener("click", async () => {
     if (!wasmReady || !cpu) {
@@ -599,6 +896,7 @@ if (runBtn) {
     await new Promise(requestAnimationFrame);
     const result = cpu.run();
     handleWasmResult(result, { fromRun: true });
+
   });
 }
 
@@ -643,7 +941,62 @@ if (stopBtn) {
   });
 }
 
-// Initialize WASM
+function updateWidgets(mmioMap) {
+  const widgetsDiv = document.getElementById("widgets");
+  if (!widgetsDiv) return;
+
+  let entries = [];
+  if (mmioMap instanceof Map) {
+    entries = Array.from(mmioMap.entries());
+  } else if (Array.isArray(mmioMap)) {
+    entries = mmioMap;
+  } else if (mmioMap && typeof mmioMap === "object") {
+    entries = Object.entries(mmioMap);
+  }
+
+  if (entries.length === 0) {
+    widgetsDiv.innerHTML = `<div style="padding:15px; color:#aaa; font-size:11px; text-align:center;">No active MMIO peripherals</div>`;
+    return;
+  }
+
+  let html = "";
+  for (const [addrKey, device] of entries) {
+    const address = typeof addrKey === "string" ? parseInt(addrKey, 10) : addrKey;
+    const hexAddr = "0x" + address.toString(16).toUpperCase();
+
+    if (device && device.type === "Led") {
+      const isOn = (device.data?.value ?? 0) !== 0;
+      const colorInt = device.data?.color ?? 0x00FF00; 
+      const colorHex = colorInt.toString(16).toUpperCase().padStart(6, "0");
+      
+      const dotColor = isOn ? `#${colorHex}` : "#444444";
+      const glow = isOn ? `0 0 8px #${colorHex}AA` : "inset 0 1px 2px rgba(0,0,0,0.5)";
+
+      html += `
+        <div class="widget-item">
+          <div class="led-status-dot" style="background: ${dotColor}; box-shadow: ${glow};"></div>
+          
+          <div class="widget-main">
+            <span class="widget-label">LED Indicator</span>
+            <span class="widget-meta">${hexAddr}</span>
+          </div>
+
+          <div class="widget-right">
+            <span class="hex-chip" style="color: ${isOn ? `#${colorHex}` : '#888'};">#${colorHex}</span>
+            <span class="status-text" style="color: ${isOn ? '#2e7d32' : '#757575'};">
+              ${isOn ? "ACTIVE" : "OFF"}
+            </span>
+          </div>
+        </div>
+      `;
+    }
+  }
+
+  widgetsDiv.innerHTML = html;
+}
+
+//init wasm
+
 init()
   .then(() => {
     cpu = new WasmCPU();
