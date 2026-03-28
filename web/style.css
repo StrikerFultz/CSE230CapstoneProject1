@@ -613,11 +613,11 @@ th {
 /*teacher view*/
 
 .two-pane {
-  max-width: 1200px;
-  margin: 0 auto;
+  max-width: none;
+  margin: 0;
   padding: 10px 20px 20px;
   display: grid;
-  grid-template-columns: minmax(220px, 0.9fr) minmax(420px, 2.3fr);
+  grid-template-columns: minmax(220px, 0.8fr) minmax(420px, 3fr);
   gap: 12px;
   background-color: #ccc;
 }
@@ -840,7 +840,7 @@ th {
 .editable {
   flex: 1 1 auto;
   padding: 8px;
-  min-height: 180px;
+  min-height: 350px;
   overflow: auto;
   font-size: 13px;
   background-color: #ffffff;
@@ -857,6 +857,7 @@ th {
 .preview-surface {
   flex: 1 1 auto;
   padding: 8px;
+  min-height: 350px;
   overflow: auto;
   font-size: 13px;
   background-color: #ffffff;
