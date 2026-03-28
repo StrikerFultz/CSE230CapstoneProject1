@@ -1,37 +1,7 @@
-SET statement_timeout = 0;
-SET lock_timeout = 0;
-SET idle_in_transaction_session_timeout = 0;
-SET transaction_timeout = 0;
-SET client_encoding = 'UTF8';
-SET standard_conforming_strings = on;
-SELECT pg_catalog.set_config('search_path', '', false);
-SET check_function_bodies = false;
-SET xmloption = content;
-SET client_min_messages = warning;
-SET row_security = off;
-
---
--- Name: uuid-ossp; Type: EXTENSION; Schema: -; Owner: -
---
-
+-- Enable UUID extension
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp" WITH SCHEMA public;
 
-
---
--- Name: EXTENSION "uuid-ossp"; Type: COMMENT; Schema: -; Owner: 
---
-
-COMMENT ON EXTENSION "uuid-ossp" IS 'generate universally unique identifiers (UUIDs)';
-
-
-SET default_tablespace = '';
-
-SET default_table_access_method = heap;
-
---
--- Name: courses; Type: TABLE; Schema: public; Owner: postgres
---
-
+-- Courses
 CREATE TABLE public.courses (
     course_id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
     course_code character varying(20) NOT NULL,
@@ -39,52 +9,28 @@ CREATE TABLE public.courses (
     description text,
     semester character varying(20) NOT NULL,
     year integer NOT NULL,
-    is_active boolean DEFAULT true
+    is_active boolean DEFAULT true,
+    CONSTRAINT courses_pkey PRIMARY KEY (course_id)
 );
 
-
-ALTER TABLE public.courses OWNER TO postgres;
-
---
--- Name: enrollments; Type: TABLE; Schema: public; Owner: postgres
---
-
-CREATE TABLE public.enrollments (
-    enrollment_id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
-    user_id uuid NOT NULL,
-    course_id uuid NOT NULL,
+-- Users
+CREATE TABLE public.users (
+    user_id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    username character varying(50) NOT NULL,
+    email character varying(255) NOT NULL,
+    full_name character varying(255),
+    asu_id character varying(20),
+    password_hash character varying(255) NOT NULL,
     role character varying(20) NOT NULL,
-    enrolled_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
-    dropped_at timestamp with time zone
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
+    last_login timestamp with time zone,
+    is_active boolean DEFAULT true,
+    CONSTRAINT users_pkey PRIMARY KEY (user_id),
+    CONSTRAINT users_username_key UNIQUE (username),
+    CONSTRAINT users_email_key UNIQUE (email)
 );
 
-
-ALTER TABLE public.enrollments OWNER TO postgres;
-
---
--- Name: lab_test_cases; Type: TABLE; Schema: public; Owner: postgres
---
-
-CREATE TABLE public.lab_test_cases (
-    test_case_id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
-    lab_id character varying(50) NOT NULL,
-    test_name character varying(255) NOT NULL,
-    test_type character varying(20) NOT NULL,
-    description text,
-    input_data jsonb DEFAULT '{}'::jsonb,
-    expected_output jsonb NOT NULL,
-    points integer DEFAULT 10,
-    is_hidden boolean DEFAULT false,
-    timeout_seconds integer DEFAULT 5
-);
-
-
-ALTER TABLE public.lab_test_cases OWNER TO postgres;
-
---
--- Name: labs; Type: TABLE; Schema: public; Owner: postgres
---
-
+-- Labs
 CREATE TABLE public.labs (
     lab_id character varying(50) NOT NULL,
     course_id uuid NOT NULL,
@@ -102,99 +48,80 @@ CREATE TABLE public.labs (
     release_date timestamp with time zone,
     due_date timestamp with time zone,
     is_published boolean DEFAULT false,
-    difficulty character varying(20) DEFAULT 'intermediate'::character varying
+    difficulty character varying(20) DEFAULT 'intermediate',
+    CONSTRAINT labs_pkey PRIMARY KEY (lab_id),
+    CONSTRAINT labs_course_fkey FOREIGN KEY (course_id) REFERENCES public.courses(course_id)
 );
 
+-- Lab test cases
+CREATE TABLE public.lab_test_cases (
+    test_case_id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    lab_id character varying(50) NOT NULL,
+    test_name character varying(255) NOT NULL,
+    test_type character varying(20) NOT NULL,
+    description text,
+    input_data jsonb DEFAULT '{}'::jsonb,
+    expected_output jsonb NOT NULL,
+    points integer DEFAULT 10,
+    is_hidden boolean DEFAULT false,
+    timeout_seconds integer DEFAULT 5,
+    CONSTRAINT lab_test_cases_pkey PRIMARY KEY (test_case_id),
+    CONSTRAINT lab_test_cases_lab_fkey FOREIGN KEY (lab_id) REFERENCES public.labs(lab_id)
+);
 
-ALTER TABLE public.labs OWNER TO postgres;
+-- Submissions (timing columns used by autograder + student detail page)
+CREATE TABLE public.submissions (
+    submission_id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    user_id uuid NOT NULL,
+    asurite_id character varying(50),
+    lab_id character varying(50) NOT NULL,
+    score integer NOT NULL,
+    total_possible integer NOT NULL,
+    source_code text NOT NULL,
+    test_results jsonb,
+    submitted_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
+    duration_seconds integer,
+    run_count integer DEFAULT 0,
+    started_at timestamp with time zone,
+    timing_flagged boolean DEFAULT false,
+    CONSTRAINT submissions_pkey PRIMARY KEY (submission_id),
+    CONSTRAINT submissions_user_fkey FOREIGN KEY (user_id) REFERENCES public.users(user_id),
+    CONSTRAINT submissions_lab_fkey FOREIGN KEY (lab_id) REFERENCES public.labs(lab_id)
+);
 
---
--- Name: user_preferences; Type: TABLE; Schema: public; Owner: postgres
---
+-- Enrollments
+CREATE TABLE public.enrollments (
+    enrollment_id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    user_id uuid NOT NULL,
+    course_id uuid NOT NULL,
+    role character varying(20) NOT NULL,
+    enrolled_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
+    dropped_at timestamp with time zone,
+    CONSTRAINT enrollments_pkey PRIMARY KEY (enrollment_id),
+    CONSTRAINT enrollments_user_fkey FOREIGN KEY (user_id) REFERENCES public.users(user_id),
+    CONSTRAINT enrollments_course_fkey FOREIGN KEY (course_id) REFERENCES public.courses(course_id)
+);
 
+-- User preferences
 CREATE TABLE public.user_preferences (
     preference_id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
     user_id uuid NOT NULL,
-    theme character varying(20) DEFAULT 'light'::character varying,
+    theme character varying(20) DEFAULT 'light',
     editor_font_size integer DEFAULT 14,
     auto_save_enabled boolean DEFAULT true,
-    additional_preferences jsonb DEFAULT '{}'::jsonb
+    additional_preferences jsonb DEFAULT '{}'::jsonb,
+    CONSTRAINT user_preferences_pkey PRIMARY KEY (preference_id),
+    CONSTRAINT user_preferences_user_fkey FOREIGN KEY (user_id) REFERENCES public.users(user_id)
 );
 
-
-ALTER TABLE public.user_preferences OWNER TO postgres;
-
---
--- Name: user_sessions; Type: TABLE; Schema: public; Owner: postgres
---
-
+-- User sessions
 CREATE TABLE public.user_sessions (
     session_id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
     user_id uuid NOT NULL,
     session_token character varying(255) NOT NULL,
     expires_at timestamp with time zone NOT NULL,
     ip_address inet,
-    user_agent text
+    user_agent text,
+    CONSTRAINT user_sessions_pkey PRIMARY KEY (session_id),
+    CONSTRAINT user_sessions_user_fkey FOREIGN KEY (user_id) REFERENCES public.users(user_id)
 );
-
-
-ALTER TABLE public.user_sessions OWNER TO postgres;
-
---
--- Name: users; Type: TABLE; Schema: public; Owner: postgres
---
-
-CREATE TABLE public.users (
-    user_id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
-    username character varying(50) NOT NULL,
-    email character varying(255) NOT NULL,
-    full_name character varying(255),
-    asu_id character varying(20),
-    password_hash character varying(255) NOT NULL,
-    role character varying(20) NOT NULL,
-    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
-    last_login timestamp with time zone,
-    is_active boolean DEFAULT true
-);
-
-CREATE TABLE public.submissions (
-    submission_id uuid DEFAULT public.uuid_generate_v4() PRIMARY KEY,
-    user_id uuid NOT NULL REFERENCES public.users(user_id),
-    asurite_id character varying(50),
-    lab_id character varying(50) NOT NULL REFERENCES public.labs(lab_id),
-    score integer NOT NULL,
-    total_possible integer NOT NULL,
-    source_code text NOT NULL,
-    test_results jsonb, 
-    submitted_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
-    duration_seconds integer,
-    run_count integer DEFAULT 0,
-    started_at timestamp with time zone,
-    timing_flagged boolean DEFAULT false
-);
-
-
-ALTER TABLE public.users OWNER TO postgres;
-
---
--- Name: courses courses_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
---
-
-ALTER TABLE ONLY public.courses
-    ADD CONSTRAINT courses_pkey PRIMARY KEY (course_id);
-
-
---
--- Name: enrollments enrollments_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
---
-
-ALTER TABLE ONLY public.enrollments
-    ADD CONSTRAINT enrollments_pkey PRIMARY KEY (enrollment_id);
-
-
---
--- Name: lab_test_cases lab_test_cases_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
---
-
-ALTER TABLE ONLY public.lab_test_cases
-    ADD CONSTRAINT lab_test_cases_pkey PRIMARY KEY (test_case_id);

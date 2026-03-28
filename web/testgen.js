@@ -1,6 +1,6 @@
 import init, { WasmCPU } from "./pkg/mips_emu_wasm.js";
 
-const API_BASE = 'http://localhost:5000/api';
+const API_BASE = '/api';
 
 async function apiRequest(endpoint, options = {}) {
   const response = await fetch(`${API_BASE}${endpoint}`, {

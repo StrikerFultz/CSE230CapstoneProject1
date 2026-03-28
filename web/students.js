@@ -1,5 +1,5 @@
 // Students browser — teacher-only page
-const API_BASE = 'http://localhost:5000/api';
+const API_BASE = '/api';
 
 async function apiRequest(endpoint, options = {}) {
   const response = await fetch(`${API_BASE}${endpoint}`, {

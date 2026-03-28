@@ -1,7 +1,7 @@
 import init, { WasmCPU } from "./pkg/mips_emu_wasm.js";
 
 // API Configuration
-const API_BASE = 'http://localhost:5000/api';
+const API_BASE = '/api';
 
 const MAX_ATTEMPTS = 5;
 

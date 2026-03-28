@@ -6,14 +6,15 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# Logging setup
+# Railway captures stderr; Python buffers stdout inside Docker containers.
+# basicConfig routes the root logger (and therefore app.logger / all children)
+# to stderr so output appears in `railway logs`.
 logging.basicConfig(
     level=logging.INFO,
     format='[%(asctime)s] %(levelname)s %(name)s: %(message)s',
     datefmt='%Y-%m-%d %H:%M:%S',
     stream=sys.stderr,
 )
-
 # Module-level logger for code that runs before the Flask app is created
 _log = logging.getLogger(__name__)
 
@@ -61,8 +62,7 @@ app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 app.config['SESSION_COOKIE_SECURE'] = os.environ.get('FLASK_ENV') == 'production'
 app.config['SESSION_COOKIE_HTTPONLY'] = True
 
-allowed_origins = os.environ.get('ALLOWED_ORIGINS', 'http://localhost:5000').split(',')
-CORS(app, supports_credentials=True, origins=allowed_origins)
+CORS(app, supports_credentials=True)
 
 DB_CONFIG = {
     'dbname':   os.environ.get('DB_NAME', 'capstone'),
