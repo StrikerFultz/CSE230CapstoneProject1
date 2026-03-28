@@ -3,14 +3,17 @@
 import psycopg2
 from psycopg2.extras import RealDictCursor
 from flask import Blueprint, request, jsonify
-from flask import session
+from flask import session, current_app
 
 import json
 import subprocess
 import tempfile
 import os
+import logging
 import platform
 from datetime import datetime, timezone
+
+log = logging.getLogger(__name__)
 
 simple_autograder_bp = Blueprint('simple_autograder', __name__, url_prefix='/api/grade')
 
@@ -87,7 +90,7 @@ def run_mips_native(source_code, initial_registers=None, initial_memory=None, ch
         return output
 
     except Exception as e:
-        print(f"[GRADER] Error: {e}")
+        log.error("Emulator execution failed: %s", e, exc_info=True)
         return {'error': 'Emulator execution failed', 'registers': {}, 'memory': {}}
 
 def calculate_grade(test_cases, source_code):
@@ -246,7 +249,7 @@ def get_test_cases_for_lab(lab_id):
         return result
         
     except Exception as e:
-        print(f"[AUTOGRADER] Database error fetching test cases for {lab_id}: {e}")
+        log.error("Database error fetching test cases for %s: %s", lab_id, e, exc_info=True)
         return None
 
 
@@ -264,7 +267,7 @@ def get_submission_count(user_id, lab_id):
         conn.close()
         return int(count)
     except Exception as e:
-        print(f"[AUTOGRADER] Error fetching submission count: {e}")
+        log.error("Error fetching submission count: %s", e, exc_info=True)
         return 0
 
 
@@ -327,8 +330,8 @@ def grade_submission():
                 # If client duration diverges >60s from server-computed elapsed,
                 # override with the server's value and flag the mismatch
                 elif duration_seconds is not None and abs(server_elapsed - duration_seconds) > 60:
-                    print(f'[AUTOGRADER] Timing mismatch for user {session["user_id"]}: '
-                          f'client={duration_seconds}s, server={int(server_elapsed)}s')
+                    log.warning('Timing mismatch for user %s: client=%ss, server=%ss',
+                                session["user_id"], duration_seconds, int(server_elapsed))
                     duration_seconds = int(server_elapsed)
                     timing_flagged = True
 
@@ -337,7 +340,7 @@ def grade_submission():
                 timing_flagged = True
 
         if timing_flagged:
-            print(f'[AUTOGRADER] Timing data flagged for user {session["user_id"]} on lab {lab_id}')
+            log.warning('Timing data flagged for user %s on lab %s', session["user_id"], lab_id)
 
         # Check submission count before doing anything else
         # Instructors and TAs are exempt from the limit
@@ -404,7 +407,7 @@ def grade_submission():
         })
 
     except Exception as e:
-        print(f'[AUTOGRADER] Submit error: {e}')
+        log.error('Submit error: %s', e, exc_info=True)
         return jsonify({'error': 'Grading failed — please try again'}), 500
 
 
@@ -469,7 +472,7 @@ def reset_attempts(lab_id, user_id):
             'deleted_count': deleted
         })
     except Exception as e:
-        print(f'[AUTOGRADER] Reset error: {e}')
+        log.error('Reset error: %s', e, exc_info=True)
         return jsonify({'error': 'Failed to reset attempts'}), 500
 
 

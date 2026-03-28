@@ -1,7 +1,21 @@
 import os
+import sys
+import logging
+import traceback
 from dotenv import load_dotenv
 
 load_dotenv()
+
+# Logging setup
+logging.basicConfig(
+    level=logging.INFO,
+    format='[%(asctime)s] %(levelname)s %(name)s: %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S',
+    stream=sys.stderr,
+)
+
+# Module-level logger for code that runs before the Flask app is created
+_log = logging.getLogger(__name__)
 
 from flask import Flask, jsonify, request, send_from_directory, send_file, session
 from flask_cors import CORS
@@ -21,8 +35,8 @@ try:
     EXCEL_AVAILABLE = True
 except ImportError:
     EXCEL_AVAILABLE = False
-    print("[WARNING] openpyxl not installed. Excel exports will not work. "
-          "Install with: pip3 install openpyxl")
+    _log.warning("openpyxl not installed. Excel exports will not work. "
+                 "Install with: pip3 install openpyxl")
 
 from simple_autograder import simple_autograder_bp
 from auth import auth_bp
@@ -63,7 +77,7 @@ def get_db_connection():
         conn = psycopg2.connect(**DB_CONFIG)
         return conn
     except psycopg2.Error as e:
-        print(f"Database connection error: {e}")
+        app.logger.error("Database connection error: %s", e)
         return None
 
 
@@ -86,8 +100,8 @@ def _require_teacher():
 
 
 def _safe_error(e, fallback='An internal error occurred'):
-    """Log the real error server-side, return a generic message to the client."""
-    print(f'[ERROR] {e}')
+    """Log the real error + traceback server-side, return a generic message to the client."""
+    app.logger.error('%s', e, exc_info=True)
     return fallback
 
 
@@ -276,7 +290,7 @@ def create_lab():
         ))
         
         conn.commit()
-        print(f"[CREATE LAB] Success: {data['lab_id']}")
+        app.logger.info("Lab created: %s", data['lab_id'])
         cursor.close()
         conn.close()
         
@@ -340,7 +354,7 @@ def update_lab(lab_id):
             return jsonify({'error': 'Lab not found'}), 404
         
         conn.commit()
-        print(f"[UPDATE LAB] Success: {lab_id}")
+        app.logger.info("Lab updated: %s", lab_id)
         cursor.close()
         conn.close()
         
@@ -373,7 +387,7 @@ def delete_lab(lab_id):
             return jsonify({'error': 'Lab not found'}), 404
         
         conn.commit()
-        print(f"[DELETE LAB] Success: {lab_id}")
+        app.logger.info("Lab deleted: %s", lab_id)
         cursor.close()
         conn.close()
         
@@ -1044,18 +1058,18 @@ def export_submissions_csv(lab_id):
 
 
 if __name__ == '__main__':
-    print("=" * 50)
-    print("MIPS Emulator - Flask Server")
-    print("=" * 50)
-    print("\nTesting database connection...")
+    app.logger.info("=" * 50)
+    app.logger.info("MIPS Emulator - Flask Server")
+    app.logger.info("=" * 50)
+    app.logger.info("Testing database connection...")
     conn = get_db_connection()
     if conn:
         try:
             cursor = conn.cursor()
             cursor.execute("SELECT version();")
             version = cursor.fetchone()
-            print(f"✓ Connected to PostgreSQL")
-            print(f"  Version: {version[0][:50]}...")
+            app.logger.info("Connected to PostgreSQL")
+            app.logger.info("  Version: %s...", version[0][:50])
             
             cursor.execute("""
                 SELECT table_name FROM information_schema.tables 
@@ -1063,40 +1077,19 @@ if __name__ == '__main__':
                 ORDER BY table_name
             """)
             tables = cursor.fetchall()
-            print(f"\n✓ Found {len(tables)} tables:")
+            app.logger.info("Found %d tables:", len(tables))
             for table in tables:
-                print(f"  - {table[0]}")
+                app.logger.info("  - %s", table[0])
             
             cursor.close()
             conn.close()
         except Exception as e:
-            print(f"✗ Database error: {e}")
+            app.logger.error("Database error: %s", e)
     else:
-        print("✗ Could not connect to database")
+        app.logger.error("Could not connect to database")
     
-    print("\n" + "=" * 50)
-    print("Starting Flask server on http://localhost:5000")
-    print("=" * 50)
-    print("\nAPI Endpoints:")
-    print("  GET  /api/labs")
-    print("  POST /api/labs")
-    print("  PUT  /api/labs/<lab_id>")
-    print("  DELETE /api/labs/<lab_id>")
-    print("  GET  /api/labs/<lab_id>/test-cases")
-    print("  POST /api/labs/<lab_id>/test-cases")
-    print("  PUT  /api/labs/<lab_id>/test-cases/<test_case_id>")
-    print("  DELETE /api/labs/<lab_id>/test-cases/<test_case_id>")
-    print("  GET  /api/students")
-    print("  GET  /api/students/<user_id>")
-    print("  GET  /api/export/grades/<lab_id>")
-    print("  GET  /api/export/submissions-zip/<lab_id>")
-    print("  GET  /api/export/submissions/<lab_id>")
-    print("  POST /api/grade/submit")
-    print("  GET  /api/grade/test-cases/<lab_id>")
-    print("  POST /api/auth/signup")
-    print("  POST /api/auth/login")
-    print("  POST /api/auth/logout")
-    print("  GET  /api/auth/me")
-    print("\n")
+    app.logger.info("=" * 50)
+    app.logger.info("Starting Flask server on http://localhost:5000")
+    app.logger.info("=" * 50)
     
     app.run(debug=True, host='0.0.0.0', port=5000)

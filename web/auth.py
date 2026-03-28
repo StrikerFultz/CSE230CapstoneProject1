@@ -2,10 +2,13 @@
 
 import psycopg2
 import os
+import logging
 from psycopg2.extras import RealDictCursor
 from flask import Blueprint, request, jsonify, session
 from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime
+
+log = logging.getLogger(__name__)
 
 auth_bp = Blueprint('auth', __name__, url_prefix='/api/auth')
 
@@ -22,7 +25,7 @@ def get_db():
     try:
         return psycopg2.connect(**DB_CONFIG)
     except psycopg2.Error as e:
-        print(f"[AUTH] DB error: {e}")
+        log.error("DB connection error: %s", e)
         return None
 
 
@@ -115,8 +118,8 @@ def signup():
     
     except Exception as e:
         conn.rollback()
-        print(f"[AUTH] Signup error: {e}")
-        return jsonify({'error': str(e)}), 500
+        log.error("Signup error: %s", e, exc_info=True)
+        return jsonify({'error': 'Signup failed'}), 500
 
 
 @auth_bp.route('/login', methods=['POST'])
@@ -175,7 +178,7 @@ def login():
         session['username'] = user['username']
         session['role'] = user['role']
 
-        print(f"[AUTH] Login: {username} ({user['role']})")
+        log.info("Login: %s (%s)", username, user['role'])
 
         return jsonify({
             'message': 'Login successful',
@@ -190,15 +193,15 @@ def login():
         })
 
     except Exception as e:
-        print(f"[AUTH] Login error: {e}")
-        return jsonify({'error': str(e)}), 500
+        log.error("Login error: %s", e, exc_info=True)
+        return jsonify({'error': 'Login failed'}), 500
 
 
 @auth_bp.route('/logout', methods=['POST'])
 def logout():
     username = session.get('username', 'unknown')
     session.clear()
-    print(f"[AUTH] Logout: {username}")
+    log.info("Logout: %s", username)
     return jsonify({'message': 'Logged out'})
 
 
@@ -239,4 +242,5 @@ def me():
         })
 
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        log.error("Error in /me: %s", e, exc_info=True)
+        return jsonify({'error': 'Failed to load user'}), 500

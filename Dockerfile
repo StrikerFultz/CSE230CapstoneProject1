@@ -17,6 +17,8 @@ RUN wasm-pack build --target web --release --out-dir web/pkg
 # ── Stage 2: Python app ────────────────────────────────────────────
 FROM python:3.12-slim
 
+ENV PYTHONUNBUFFERED=1
+
 WORKDIR /app
 
 # Copy Python dependencies and install
@@ -34,4 +36,4 @@ COPY --from=rust-builder /app/target/release/mips-emu-wasm ./mips-emu-wasm
 RUN chmod +x ./mips-emu-wasm
 
 EXPOSE 5000
-CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--timeout", "120", "--workers", "3", "server:app"]
+CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--timeout", "120", "--workers", "3", "--access-logfile", "-", "--error-logfile", "-", "--log-level", "info", "server:app"]
