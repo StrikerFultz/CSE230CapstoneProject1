@@ -1,0 +1,9 @@
+target/
+node_modules/
+.vercel/
+.env
+.env.local
+__pycache__/
+*.pyc
+deploy/public/pkg/
+deploy/api/pkg-node/
