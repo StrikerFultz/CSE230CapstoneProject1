@@ -53,6 +53,36 @@
 
       <!-- right side for registers memory widgets -->
       <section class="panel right-panel">
+        <!-- Initial Values (student can set before running) -->
+        <div class="side-box init-values-box">
+          <div class="init-values-header">
+            <strong>Initial Values</strong>
+            <button id="init-values-toggle" class="btn-ghost init-toggle-btn">▼</button>
+          </div>
+          <div id="init-values-body" class="init-values-body">
+            <fieldset class="tc-fieldset">
+              <legend>Registers</legend>
+              <div id="student-init-regs" class="tc-kv-list"></div>
+              <button type="button" class="btn-ghost tc-add-row"
+                      data-target="student-init-regs"
+                      data-placeholder-key="$t0"
+                      data-placeholder-val="0">+ register</button>
+            </fieldset>
+            <fieldset class="tc-fieldset">
+              <legend>Memory</legend>
+              <div id="student-init-mem" class="tc-kv-list"></div>
+              <button type="button" class="btn-ghost tc-add-row"
+                      data-target="student-init-mem"
+                      data-placeholder-key="0x10000000"
+                      data-placeholder-val="0">+ address</button>
+            </fieldset>
+            <div class="init-actions">
+              <button id="init-apply-btn" class="init-apply-btn">Apply &amp; Reset</button>
+              <button id="init-clear-btn" class="btn-ghost">Clear</button>
+            </div>
+          </div>
+        </div>
+
         <div class="side-box">
           <strong>Registers</strong>
           <div id="registers"></div>

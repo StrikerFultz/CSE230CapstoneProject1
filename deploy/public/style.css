@@ -285,7 +285,7 @@ th {
 
 .workspace {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 6px 300px;
+  grid-template-columns: minmax(0, 1fr) 6px 340px;
   grid-template-areas:
     "assembler resizer right"
     "memory memory memory"
@@ -461,6 +461,87 @@ th {
   min-height: 100px; 
 }
 
+/* ── Student Initial Values panel ── */
+
+.init-values-box {
+  flex: 0 0 auto;                 /* don't stretch like other side-boxes */
+}
+
+.init-values-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background-color: #d0d0d0;
+  border-bottom: 1px solid #000;
+  padding: 4px 6px;
+}
+
+.init-values-header strong {
+  border-bottom: none;            /* already on the wrapper */
+  padding: 0;
+  background: none;
+}
+
+.init-toggle-btn {
+  font-size: 11px;
+  line-height: 1;
+}
+
+/* Override the catch-all .side-box div for the init panel's children */
+.init-values-box .init-values-body,
+.init-values-box .init-values-body div,
+.init-values-box .init-values-header {
+  font-family: "Segoe UI", Arial, sans-serif;
+  min-height: 0;
+  background-color: transparent;
+  border-top: none;
+  overflow: visible;
+  padding: 0;
+  flex-grow: 0;
+}
+
+.init-values-body {
+  padding: 8px 10px !important;
+  background-color: #f0f0f0 !important;
+}
+
+.init-values-body.collapsed {
+  display: none;
+}
+
+/* Fieldsets inside use existing tc-* classes; tighten spacing for side panel */
+.init-values-box .tc-fieldset {
+  margin-bottom: 6px;
+  padding: 6px 8px 6px;
+  background: #fafafa;
+}
+
+.init-values-box .tc-kv-row input {
+  font-family: monospace;         /* restore mono for value inputs */
+}
+
+.init-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.init-apply-btn {
+  flex: 1;
+  padding: 4px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  background: #4caf50;
+  color: #fff;
+  border: 1px solid #388e3c;
+  border-radius: 2px;
+  cursor: pointer;
+}
+
+.init-apply-btn:hover {
+  background: #43a047;
+}
+
 /*reg grid*/
 #registers {
   display: grid;
@@ -471,6 +552,28 @@ th {
   white-space: normal;
   word-break: break-all;
   line-height: 1.3;
+}
+
+/* Register table (student view) */
+.reg-table {
+  width: 100%;
+  font-size: 12px;
+  border-collapse: collapse;
+}
+
+.reg-table th,
+.reg-table td {
+  white-space: nowrap;
+  padding: 3px 6px;
+}
+
+.reg-table .reg-name {
+  width: 50px;
+}
+
+.reg-table .reg-edit {
+  width: 100%;
+  box-sizing: border-box;
 }
 
 #memory,

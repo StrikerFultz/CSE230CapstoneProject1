@@ -112,16 +112,11 @@ if (labsMenuButton && labsMenu) {
 function applyInitialValues(labData) {
   if (!cpu || !wasmReady) return;
 
-  // lab-level initial_values (from DB)
-  const labInitial = labData.initial_values || labData.initialValues || {};
+  // Student-set values (from the UI) override lab/test-case defaults
+  const studentRegs = readInitKV('student-init-regs');
+  const studentMem  = readInitKV('student-init-mem');
 
-  // Normalize test cases so we can pull from the first one
-  const rawCases = labData.test_cases || labData.testCases || [];
-  const testCases = normalizeTestCases(rawCases);
-
-  const tcInitial = testCases.length > 0 ? (testCases[0].inputs || {}) : {};
-
-  const merged = { ...tcInitial, ...labInitial };
+  const merged = studentRegs;
 
   for (const [reg, val] of Object.entries(merged)) {
     try {
@@ -132,9 +127,7 @@ function applyInitialValues(labData) {
   }
 
   // Also apply initial memory values if present
-  const labMem = labData.initial_memory || labData.initialMemory || {};
-  const tcMem = testCases.length > 0 ? (testCases[0].initialMemory || {}) : {};
-  const mergedMem = { ...tcMem, ...labMem };
+  const mergedMem = studentMem;
 
   for (const [addr, val] of Object.entries(mergedMem)) {
     try {
@@ -144,18 +137,181 @@ function applyInitialValues(labData) {
     }
   }
 
-  // Update the UI to reflect the new state
-  if (Object.keys(merged).length > 0) {
-    const display = {};
+  // Track initial values as baseline for runtime change detection,
+  // but do NOT paint them into the Registers panel — that's for runtime only.
+  const regCount = Object.keys(merged).length;
+  const memCount = Object.keys(mergedMem).length;
+  if (regCount > 0) {
+    const baseline = {};
     for (const [reg, val] of Object.entries(merged)) {
-      display[reg] = Number(val) >>> 0;
+      baseline[reg] = Number(val) >>> 0;
     }
-    paintRegisters(display);
-    lastRegs = display;
-    log(`Loaded initial values for ${Object.keys(merged).length} register(s).`);
+    lastRegs = baseline;
+  }
+
+  if (regCount > 0 || memCount > 0) {
+    const parts = [];
+    if (regCount > 0) parts.push(`${regCount} register(s)`);
+    if (memCount > 0) parts.push(`${memCount} memory value(s)`);
+    log(`Applied ${parts.join(', ')}.`);
   }
 
   updateMemoryView();
+}
+
+// ── Student Initial Values (register & memory KV rows) ───────────────────────
+
+function addInitKVRow(containerId, keyPH, valPH, keyVal, valVal) {
+  const container = document.getElementById(containerId);
+  if (!container) return;
+  const row = document.createElement('div');
+  row.className = 'tc-kv-row';
+  row.innerHTML = `
+    <input placeholder="${keyPH}" value="${keyVal || ''}" />
+    <input placeholder="${valPH}" value="${valVal || ''}" />
+    <button type="button" class="tc-remove-row" title="Remove">×</button>
+  `;
+  row.querySelector('.tc-remove-row').addEventListener('click', () => row.remove());
+  container.appendChild(row);
+}
+
+function readInitKV(containerId) {
+  const container = document.getElementById(containerId);
+  const obj = {};
+  if (!container) return obj;
+  container.querySelectorAll('.tc-kv-row').forEach(row => {
+    const inputs = row.querySelectorAll('input');
+    const k = inputs[0].value.trim();
+    const v = inputs[1].value.trim();
+    if (k) {
+      // Support hex values (0x...) and decimal
+      let numVal;
+      if (v.startsWith('0x') || v.startsWith('0X')) {
+        numVal = parseInt(v, 16);
+      } else {
+        numVal = Number(v);
+      }
+      obj[k] = isNaN(numVal) ? 0 : numVal;
+    }
+  });
+  return obj;
+}
+
+// Populate the Initial Values UI from a lab's data (called on lab switch)
+function populateInitialValuesUI(labData) {
+  const regsContainer = document.getElementById('student-init-regs');
+  const memContainer = document.getElementById('student-init-mem');
+  if (!regsContainer || !memContainer) return;
+
+  // Clear existing rows
+  regsContainer.innerHTML = '';
+  memContainer.innerHTML = '';
+
+  // Gather lab-level + first test case initial values
+  const labInitial = labData.initial_values || labData.initialValues || {};
+  const rawCases = labData.test_cases || labData.testCases || [];
+  const testCases = normalizeTestCases(rawCases);
+  const tcInitial = testCases.length > 0 ? (testCases[0].inputs || {}) : {};
+  const mergedRegs = { ...tcInitial, ...labInitial };
+
+  const labMem = labData.initial_memory || labData.initialMemory || {};
+  const tcMem = testCases.length > 0 ? (testCases[0].initialMemory || {}) : {};
+  const mergedMem = { ...tcMem, ...labMem };
+
+  // Create register rows
+  for (const [reg, val] of Object.entries(mergedRegs)) {
+    addInitKVRow('student-init-regs', '$t0', '0', reg, String(val));
+  }
+
+  // Create memory rows (display addresses in hex for readability)
+  for (const [addr, val] of Object.entries(mergedMem)) {
+    const addrNum = Number(addr);
+    const addrStr = isNaN(addrNum) ? addr : '0x' + addrNum.toString(16).toUpperCase();
+    addInitKVRow('student-init-mem', '0x10000000', '0', addrStr, String(val));
+  }
+}
+
+// Wire up "+ register" and "+ address" buttons (tc-add-row class, shared pattern)
+document.querySelectorAll('.tc-add-row').forEach(btn => {
+  btn.addEventListener('click', () => {
+    addInitKVRow(
+      btn.dataset.target,
+      btn.dataset.placeholderKey || 'key',
+      btn.dataset.placeholderVal || 'value',
+      '', ''
+    );
+  });
+});
+
+// Toggle collapse
+const initValuesToggle = document.getElementById('init-values-toggle');
+const initValuesBody = document.getElementById('init-values-body');
+if (initValuesToggle && initValuesBody) {
+  initValuesToggle.addEventListener('click', () => {
+    const collapsed = initValuesBody.classList.toggle('collapsed');
+    initValuesToggle.textContent = collapsed ? '▶' : '▼';
+  });
+}
+
+// Apply & Reset: resets the emulator then applies student-set + lab initial values
+const initApplyBtn = document.getElementById('init-apply-btn');
+if (initApplyBtn) {
+  initApplyBtn.addEventListener('click', () => {
+    if (!cpu || !wasmReady) {
+      log('WASM not initialized yet.');
+      return;
+    }
+    if (isProgramLoaded) {
+      log('Stopping current execution to apply initial values.');
+    }
+    resetEmulator();
+    if (currentLabData) {
+      applyInitialValues(currentLabData);
+    } else {
+      // No lab loaded — just apply raw student values
+      const regs = readInitKV('student-init-regs');
+      const mem  = readInitKV('student-init-mem');
+      for (const [reg, val] of Object.entries(regs)) {
+        try { cpu.set_register(reg, Number(val)); } catch(e) { log(`Error: ${reg}: ${e.message}`); }
+      }
+      for (const [addr, val] of Object.entries(mem)) {
+        try { cpu.set_memory_word(Number(addr), Number(val)); } catch(e) { log(`Error: mem[${addr}]: ${e.message}`); }
+      }
+      if (Object.keys(regs).length || Object.keys(mem).length) {
+        // Track as baseline for change detection, but don't paint
+        const baseline = {};
+        for (const [reg, val] of Object.entries(regs)) {
+          baseline[reg] = Number(val) >>> 0;
+        }
+        lastRegs = baseline;
+        log(`Applied ${Object.keys(regs).length} register(s), ${Object.keys(mem).length} memory value(s).`);
+      }
+      updateMemoryView();
+    }
+  });
+}
+
+// Clear: removes all student-set initial value rows AND resets the emulator
+// so CPU state doesn't still hold previously-applied values
+const initClearBtn = document.getElementById('init-clear-btn');
+if (initClearBtn) {
+  initClearBtn.addEventListener('click', () => {
+    const regsContainer = document.getElementById('student-init-regs');
+    const memContainer = document.getElementById('student-init-mem');
+    if (regsContainer) regsContainer.innerHTML = '';
+    if (memContainer) memContainer.innerHTML = '';
+
+    // Reset emulator so stale values don't linger in CPU state
+    if (cpu && wasmReady) {
+      resetEmulator();
+      // Re-apply just the lab defaults (without student overrides)
+      if (currentLabData) {
+        populateInitialValuesUI(currentLabData);
+        applyInitialValues(currentLabData);
+      }
+    }
+    log('Cleared student initial values and reset emulator.');
+  });
 }
 
 // ── Attempts display ──────────────────────────────────────────────────────────
@@ -263,6 +419,9 @@ async function showLesson(id) {
   const url = new URL(window.location);
   url.searchParams.set('lesson', id);
   window.history.replaceState({}, '', url);
+
+  // Populate the Initial Values panel with this lab's defaults
+  populateInitialValuesUI(data);
 
   applyInitialValues(data);
 
@@ -524,7 +683,7 @@ function paintRegisters(regObj) {
             data-reg="${name}"
             type="number"
             value="${signed}"
-            style="width:80px"
+            style="width:70px"
           >
         </td>
         <td>${hex32(val)}</td>
