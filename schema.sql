@@ -143,3 +143,12 @@ CREATE TABLE public.course_roster (
     CONSTRAINT course_roster_added_by_fkey FOREIGN KEY (added_by) REFERENCES public.users(user_id),
     CONSTRAINT course_roster_asurite_course_uq UNIQUE (asurite, course_id)
 );
+
+CREATE TABLE public.run_telemetry (
+    telemetry_id uuid DEFAULT public.uuid_generate_v4() PRIMARY KEY,
+    user_id uuid NOT NULL REFERENCES public.users(user_id),
+    lab_id character varying(50) NOT NULL REFERENCES public.labs(lab_id),
+    source_code text NOT NULL,
+    executed_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
+    is_step boolean DEFAULT false
+);

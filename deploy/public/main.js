@@ -743,6 +743,26 @@ let currentLessonId = null;
 let labOpenedAt = null;   // timestamp when student opened/switched to this lab
 let runCount = 0;         // number of Run/Step clicks since opening the lab
 
+// Helper to log telemetry only at start of execution
+async function logRunTelemetry(isStep = false) {
+  if (!currentLessonId) return;
+  const sourceCode = cpuEditor.getValue();
+  try {
+    await fetch('/api/grade/log-run', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        lab_id: currentLessonId,
+        source_code: sourceCode,
+        is_step: isStep
+      }),
+      credentials: 'include'
+    });
+  } catch (err) {
+    console.warn("Telemetry log failed", err);
+  }
+}
+
 // uses coldmirror
 
 CodeMirror.defineSimpleMode("mips-custom", {
@@ -853,8 +873,15 @@ function updateMemoryView(highlightAddr = null, highlightSize = 0) {
   if (!cpu || !wasmReady || !memView) return;
 
   // get address
-  let addrStr = memStartInput ? memStartInput.value : "0x10000000";
-  let startAddr = parseInt(addrStr, 16);
+  let addrStr = memStartInput ? memStartInput.value.trim() : "0x10000000";
+  let startAddr;
+
+  // Support both Hex (0x...) and Decimal
+  if (addrStr.toLowerCase().startsWith('0x')) {
+    startAddr = parseInt(addrStr, 16);
+  } else {
+    startAddr = parseInt(addrStr, 10);
+  }
 
   // default to 0x10000000 if input is empty or garbage (NaN)
   if (isNaN(startAddr)) {
@@ -1154,6 +1181,8 @@ if (runBtn) {
 
     if (!isProgramLoaded) {
       if (!loadProgram()) return;
+      // Log the code used for this Run session
+      logRunTelemetry(false);
     } else {
       cpu.set_breakpoints(Array.from(breakpoints));
     }
@@ -1175,6 +1204,8 @@ if (stepBtn) {
     }
 
     if (!isProgramLoaded) {
+      // This is the initial Step: log the source code now
+      logRunTelemetry(true);
       if (!loadProgram()) return;
     }
 

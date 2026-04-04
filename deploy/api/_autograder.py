@@ -339,6 +339,34 @@ def grade_submission():
         return jsonify({'error': 'Grading failed — please try again'}), 500
 
 
+@simple_autograder_bp.route('/log-run', methods=['POST'])
+def log_run():
+    if 'user_id' not in session:
+        return jsonify({'error': 'Unauthorized'}), 401
+    
+    data = request.get_json()
+    lab_id = data.get('lab_id')
+    source_code = (data.get('source_code') or '').strip().replace('\n', '\\n')
+    is_step = data.get('is_step', False)
+
+    conn = get_db_connection()
+    if not conn:
+        return jsonify({'error': 'DB connection failed'}), 500
+    try:
+        cur = conn.cursor()
+        cur.execute("""
+            INSERT INTO run_telemetry (user_id, lab_id, source_code, is_step)
+            VALUES (%s, %s, %s, %s)
+        """, (session['user_id'], lab_id, source_code, is_step))
+        conn.commit()
+        return jsonify({'success': True})
+    except Exception as e:
+        log.error("Telemetry error: %s", e)
+        return jsonify({'error': 'Failed to log run'}), 500
+    finally:
+        conn.close()
+
+
 @simple_autograder_bp.route('/attempts/<lab_id>', methods=['GET'])
 def get_attempts(lab_id):
     if 'user_id' not in session:

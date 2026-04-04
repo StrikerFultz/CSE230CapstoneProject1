@@ -154,11 +154,14 @@ function renderDetail(data) {
 
   const allSubs = labs.flatMap(l => l.submissions || []);
   const subsWithTime = allSubs.filter(s => s.duration_seconds != null);
+  
+  const totalRuns = allSubs.reduce((a, s) => a + (s.run_count || 0), 0);
+
   const avgTimeSec = subsWithTime.length
     ? Math.round(subsWithTime.reduce((a, s) => a + s.duration_seconds, 0) / subsWithTime.length)
     : null;
   const avgRuns = subsWithTime.length
-    ? (subsWithTime.reduce((a, s) => a + (s.run_count || 0), 0) / subsWithTime.length).toFixed(1)
+    ? (totalRuns / subsWithTime.length).toFixed(1)
     : null;
   const flaggedCount = allSubs.filter(s => s.timing_flagged).length;
 
@@ -170,6 +173,10 @@ function renderDetail(data) {
     <div class="stu-stat">
       <div class="stu-stat-num">${totalSubs}</div>
       <div class="stu-stat-label">Total submissions</div>
+    </div>
+    <div class="stu-stat">
+      <div class="stu-stat-num">${totalRuns}</div>
+      <div class="stu-stat-label">Total runs (all labs)</div>
     </div>
     <div class="stu-stat">
       <div class="stu-stat-num">${avgPct}%</div>
@@ -204,11 +211,6 @@ function renderDetail(data) {
     const statusText = !hasAttempt ? 'Not attempted' : pct == 100 ? 'Perfect' : `${pct}%`;
     const statusClass = !hasAttempt ? 'stu-status-none' : pct == 100 ? 'stu-status-perfect' : '';
 
-    let latestDate = '';
-    if (lab.latest_submission) {
-      latestDate = new Date(lab.latest_submission.submitted_at).toLocaleString();
-    }
-
     card.innerHTML = `
       <div class="stu-lab-header">
         <div class="stu-lab-header-left">
@@ -224,6 +226,13 @@ function renderDetail(data) {
       </div>
       <div class="stu-lab-body">
         ${!hasAttempt ? '<div class="stu-lab-empty">No submissions yet</div>' : renderSubmissionTable(lab)}
+        
+        <div class="stu-run-history" style="margin-top: 15px; border-top: 1px solid #eee; padding-top: 10px;">
+          <details class="stu-run-details">
+            <summary style="cursor:pointer; font-size: 13px; color: #666; font-weight: 600;">View Run History (${lab.telemetry ? lab.telemetry.length : 0} runs)</summary>
+            ${renderRunTable(lab.telemetry || [])}
+          </details>
+        </div>
       </div>
     `;
 
@@ -302,6 +311,37 @@ function renderSubmissionTable(lab) {
       <thead>
         <tr><th>#</th><th>Submitted</th><th>Score</th><th>%</th><th>Time Spent</th><th>Runs</th><th></th></tr>
       </thead>
+      <tbody>${rows}</tbody>
+    </table>
+  `;
+}
+
+function renderRunTable(telemetry) {
+  if (!telemetry.length) return '<div class="stu-lab-empty">No run history recorded</div>';
+  
+  let rows = '';
+  telemetry.forEach((t, idx) => {
+    const date = new Date(t.executed_at).toLocaleString();
+    const type = t.is_step ? 'Step' : 'Run';
+    const code = (t.source_code || '').replace(/\\n/g, '\n');
+
+    rows += `
+      <tr>
+        <td style="font-size: 12px;">${date}</td>
+        <td><span class="chip" style="font-size: 10px; padding: 2px 6px; background: #eee; border-radius: 4px;">${type}</span></td>
+        <td>
+          <details class="stu-sub-code-details">
+            <summary style="font-size: 11px; color: #3498db; cursor: pointer;">Code</summary>
+            <pre class="stu-sub-code" style="max-height: 150px; overflow-y: auto;">${escapeHTML(code)}</pre>
+          </details>
+        </td>
+      </tr>
+    `;
+  });
+
+  return `
+    <table class="stu-sub-table" style="margin-top: 10px;">
+      <thead><tr><th>Timestamp</th><th>Type</th><th>Code Snapshot</th></tr></thead>
       <tbody>${rows}</tbody>
     </table>
   `;

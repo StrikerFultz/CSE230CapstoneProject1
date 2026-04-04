@@ -535,6 +535,15 @@ def get_student_detail(user_id):
             FROM submissions WHERE user_id = %s ORDER BY submitted_at DESC
         """, (user_id,))
         submissions = cursor.fetchall()
+
+        # --- NEW TELEMETRY QUERY ---
+        cursor.execute("""
+            SELECT lab_id, source_code, executed_at, is_step
+            FROM run_telemetry 
+            WHERE user_id = %s 
+            ORDER BY executed_at DESC
+        """, (user_id,))
+        telemetry = cursor.fetchall()
         conn.close()
 
         subs_by_lab = {}
@@ -553,10 +562,19 @@ def get_student_detail(user_id):
                 'timing_flagged':   sub.get('timing_flagged', False),
             })
 
+        tel_by_lab = {}
+        for t in telemetry:
+            tel_by_lab.setdefault(t['lab_id'], []).append({
+                'source_code': t['source_code'],
+                'executed_at': t['executed_at'].isoformat(),
+                'is_step': t['is_step']
+            })
+
         lab_details = []
         for lab in all_labs:
             lid = lab['lab_id']
             lab_subs = subs_by_lab.get(lid, [])
+            lab_tel  = tel_by_lab.get(lid, []) # NEW
             best_score = max((s['score'] for s in lab_subs), default=None)
             best_possible = lab_subs[0]['total_possible'] if lab_subs else lab['total_points']
 
@@ -567,6 +585,7 @@ def get_student_detail(user_id):
                 'best_possible': best_possible,
                 'latest_submission': lab_subs[0] if lab_subs else None,
                 'submissions': lab_subs,
+                'telemetry': lab_tel
             })
 
         return jsonify({
