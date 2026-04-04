@@ -46,7 +46,7 @@ impl CPU {
             breakpoints: HashSet::new(),
             validation_stack: Vec::new(),
             last_mem_access: None,
-            max_instructions: 10_000
+            max_instructions: 1_000_000
         }
     }
 

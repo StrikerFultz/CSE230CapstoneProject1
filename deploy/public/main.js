@@ -618,34 +618,44 @@ const INTERESTING = /^\$(?:s[0-7]|t[0-9]|a[0-3]|v[0-1])$/i;
 // hide unless changed
 const SYSTEM = /^\$(?:zero|gp|sp|fp|ra|at|k0|k1|lo|hi)$/i;
 
-function filterForTab(curr, prev) {
+function filterForTab(curr, prev, usedNames) {
   const out = {};
 
   for (const [name, val] of Object.entries(curr)) {
     const now = toNumber(val);
-
-    // if don't have a previous snapshot treat it as "same as now"
-    // so changed will be false on first run
     const hadPrev = Object.prototype.hasOwnProperty.call(prev, name);
     const was = hadPrev ? toNumber(prev[name]) : now;
 
     const changed = now !== was;
     const nonZero = now !== 0;
+    const isExplicitlyUsed = usedNames.has(name.toLowerCase());
 
-    if (INTERESTING.test(name)) {
-      if (nonZero || changed) out[name] = now;
-      continue;
+    // Show if: 1. Used in code/initial values, 2. Value changed, 3. Interesting & non-zero
+    if (isExplicitlyUsed || changed) {
+      out[name] = now;
+    } else if (INTERESTING.test(name) && nonZero) {
+      out[name] = now;
     }
-
-    if (SYSTEM.test(name)) {
-      if (changed) out[name] = now;
-      continue;
-    }
-    // other regs show only if nonzero or changed
-    if (nonZero || changed) out[name] = now;
   }
 
   return out;
+}
+
+function getUsedRegisterNames() {
+  const names = new Set();
+  
+  // Scan code in editor
+  const code = cpuEditor.getValue();
+  const codeMatches = code.match(/\$[a-z0-9]+/gi);
+  if (codeMatches) {
+    codeMatches.forEach(m => names.add(m.toLowerCase()));
+  }
+
+  // Scan Initial Values UI
+  const initRegs = readInitKV('student-init-regs');
+  Object.keys(initRegs).forEach(k => names.add(k.toLowerCase()));
+
+  return names;
 }
 
 // add 11/14 (make reg table editable)
@@ -1035,7 +1045,10 @@ function handleWasmResult(result, { fromRun = false } = {}) {
                   (result && result.registers) || {};
                   
   const allRegs = coerceRegs(rawRegs);
-  const tabRegs = filterForTab(allRegs, lastRegs);
+
+  const usedNames = getUsedRegisterNames();
+  const tabRegs = filterForTab(allRegs, lastRegs, usedNames);
+  
   paintRegisters(tabRegs);
 
   // handle memory read/write
