@@ -251,6 +251,11 @@
       }
     });
 
+    document.getElementById('signup-asuid').addEventListener('input', (e) => {
+      // Removes any non-digit character as the student types
+      e.target.value = e.target.value.replace(/\D/g, '').substring(0, 10);
+    });
+
     document.getElementById('signup-btn').addEventListener('click', async () => {
       const asurite = document.getElementById('signup-asurite').value.trim();
       const email = document.getElementById('signup-email').value.trim();
@@ -266,6 +271,12 @@
 
       if (!asurite || !email || !fullName || !password) {
         errorEl.textContent = 'Please fill in all required fields.';
+        return;
+      }
+
+      // ASU ID format validation
+      if (!/^\d{10}$/.test(asuId)) {
+        errorEl.textContent = 'ASU ID must be exactly 10 digits (numbers only).';
         return;
       }
 
