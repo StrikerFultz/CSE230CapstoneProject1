@@ -102,7 +102,6 @@ if (searchEl) {
 async function selectStudent(userId) {
   selectedUserId = userId;
 
-  // Highlight in roster
   rosterEl.querySelectorAll('.stu-roster-item').forEach(el => {
     el.classList.toggle('active', el.dataset.userId === userId);
   });
@@ -125,7 +124,6 @@ function renderDetail(data) {
   const stu = data.student;
   const labs = data.labs;
 
-  // ── Header card ──
   const joined = stu.created_at ? new Date(stu.created_at).toLocaleDateString() : '—';
   const lastLogin = stu.last_login ? new Date(stu.last_login).toLocaleString() : 'Never';
 
@@ -143,7 +141,6 @@ function renderDetail(data) {
     </div>
   `;
 
-  // ── Summary stats ──
   const attempted = labs.filter(l => l.attempt_count > 0).length;
   const totalLabs = labs.length;
   const totalSubs = labs.reduce((n, l) => n + l.attempt_count, 0);
@@ -155,7 +152,6 @@ function renderDetail(data) {
 
   const perfect = scoresWithAttempts.filter(l => l.best_score === l.best_possible).length;
 
-  // Compute average time per attempt across all submissions
   const allSubs = labs.flatMap(l => l.submissions || []);
   const subsWithTime = allSubs.filter(s => s.duration_seconds != null);
   const avgTimeSec = subsWithTime.length
@@ -197,7 +193,6 @@ function renderDetail(data) {
     </div>` : ''}
   `;
 
-  // ── Per-lab list ──
   labsList.innerHTML = '';
   labs.forEach(lab => {
     const card = document.createElement('div');
@@ -232,7 +227,6 @@ function renderDetail(data) {
       </div>
     `;
 
-    // Toggle expand (ignore clicks on the reset button)
     card.querySelector('.stu-lab-header').addEventListener('click', (e) => {
       if (e.target.classList.contains('stu-reset-btn')) return;
       card.querySelector('.stu-lab-body').classList.toggle('open');
@@ -251,7 +245,6 @@ function renderSubmissionTable(lab) {
     const rowClass = isBest ? 'stu-sub-best' : '';
     const uniqueId = `sub-${lab.lab_id}-${idx}`;
 
-    // Parse test results
     let detailHTML = '';
     let results = sub.test_results;
     if (typeof results === 'string') { try { results = JSON.parse(results); } catch(_) { results = []; } }
@@ -278,7 +271,6 @@ function renderSubmissionTable(lab) {
       detailHTML += '</div>';
     }
 
-    // Source code preview
     const codeTruncated = (sub.source_code || '').replace(/\\n/g, '\n');
     detailHTML += `<details class="stu-sub-code-details">
       <summary>View source code</summary>
@@ -332,7 +324,6 @@ function formatDuration(seconds) {
   return rm > 0 ? `${h}h ${rm}m` : `${h}h`;
 }
 
-// Delegate detail expand buttons
 document.addEventListener('click', (e) => {
   if (e.target.classList.contains('stu-expand-btn')) {
     const target = document.getElementById(e.target.dataset.target);
@@ -340,11 +331,10 @@ document.addEventListener('click', (e) => {
   }
 });
 
-// Delegate reset-attempts buttons
 document.addEventListener('click', async (e) => {
   if (!e.target.classList.contains('stu-reset-btn')) return;
 
-  e.stopPropagation(); // don't toggle the lab card expand
+  e.stopPropagation();
 
   const labId = e.target.dataset.labId;
   const userId = selectedUserId;
@@ -354,15 +344,137 @@ document.addEventListener('click', async (e) => {
 
   try {
     await apiRequest(`/grade/attempts/${labId}/${userId}`, { method: 'DELETE' });
-    // Refresh the student detail to reflect the reset
     selectStudent(userId);
   } catch (err) {
     alert('Failed to reset attempts: ' + err.message);
   }
 });
 
+// ─── Roster Management ───
+
+const rosterFileInput  = document.getElementById('roster-file-input');
+const rosterTableEl    = document.getElementById('roster-table');
+const rosterTbody      = document.getElementById('roster-tbody');
+const rosterEmptyEl    = document.getElementById('roster-empty');
+const rosterCountEl    = document.getElementById('roster-count');
+const rosterStatusEl   = document.getElementById('roster-status');
+const rosterClearBtn   = document.getElementById('roster-clear-btn');
+
+async function loadCourseRoster() {
+  try {
+    const entries = await apiRequest('/roster');
+    renderCourseRoster(entries);
+  } catch (err) {
+    if (rosterEmptyEl) {
+      rosterEmptyEl.style.display = '';
+      rosterEmptyEl.textContent = 'Error: ' + err.message;
+      rosterEmptyEl.style.color = '#c62828';
+    }
+  }
+}
+
+function renderCourseRoster(entries) {
+  if (!rosterCountEl || !rosterTbody) return;
+
+  const registered = entries.filter(e => e.is_registered).length;
+  rosterCountEl.textContent = `${registered} / ${entries.length} registered`;
+
+  if (!entries.length) {
+    rosterTableEl.style.display = 'none';
+    rosterEmptyEl.style.display = '';
+    rosterEmptyEl.textContent = 'No roster uploaded yet. Use the upload button above to import your class list.';
+    rosterEmptyEl.style.color = '';
+    return;
+  }
+
+  rosterEmptyEl.style.display = 'none';
+  rosterTableEl.style.display = '';
+
+  rosterTbody.innerHTML = '';
+  entries.forEach(e => {
+    const tr = document.createElement('tr');
+    if (e.is_registered) tr.className = 'roster-row-registered';
+
+    const statusColor = e.is_registered ? '#2e7d32' : '#888';
+    const statusLabel = e.is_registered ? 'Registered' : 'Pending';
+    const statusDot   = e.is_registered
+      ? '<span class="roster-dot roster-dot-green"></span>'
+      : '<span class="roster-dot roster-dot-gray"></span>';
+
+    tr.innerHTML = `
+      <td style="font-weight:600;">${escapeHTML(e.full_name || '—')}</td>
+      <td><code>${escapeHTML(e.asurite)}</code></td>
+      <td>${escapeHTML(e.asu_id || '—')}</td>
+      <td>${escapeHTML(e.email || '—')}</td>
+      <td>${statusDot} <span style="color:${statusColor};">${statusLabel}</span></td>
+      <td><button class="btn-ghost roster-delete-btn" data-id="${e.roster_id}">Remove</button></td>
+    `;
+    rosterTbody.appendChild(tr);
+  });
+}
+
+if (rosterFileInput) {
+  rosterFileInput.addEventListener('change', async () => {
+    const file = rosterFileInput.files[0];
+    if (!file) return;
+
+    rosterStatusEl.textContent = 'Uploading…';
+    rosterStatusEl.className = 'roster-status';
+
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+      const res = await fetch(`${API_BASE}/roster/upload`, {
+        method: 'POST',
+        credentials: 'include',
+        body: formData,
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Upload failed');
+
+      rosterStatusEl.className = 'roster-status roster-status-ok';
+      rosterStatusEl.textContent = data.message;
+      loadCourseRoster();
+      loadRoster();
+    } catch (err) {
+      rosterStatusEl.className = 'roster-status roster-status-err';
+      rosterStatusEl.textContent = err.message;
+    }
+
+    rosterFileInput.value = '';
+  });
+}
+
+document.addEventListener('click', async (e) => {
+  if (!e.target.classList.contains('roster-delete-btn')) return;
+  const id = e.target.dataset.id;
+  if (!id) return;
+  try {
+    await apiRequest(`/roster/${id}`, { method: 'DELETE' });
+    loadCourseRoster();
+  } catch (err) {
+    alert('Failed to delete: ' + err.message);
+  }
+});
+
+if (rosterClearBtn) {
+  rosterClearBtn.addEventListener('click', async () => {
+    if (!confirm('This will remove ALL roster entries. Students who already signed up will keep their accounts.\n\nAre you sure?')) return;
+    try {
+      await apiRequest('/roster/clear', { method: 'DELETE' });
+      loadCourseRoster();
+      rosterStatusEl.className = 'roster-status roster-status-ok';
+      rosterStatusEl.textContent = 'Roster cleared.';
+    } catch (err) {
+      alert('Failed: ' + err.message);
+    }
+  });
+}
+
 // ─── Init ───
 
 (async () => {
   await loadRoster();
+  loadCourseRoster();
 })();

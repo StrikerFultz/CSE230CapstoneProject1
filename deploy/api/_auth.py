@@ -22,7 +22,6 @@ def signup():
     full_name = (data.get('full_name') or '').strip()
     asu_id   = (data.get('asu_id')    or '').strip()
     password = data.get('password', '')
-    role     = data.get('role', 'student')
 
     if not asurite or not email or not full_name or not password:
         return jsonify({'error': 'All fields are required'}), 400
@@ -30,8 +29,6 @@ def signup():
         return jsonify({'error': 'Must use an @asu.edu email address'}), 400
     if len(password) < 4:
         return jsonify({'error': 'Password must be at least 4 characters'}), 400
-    if role not in ('student', 'instructor', 'ta'):
-        return jsonify({'error': 'Invalid role'}), 400
 
     conn = get_db_connection()
     if not conn:
@@ -39,13 +36,29 @@ def signup():
 
     try:
         cursor = conn.cursor(cursor_factory=RealDictCursor)
+
+        cursor.execute("""
+            SELECT roster_id, full_name AS roster_name FROM course_roster
+            WHERE asurite = %s AND (asu_id = %s OR %s = '')
+            LIMIT 1
+        """, (asurite, asu_id, asu_id))
+        roster_entry = cursor.fetchone()
+
+        if not roster_entry:
+            return jsonify({'error': 'You are not on the course roster. Contact your instructor if you believe this is an error.'}), 403
+
         cursor.execute("""
             INSERT INTO users (username, email, full_name, asu_id, password_hash, role)
-            VALUES (%s, %s, %s, %s, %s, %s)
+            VALUES (%s, %s, %s, %s, %s, 'student')
             RETURNING user_id, username, email, full_name, asu_id, role
-        """, (asurite, email, full_name, asu_id, generate_password_hash(password), role))
+        """, (asurite, email, full_name, asu_id, generate_password_hash(password)))
 
         user = cursor.fetchone()
+
+        cursor.execute("""
+            UPDATE course_roster SET is_registered = true WHERE asurite = %s
+        """, (asurite,))
+
         conn.commit()
 
         session['user_id']  = str(user['user_id'])

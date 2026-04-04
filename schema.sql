@@ -126,3 +126,20 @@ CREATE TABLE public.user_sessions (
     CONSTRAINT user_sessions_pkey PRIMARY KEY (session_id),
     CONSTRAINT user_sessions_user_fkey FOREIGN KEY (user_id) REFERENCES public.users(user_id)
 );
+
+-- Course roster (instructor-uploaded student whitelist for signup validation)
+CREATE TABLE public.course_roster (
+    roster_id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    course_id uuid NOT NULL,
+    asurite character varying(50) NOT NULL,
+    asu_id character varying(20),
+    full_name character varying(255),
+    email character varying(255),
+    added_by uuid,
+    added_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
+    is_registered boolean DEFAULT false,
+    CONSTRAINT course_roster_pkey PRIMARY KEY (roster_id),
+    CONSTRAINT course_roster_course_fkey FOREIGN KEY (course_id) REFERENCES public.courses(course_id),
+    CONSTRAINT course_roster_added_by_fkey FOREIGN KEY (added_by) REFERENCES public.users(user_id),
+    CONSTRAINT course_roster_asurite_course_uq UNIQUE (asurite, course_id)
+);

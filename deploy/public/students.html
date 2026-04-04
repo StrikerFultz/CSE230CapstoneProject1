@@ -39,7 +39,7 @@
       </div>
     </aside>
 
-    <!-- Right: Student detail -->
+    <!-- Right: Student detail + Roster viewer -->
     <section class="pane editor-pane stu-detail-pane">
       <div id="stu-placeholder" class="stu-placeholder">
         <div class="stu-placeholder-icon">👤</div>
@@ -47,17 +47,46 @@
       </div>
 
       <div id="stu-detail" class="stu-detail" style="display:none;">
-
-        <!-- Header card -->
         <div class="stu-header-card" id="stu-header-card"></div>
-
-        <!-- Summary stats row -->
         <div class="stu-stats-row" id="stu-stats-row"></div>
-
-        <!-- Per-lab breakdown -->
         <div class="stu-labs-section">
           <div class="stu-labs-title">Lab Submissions</div>
           <div id="stu-labs-list" class="stu-labs-list"></div>
+        </div>
+      </div>
+
+      <!-- Course Roster Section -->
+      <div class="export-section" id="roster-section">
+        <div class="export-header">
+          <span>Course Roster</span>
+          <div class="roster-header-actions">
+            <small id="roster-count"></small>
+            <label class="roster-upload-btn">
+              Upload (.csv / .xlsx)
+              <input type="file" id="roster-file-input" accept=".csv,.xlsx,.xls" style="display:none" />
+            </label>
+            <a href="/api/roster/template" class="roster-action-link" title="Download a CSV template">Template ↓</a>
+            <button id="roster-clear-btn" class="roster-action-link roster-clear-link" title="Remove all roster entries">Clear All</button>
+          </div>
+        </div>
+
+        <div id="roster-status" class="roster-status"></div>
+
+        <div class="roster-table-wrap" id="roster-table-wrap">
+          <table class="roster-table" id="roster-table" style="display:none;">
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>ASURITE</th>
+                <th>ASU ID</th>
+                <th>Email</th>
+                <th>Status</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="roster-tbody"></tbody>
+          </table>
+          <div id="roster-empty" class="tc-empty">No roster uploaded yet. Use the upload button above to import your class list.</div>
         </div>
       </div>
     </section>

@@ -121,12 +121,11 @@
       margin-top: 8px;
     }
 
-    .role-select {
-      width: 100%;
-      padding: 6px 8px;
-      font-size: 13px;
-      border: 1px solid #999;
-      border-radius: 2px;
+    .roster-notice {
+      font-size: 11px;
+      color: #666;
+      margin: 8px 0 0;
+      text-align: center;
     }
   </style>
 </head>
@@ -145,7 +144,7 @@
 
       <div class="auth-tabs">
         <div class="auth-tab active" data-tab="login">Log In</div>
-        <div class="auth-tab" data-tab="signup">Sign Up</div>
+        <div class="auth-tab" data-tab="signup">Student Sign Up</div>
       </div>
 
       <div id="login-form" class="auth-form active">
@@ -190,15 +189,7 @@
           <input id="signup-password" type="password" placeholder="At least 4 characters" autocomplete="new-password" />
         </div>
 
-        <div class="field">
-          <label for="signup-role">Role</label>
-          <select id="signup-role" class="role-select">
-            <option value="student">Student</option>
-            <option value="ta">Teaching Assistant</option>
-            <option value="instructor">Instructor</option>
-          </select>
-        </div>
-
+        <p class="roster-notice">You must be on the course roster to sign up. Contact your instructor if you are not enrolled.</p>
         <button id="signup-btn" class="auth-btn signup-btn">Create Account</button>
         <p id="signup-error" class="auth-error"></p>
         <p id="signup-success" class="auth-success"></p>
@@ -247,7 +238,6 @@
           return;
         }
 
-        // Redirect based on role
         const role = data.user.role;
         if (role === 'instructor') {
           localStorage.setItem('professorAuthed', 'true');
@@ -261,7 +251,6 @@
       }
     });
 
-    // signup
     document.getElementById('signup-btn').addEventListener('click', async () => {
       const asurite = document.getElementById('signup-asurite').value.trim();
       const email = document.getElementById('signup-email').value.trim();
@@ -269,7 +258,6 @@
       const asuId = document.getElementById('signup-asuid').value.trim();
 
       const password = document.getElementById('signup-password').value;
-      const role = document.getElementById('signup-role').value;
       const errorEl = document.getElementById('signup-error');
       const successEl = document.getElementById('signup-success');
 
@@ -291,8 +279,7 @@
             email,
             full_name: fullName,
             asu_id: asuId,
-            password,
-            role
+            password
           })
         });
 
@@ -306,13 +293,7 @@
         successEl.textContent = 'Account created! Redirecting...';
 
         setTimeout(() => {
-          const userRole = data.user.role;
-          if (userRole === 'instructor') {
-            localStorage.setItem('professorAuthed', 'true');
-            window.location.href = 'teacher.html';
-          } else {
-            window.location.href = 'index.html';
-          }
+          window.location.href = 'index.html';
         }, 1000);
 
       } catch (err) {
@@ -332,7 +313,6 @@
       });
     });
 
-    // autofill email from ASUrite
     document.getElementById('signup-asurite').addEventListener('input', (e) => {
       const emailEl = document.getElementById('signup-email');
       const asurite = e.target.value.trim().toLowerCase();

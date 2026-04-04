@@ -585,6 +585,243 @@ def get_student_detail(user_id):
         return jsonify({'error': _safe_error(e, 'Failed to load student details')}), 500
 
 
+@app.route('/api/roster', methods=['GET'])
+def get_roster():
+    uid, err = _require_teacher()
+    if err:
+        return jsonify({'error': 'Unauthorized'}), 403 if err == 'not_teacher' else 401
+
+    conn = get_db_connection()
+    if not conn:
+        return jsonify({'error': 'Database connection failed'}), 500
+
+    try:
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+        cursor.execute("""
+            SELECT r.roster_id, r.asurite, r.asu_id, r.full_name, r.email,
+                   r.is_registered, r.added_at,
+                   u.user_id AS registered_user_id
+            FROM course_roster r
+            LEFT JOIN users u ON u.username = r.asurite AND u.role = 'student'
+            ORDER BY r.full_name, r.asurite
+        """)
+        rows = cursor.fetchall()
+        conn.close()
+
+        return jsonify([{
+            'roster_id':    str(r['roster_id']),
+            'asurite':      r['asurite'],
+            'asu_id':       r['asu_id'],
+            'full_name':    r['full_name'],
+            'email':        r['email'],
+            'is_registered': r['is_registered'] or r['registered_user_id'] is not None,
+            'added_at':     r['added_at'].isoformat() if r['added_at'] else None,
+        } for r in rows])
+    except Exception as e:
+        return jsonify({'error': _safe_error(e, 'Failed to load roster')}), 500
+
+
+@app.route('/api/roster/upload', methods=['POST'])
+def upload_roster():
+    uid, err = _require_teacher()
+    if err:
+        return jsonify({'error': 'Unauthorized'}), 403 if err == 'not_teacher' else 401
+
+    if 'file' not in request.files:
+        return jsonify({'error': 'No file provided'}), 400
+
+    file = request.files['file']
+    filename = (file.filename or '').lower()
+
+    try:
+        rows = []
+        if filename.endswith('.csv'):
+            text = file.read().decode('utf-8-sig')
+            reader = csv.DictReader(StringIO(text))
+            for r in reader:
+                rows.append({k.strip().lower(): (v or '').strip() for k, v in r.items()})
+        elif filename.endswith('.xlsx') or filename.endswith('.xls'):
+            if not EXCEL_AVAILABLE:
+                return jsonify({'error': 'Excel support not available on server'}), 500
+            from openpyxl import load_workbook
+            wb = load_workbook(filename=BytesIO(file.read()), read_only=True)
+            ws = wb.active
+            header_row = next(ws.iter_rows(min_row=1, max_row=1, values_only=True))
+            headers = [str(h or '').strip().lower() for h in header_row]
+            for row in ws.iter_rows(min_row=2, values_only=True):
+                d = {}
+                for i, val in enumerate(row):
+                    if i < len(headers):
+                        d[headers[i]] = str(val or '').strip()
+                rows.append(d)
+            wb.close()
+        else:
+            return jsonify({'error': 'Unsupported file type. Use .csv or .xlsx'}), 400
+
+        if not rows:
+            return jsonify({'error': 'File is empty'}), 400
+
+        COL_MAP_ASURITE = {'asurite', 'asurite id', 'asuriteid', 'username'}
+        COL_MAP_ASUID   = {'asu id', 'asuid', 'asu_id', 'student id', 'id number', 'id'}
+        COL_MAP_NAME    = {'full name', 'fullname', 'full_name', 'name', 'student name', 'student'}
+        COL_MAP_EMAIL   = {'email', 'asu email', 'e-mail'}
+
+        def find_col(row_keys, candidates):
+            for k in row_keys:
+                if k in candidates:
+                    return k
+            return None
+
+        sample_keys = list(rows[0].keys())
+        col_asurite = find_col(sample_keys, COL_MAP_ASURITE)
+        col_asuid   = find_col(sample_keys, COL_MAP_ASUID)
+        col_name    = find_col(sample_keys, COL_MAP_NAME)
+        col_email   = find_col(sample_keys, COL_MAP_EMAIL)
+
+        if not col_asurite:
+            return jsonify({'error': 'Could not find an ASURITE column. Expected one of: ' + ', '.join(sorted(COL_MAP_ASURITE))}), 400
+
+        conn = get_db_connection()
+        if not conn:
+            return jsonify({'error': 'Database connection failed'}), 500
+
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+        cursor.execute("SELECT course_id FROM courses LIMIT 1")
+        course = cursor.fetchone()
+        if not course:
+            conn.close()
+            return jsonify({'error': 'No course exists. Create a course first.'}), 400
+        course_id = course['course_id']
+
+        added = 0
+        skipped = 0
+        errors = []
+
+        for i, row in enumerate(rows):
+            asurite = row.get(col_asurite, '').strip().lower()
+            if not asurite:
+                skipped += 1
+                continue
+
+            asu_id    = row.get(col_asuid, '').strip() if col_asuid else ''
+            full_name = row.get(col_name, '').strip() if col_name else ''
+            email     = row.get(col_email, '').strip().lower() if col_email else ''
+            if not email and asurite:
+                email = asurite + '@asu.edu'
+
+            try:
+                cursor.execute("""
+                    INSERT INTO course_roster (course_id, asurite, asu_id, full_name, email, added_by)
+                    VALUES (%s, %s, %s, %s, %s, %s)
+                    ON CONFLICT (asurite, course_id) DO UPDATE SET
+                        asu_id = EXCLUDED.asu_id,
+                        full_name = EXCLUDED.full_name,
+                        email = EXCLUDED.email
+                """, (course_id, asurite, asu_id, full_name, email, uid))
+                added += 1
+            except Exception as row_err:
+                errors.append(f"Row {i+2}: {row_err}")
+                conn.rollback()
+
+        conn.commit()
+        conn.close()
+
+        return jsonify({
+            'message': f'Roster uploaded: {added} added/updated, {skipped} skipped',
+            'added': added,
+            'skipped': skipped,
+            'errors': errors[:10],
+        })
+    except Exception as e:
+        return jsonify({'error': _safe_error(e, 'Failed to process roster file')}), 500
+
+
+@app.route('/api/roster/<roster_id>', methods=['DELETE'])
+def delete_roster_entry(roster_id):
+    uid, err = _require_teacher()
+    if err:
+        return jsonify({'error': 'Unauthorized'}), 403 if err == 'not_teacher' else 401
+
+    conn = get_db_connection()
+    if not conn:
+        return jsonify({'error': 'Database connection failed'}), 500
+
+    try:
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM course_roster WHERE roster_id = %s RETURNING roster_id", (roster_id,))
+        if cursor.rowcount == 0:
+            conn.close()
+            return jsonify({'error': 'Entry not found'}), 404
+        conn.commit()
+        conn.close()
+        return jsonify({'message': 'Roster entry deleted'})
+    except Exception as e:
+        conn.rollback()
+        conn.close()
+        return jsonify({'error': _safe_error(e, 'Failed to delete roster entry')}), 500
+
+
+@app.route('/api/roster/clear', methods=['DELETE'])
+def clear_roster():
+    uid, err = _require_teacher()
+    if err:
+        return jsonify({'error': 'Unauthorized'}), 403 if err == 'not_teacher' else 401
+
+    conn = get_db_connection()
+    if not conn:
+        return jsonify({'error': 'Database connection failed'}), 500
+
+    try:
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM course_roster")
+        count = cursor.rowcount
+        conn.commit()
+        conn.close()
+        return jsonify({'message': f'Cleared {count} roster entries'})
+    except Exception as e:
+        conn.rollback()
+        conn.close()
+        return jsonify({'error': _safe_error(e, 'Failed to clear roster')}), 500
+
+
+@app.route('/api/roster/template', methods=['GET'])
+def roster_template():
+    uid, err = _require_teacher()
+    if err:
+        return jsonify({'error': 'Unauthorized'}), 403 if err == 'not_teacher' else 401
+
+    if not EXCEL_AVAILABLE:
+        return jsonify({'error': 'Excel support not available on server'}), 500
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Roster"
+
+    headers = ['ASURITE', 'ASU ID', 'Full Name', 'Email']
+    for col_idx, header in enumerate(headers, 1):
+        cell = ws.cell(row=1, column=col_idx, value=header)
+        cell.font = Font(bold=True, color="FFFFFF")
+        cell.fill = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")
+        cell.alignment = Alignment(horizontal="center")
+
+    example = ['jdoe42', '1234567890', 'Jane Doe', 'jdoe42@asu.edu']
+    for col_idx, val in enumerate(example, 1):
+        ws.cell(row=2, column=col_idx, value=val)
+
+    for col_idx, width in enumerate([15, 15, 25, 30], 1):
+        ws.column_dimensions[chr(64 + col_idx)].width = width
+
+    output = BytesIO()
+    wb.save(output)
+    output.seek(0)
+
+    return send_file(output,
+        mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        as_attachment=True,
+        download_name='roster_template.xlsx'
+    )
+
+
 @app.route('/api/export/grades/<lab_id>', methods=['GET'])
 def export_grades_excel(lab_id):
     uid, err = _require_teacher()
