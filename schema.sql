@@ -49,6 +49,7 @@ CREATE TABLE public.labs (
     due_date timestamp with time zone,
     is_published boolean DEFAULT false,
     difficulty character varying(20) DEFAULT 'intermediate',
+    use_isolation boolean DEFAULT false,
     CONSTRAINT labs_pkey PRIMARY KEY (lab_id),
     CONSTRAINT labs_course_fkey FOREIGN KEY (course_id) REFERENCES public.courses(course_id)
 );

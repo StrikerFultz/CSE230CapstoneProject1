@@ -70,6 +70,7 @@ const memViewEl     = document.getElementById('tg-mem-view');
 const capturedMemEl = document.getElementById('tg-captured-mem');
 const saveBtn       = document.getElementById('tg-save');
 const loadStarterBtn = document.getElementById('tg-load-starter');
+const simulateIsoEl = document.getElementById('tg-simulate-isolation');
 
 let labsCache = {};
 
@@ -99,7 +100,6 @@ function coerceRegs(raw) {
   return {};
 }
 
-// Key-value row helpers (shared with teacher page pattern)
 function addKVRow(containerId, keyPH, valPH, keyVal, valVal) {
   const container = document.getElementById(containerId);
   if (!container) return;
@@ -128,7 +128,15 @@ function readKV(containerId) {
     const inputs = row.querySelectorAll('input');
     const k = inputs[0].value.trim();
     const v = inputs[1].value.trim();
-    if (k) { obj[k] = isNaN(Number(v)) ? v : Number(v); }
+    if (k) {
+      let numVal;
+      if (v.toLowerCase().startsWith('0x')) {
+        numVal = parseInt(v, 16);
+      } else {
+        numVal = Number(v);
+      }
+      obj[k] = isNaN(numVal) ? 0 : numVal;
+    }
   });
   return obj;
 }
@@ -152,7 +160,6 @@ async function loadLabs() {
   }
 }
 
-// Load starter code from selected lab
 if (loadStarterBtn) {
   loadStarterBtn.addEventListener('click', () => {
     const labId = labSelect.value;
@@ -213,7 +220,8 @@ function handleResult(result, { fromRun = false } = {}) {
   const rawRegs = (result?.snapshot?.registers) || (result?.registers) || {};
   allRegsSnapshot = coerceRegs(rawRegs);
 
-  updateMemView();
+  const hlAddr = result?.snapshot?.memory_access_addr ?? null;
+  updateMemView(hlAddr);
 
   if (result?.error === 'Termination' || fromRun) {
     isProgramLoaded = false;
@@ -248,18 +256,28 @@ function handleResult(result, { fromRun = false } = {}) {
 
 runBtn?.addEventListener('click', async () => {
   if (!wasmReady || !cpu) { log('WASM not ready.'); return; }
+  
+  if (simulateIsoEl && simulateIsoEl.checked) {
+      cpu.set_isolation(true);
+  }
+
   if (!isProgramLoaded) { if (!loadProgram()) return; }
   log('Running…');
   runStatus.textContent = '…';
   runStatus.style.color = '#555';
-  await new Promise(requestAnimationFrame);
-  const result = cpu.run();
-  handleResult(result, { fromRun: true });
+  
+  try {
+    await new Promise(requestAnimationFrame);
+    const result = cpu.run();
+    handleResult(result, { fromRun: true });
+  } finally {
+    cpu.set_isolation(false);
+  }
 });
 
 stepBtn?.addEventListener('click', async () => {
   if (!wasmReady || !cpu) { log('WASM not ready.'); return; }
-  if (!isProgramLoaded) { if (!loadProgram()) return; return; }
+  if (!isProgramLoaded) { if (!loadProgram()) return; }
   const nextInsn = cpu.next_instruction();
   log(nextInsn);
   if (nextInsn === '---') {
@@ -295,12 +313,11 @@ function renderResultRegisters(regs) {
     const isZero = v === 0;
     const isSys = SYSTEM_RE.test(name);
 
-    // Pre-check interesting non-zero registers
-    const preChecked = (!isSys && !isZero) || INTERESTING_RE.test(name) && !isZero;
+    const preChecked = (!isSys && !isZero) || (INTERESTING_RE.test(name) && !isZero);
     const dimClass = (isSys && isZero) ? 'tg-reg-dim' : '';
 
     html += `<tr class="${dimClass}">
-      <td><input type="checkbox" class="tg-reg-cb" data-reg="${name}" data-val="${v}" ${preChecked ? 'checked' : ''} /></td>
+      <td><input type="checkbox" class="tg-reg-cb" data-reg="${name}" data-val="${signed}" ${preChecked ? 'checked' : ''} /></td>
       <td class="reg-name">${name}</td>
       <td>${signed}</td>
       <td style="font-family:monospace;">${hex32(v)}</td>
@@ -322,11 +339,17 @@ selectAllBtn?.addEventListener('click', () => {
 
 const MEM_CHUNK = 128;
 
-function updateMemView() {
+function updateMemView(highlightAddr = null) {
   if (!cpu || !wasmReady || !memViewEl) return;
   let addrStr = memAddrInput?.value || '0x10000000';
-  let startAddr = parseInt(addrStr, 16);
+  let startAddr = addrStr.toLowerCase().startsWith('0x') ? parseInt(addrStr, 16) : parseInt(addrStr, 10);
+  
   if (isNaN(startAddr)) startAddr = 0x10000000;
+
+  if (typeof highlightAddr === 'number') {
+    startAddr = Math.floor(highlightAddr / 16) * 16;
+    memAddrInput.value = hex32(startAddr);
+  }
 
   let bytes;
   try { bytes = cpu.get_memory(startAddr, MEM_CHUNK); } catch(e) { return; }
@@ -339,15 +362,20 @@ function updateMemView() {
 
     let hexStr = '', asciiStr = '';
     for (let j = 0; j < 16; j++) {
+      const byteAddr = rowAddr + j;
+      const isHighlighted = (typeof highlightAddr === 'number' && byteAddr >= highlightAddr && byteAddr < highlightAddr + 4);
+      const activeClass = isHighlighted ? 'mem-highlight' : '';
+
       if (j < slice.length) {
-        hexStr += slice[j].toString(16).toUpperCase().padStart(2, '0') + ' ';
-        const c = slice[j];
-        asciiStr += (c >= 32 && c <= 126) ? String.fromCharCode(c) : '.';
-      } else { hexStr += '   '; }
+        const val = slice[j];
+        hexStr += `<span class="byte-val ${activeClass}">${val.toString(16).toUpperCase().padStart(2, '0')}</span> `;
+        asciiStr += (val >= 32 && val <= 126) ? String.fromCharCode(val) : '.';
+      } else { 
+        hexStr += '   '; 
+      }
       if (j === 7) hexStr += ' ';
     }
 
-    // Each row is clickable to capture a word
     html += `<div class="mem-row tg-mem-row" data-addr="${rowAddr}">
       <span class="m-addr">${addrFmt}</span>
       <span class="m-hex">${hexStr}</span>
@@ -357,18 +385,16 @@ function updateMemView() {
 
   memViewEl.innerHTML = html;
 
-  // Click to capture a memory word
   memViewEl.querySelectorAll('.tg-mem-row').forEach(row => {
     row.addEventListener('click', () => {
       const addr = parseInt(row.dataset.addr);
       if (isNaN(addr)) return;
-      // Read the 4-byte word at this address
       try {
         const wordBytes = cpu.get_memory(addr, 4);
         const val = wordBytes[0] | (wordBytes[1] << 8) | (wordBytes[2] << 16) | (wordBytes[3] << 24);
-        const uval = val >>> 0;
-        addKVRow('tg-captured-mem', '268435456', '0', String(addr), String(uval));
-        log(`Captured mem[${addr}] = ${uval} (${hex32(uval)})`);
+        const sval = (val << 0); 
+        addKVRow('tg-captured-mem', '268435456', '0', String(addr), String(sval));
+        log(`Captured mem[${addr}] = ${sval} (${hex32(val)})`);
       } catch(e) {
         log('Could not read memory at ' + addr);
       }
@@ -376,7 +402,7 @@ function updateMemView() {
   });
 }
 
-memGoBtn?.addEventListener('click', () => updateMemView());
+memGoBtn?.addEventListener('click', () => updateMemView(null));
 
 // ─── Collapse inputs ───
 
@@ -398,13 +424,11 @@ saveBtn?.addEventListener('click', async () => {
   const name = tcNameEl.value.trim();
   if (!name) { alert('Enter a test case name.'); return; }
 
-  // Gather selected registers
   const expectedRegs = {};
   resultRegsEl.querySelectorAll('.tg-reg-cb:checked').forEach(cb => {
     expectedRegs[cb.dataset.reg] = Number(cb.dataset.val);
   });
 
-  // Gathered captured memory
   const expectedMem = readKV('tg-captured-mem');
 
   if (!Object.keys(expectedRegs).length && !Object.keys(expectedMem).length) {
