@@ -49,15 +49,19 @@ def seed_database():
         for lab_id, data in curriculum.items():
             print(f"Processing {lab_id}...")
             
+            # Extract use_isolation from JSON (default to False)
+            use_iso = data.get('use_isolation', False)
+
             cur.execute("""
-                INSERT INTO labs (lab_id, course_id, title, instructions, starter_code, is_published)
-                VALUES (%s, %s, %s, %s, %s, TRUE)
+                INSERT INTO labs (lab_id, course_id, title, instructions, starter_code, is_published, use_isolation)
+                VALUES (%s, %s, %s, %s, %s, TRUE, %s)
                 ON CONFLICT (lab_id) DO UPDATE SET
                     title = EXCLUDED.title,
                     instructions = EXCLUDED.instructions,
                     starter_code = EXCLUDED.starter_code,
-                    is_published = TRUE;
-            """, (lab_id, course_id, data['title'], data['html'], data.get('starter_code')))
+                    is_published = TRUE,
+                    use_isolation = EXCLUDED.use_isolation;
+            """, (lab_id, course_id, data['title'], data['html'], data.get('starter_code'), use_iso))
 
             cur.execute("DELETE FROM lab_test_cases WHERE lab_id = %s", (lab_id,))
             

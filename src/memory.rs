@@ -28,7 +28,8 @@ fn page_offset(addr: u32) -> usize { (addr & PAGE_MASK) as usize }
 
 pub struct Memory {
     pub pages: HashMap<u32, Box<[i8; PAGE_SIZE]>>,
-    // The MMIO Bus handles virtual devices
+    pub snapshot: Option<HashMap<u32, Box<[i8; PAGE_SIZE]>>>, // Holds "frozen" input state
+    pub isolation_active: bool,                             // Toggle for autograder mode
     pub mmio: MmioBus, 
 }
 
@@ -50,8 +51,10 @@ impl Memory {
         
         Memory {
             pages,
+            snapshot: None,         // Initialize as None
+            isolation_active: false, // Default to standard hardware mode
             mmio: bus,
-        } 
+        }
     }
 
     pub fn set_word(&mut self, address: u32, value: i32) {
@@ -99,14 +102,23 @@ impl Memory {
 
     pub fn load_byte(&mut self, address: u32) -> i8 {
         if address >= MMIO_START {
-             let aligned = address & !3;
-             let word = self.mmio.load(aligned);
-             let shift = (address & 3) * 8;
-             return ((word >> shift) & 0xFF) as i8;
+            let aligned = address & !3;
+            let word = self.mmio.load(aligned);
+            let shift = (address & 3) * 8;
+            return ((word >> shift) & 0xFF) as i8;
         }
 
         let page = page_index(address);        
         let offset = page_offset(address);   
+
+        // If isolation is active and a snapshot exists, read from the "original" data
+        if self.isolation_active {
+            if let Some(snap) = &self.snapshot {
+                if let Some(page_data) = snap.get(&page) {
+                    return page_data[offset];
+                }
+            }
+        }
 
         if let Some(page_data) = self.pages.get(&page) {    
             page_data[offset]
@@ -235,5 +247,15 @@ impl Memory {
         }
         
         result
+    }
+
+    pub fn freeze_inputs(&mut self) {
+        self.snapshot = Some(self.pages.clone());
+        self.isolation_active = true;
+    }
+
+    pub fn thaw_inputs(&mut self) {
+        self.isolation_active = false;
+        self.snapshot = None;
     }
 }

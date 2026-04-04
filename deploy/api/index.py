@@ -135,9 +135,10 @@ def get_labs():
         cursor = conn.cursor(cursor_factory=RealDictCursor)
         cursor.execute("""
             SELECT lab_id, course_id, title, description, instructions,
-                   starter_code, register_mapping, initial_values,
-                   max_memory_kb, time_limit_seconds, max_instructions,
-                   total_points, release_date, due_date, is_published, difficulty
+                starter_code, register_mapping, initial_values,
+                max_memory_kb, time_limit_seconds, max_instructions,
+                total_points, release_date, due_date, is_published, difficulty,
+                use_isolation
             FROM labs ORDER BY lab_id
         """)
         labs = cursor.fetchall()
@@ -204,8 +205,9 @@ def create_lab():
                 lab_id, course_id, title, description, instructions,
                 starter_code, solution_code, register_mapping, initial_values,
                 difficulty, total_points, max_instructions, time_limit_seconds,
-                max_memory_kb, release_date, due_date, is_published
-            ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                max_memory_kb, release_date, due_date, is_published,
+                use_isolation
+            ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
             RETURNING lab_id
         """, (
             data['lab_id'], default_course_id, data['title'],
@@ -217,6 +219,7 @@ def create_lab():
             data.get('max_instructions', 10000), data.get('time_limit_seconds', 10),
             data.get('max_memory_kb', 1024), data.get('release_date'),
             data.get('due_date'), data.get('is_published', True),
+            data.get('use_isolation', False),
         ))
 
         conn.commit()
@@ -255,7 +258,8 @@ def update_lab(lab_id):
                 difficulty = COALESCE(%s, difficulty),
                 total_points = COALESCE(%s, total_points),
                 due_date = COALESCE(%s, due_date),
-                is_published = COALESCE(%s, is_published)
+                is_published = COALESCE(%s, is_published),
+                use_isolation = COALESCE(%s, use_isolation)
             WHERE lab_id = %s RETURNING lab_id
         """, (
             data.get('title'), data.get('description'), data.get('instructions'),
@@ -263,7 +267,7 @@ def update_lab(lab_id):
             json.dumps(data.get('register_mapping')) if 'register_mapping' in data else None,
             json.dumps(data.get('initial_values')) if 'initial_values' in data else None,
             data.get('difficulty'), data.get('points'), data.get('due_date'),
-            data.get('is_published'), lab_id,
+            data.get('is_published'), data.get('use_isolation'), lab_id,
         ))
 
         if cursor.rowcount == 0:

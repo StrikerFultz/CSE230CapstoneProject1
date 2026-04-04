@@ -20,7 +20,7 @@ function collectRegisters(cpu) {
 /**
  * Run student MIPS code with initial state and return register/memory results.
  */
-function runEmulator(sourceCode, initialRegisters, initialMemory, checkMemory) {
+function runEmulator(sourceCode, initialRegisters, initialMemory, checkMemory, useIsolation) {
   const cpu = new WasmCPU();
 
   const loadResult = cpu.load_source(sourceCode);
@@ -51,10 +51,18 @@ function runEmulator(sourceCode, initialRegisters, initialMemory, checkMemory) {
   let runError = '';
 
   try {
-    execResult = cpu.run();
+    if (useIsolation) {
+      cpu.set_isolation(true); // Call the WASM method we added to lib.rs
+    } 
 
-    if (execResult && execResult.error && execResult.error !== 'Termination') {
-      runError = execResult.error;
+    try {
+      execResult = cpu.run();
+      
+      if (execResult && execResult.error && execResult.error !== 'Termination') {
+        runError = execResult.error;
+      }
+    } finally {
+      cpu.set_isolation(false); // Always cleanup
     }
   } catch (e) {
     runError = e.message || String(e);
@@ -110,7 +118,7 @@ module.exports = async (req, res) => {
   }
 
   try {
-    const { source_code, initial_registers, initial_memory, check_memory } = req.body;
+    const { source_code, initial_registers, initial_memory, check_memory, use_isolation } = req.body;
 
     if (!source_code && source_code !== '') {
       return res.status(400).json({ error: 'source_code is required' });
@@ -121,6 +129,7 @@ module.exports = async (req, res) => {
       initial_registers || {},
       initial_memory || {},
       check_memory || [],
+      use_isolation || false,
     );
 
     return res.status(200).json(result);

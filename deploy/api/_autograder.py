@@ -42,7 +42,7 @@ def _strip_expected_for_student(results_list):
 
 
 def run_mips_via_wasm(source_code, initial_registers=None,
-                      initial_memory=None, check_memory=None):
+                      initial_memory=None, check_memory=None, use_isolation=False):
     """
     Run student code by POSTing to the Node.js /api/emulator endpoint.
     This replaces the old subprocess.run(GRADER_BINARY, ...) call.
@@ -52,6 +52,7 @@ def run_mips_via_wasm(source_code, initial_registers=None,
         'initial_registers': initial_registers or {},
         'initial_memory':    initial_memory or {},
         'check_memory':      check_memory or [],
+        'use_isolation':     use_isolation,
     }
 
     try:
@@ -77,7 +78,7 @@ def run_mips_via_wasm(source_code, initial_registers=None,
         return {'error': 'Emulator execution failed', 'registers': {}, 'memory': {}}
 
 
-def calculate_grade(test_cases, source_code):
+def calculate_grade(test_cases, source_code, use_isolation=False):
     """Grade by running source code against each test case via the WASM endpoint."""
 
     total_points = 0
@@ -104,6 +105,7 @@ def calculate_grade(test_cases, source_code):
             initial_registers=initial_regs,
             initial_memory=initial_mem,
             check_memory=check_memory,
+            use_isolation=use_isolation, # Pass the flag here
         )
 
         if run_result.get('error'):
@@ -287,12 +289,18 @@ def grade_submission():
             }), 403
 
         test_cases = get_test_cases_for_lab(lab_id)
-        grade_report = calculate_grade(test_cases, source_code)
 
-        # Save to DB
         conn = get_db_connection()
         cur = conn.cursor()
 
+        # Before calling calculate_grade, fetch the lab configuration
+        cur.execute("SELECT use_isolation FROM labs WHERE lab_id = %s", (lab_id,))
+        lab_config = cur.fetchone()
+        use_isolation = lab_config[0] if lab_config else False
+
+        grade_report = calculate_grade(test_cases, source_code, use_isolation=use_isolation)
+
+        # Save to DB
         normalized_source = source_code.strip().replace('\n', '\\n')
 
         cur.execute("""
