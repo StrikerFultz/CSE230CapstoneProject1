@@ -59,44 +59,25 @@ impl Memory {
             self.mmio.store(address, value as u32);
             return; 
         }
-
-        let page = page_index(address);       
-        let offset = page_offset(address);  
-
-        if !self.pages.contains_key(&page) {                   
-            self.pages.insert(page, Box::new([0; PAGE_SIZE]));
-        }
-
-        let page_data = self.pages.get_mut(&page).unwrap();     
-        let bytes = value.to_be_bytes();        
+        let bytes = value.to_le_bytes();        
         for i in 0..WORD_SIZE {                 
-            page_data[offset + i] = bytes[i] as i8;
+            self.set_byte(address + i as u32, bytes[i] as i8);
         }
     }
 
     pub fn load_word(&mut self, address: u32) -> i32 {
-        if address >= MMIO_START {
-            return self.mmio.load(address) as i32;
+        if address >= MMIO_START { return self.mmio.load(address) as i32; }
+        let mut bytes = [0u8; WORD_SIZE];           
+        for i in 0..WORD_SIZE {                         
+            bytes[i] = self.load_byte(address + i as u32) as u8;
         }
-
-        let page = page_index(address);        
-        let offset = page_offset(address);   
-
-        if let Some(page_data) = self.pages.get(&page) {    
-            let mut bytes = [0 as u8; WORD_SIZE];           
-            for i in 0..WORD_SIZE {                         
-                bytes[i] = page_data[offset + i] as u8;
-            }
-            i32::from_be_bytes(bytes)             
-        } else {
-            0
-        }
+        i32::from_le_bytes(bytes)             
     }
 
     pub fn set_byte(&mut self, address: u32, value: i8) {
         if address >= MMIO_START {
              let aligned = address & !3;
-             let shift = (3 - (address & 3)) * 8;
+             let shift = (address & 3) * 8;
              let current = self.mmio.load(aligned);
              let mask = !(0xFF << shift);
              let new_val = (current & mask) | ((value as u32 & 0xFF) << shift);
@@ -120,7 +101,7 @@ impl Memory {
         if address >= MMIO_START {
              let aligned = address & !3;
              let word = self.mmio.load(aligned);
-             let shift = (3 - (address & 3)) * 8;
+             let shift = (address & 3) * 8;
              return ((word >> shift) & 0xFF) as i8;
         }
 
@@ -150,7 +131,7 @@ impl Memory {
 
         let page_data = self.pages.get_mut(&page).unwrap();     
 
-        let bytes = value.to_be_bytes();        
+        let bytes = value.to_le_bytes();        
         for i in 0..HALF_SIZE {                 
             page_data[offset + i] = bytes[i] as i8;
         }
@@ -169,7 +150,7 @@ impl Memory {
             for i in 0..HALF_SIZE {                         
                 bytes[i] = page_data[offset + i] as u8;
             }
-            i16::from_be_bytes(bytes)             
+            i16::from_le_bytes(bytes)             
         } else {
             0
         }
@@ -184,7 +165,7 @@ impl Memory {
         }
 
         let page_data = self.pages.get_mut(&page).unwrap();     
-        let bytes = value.to_be_bytes();
+        let bytes = value.to_le_bytes();
         for i in 0..DOUBLE_SIZE {
             page_data[offset + i] = bytes[i] as i8;
         }
@@ -199,7 +180,7 @@ impl Memory {
             for i in 0..DOUBLE_SIZE {
                 bytes[i] = page_data[offset + i] as u8;
             }
-            f64::from_be_bytes(bytes)
+            f64::from_le_bytes(bytes)
         } else {
             0.0
         }
@@ -214,7 +195,7 @@ impl Memory {
         }
 
         let page_data = self.pages.get_mut(&page).unwrap();     
-        let bytes = value.to_be_bytes();
+        let bytes = value.to_le_bytes();
         for i in 0..FLOAT_SIZE {
             page_data[offset + i] = bytes[i] as i8;
         }
@@ -229,7 +210,7 @@ impl Memory {
             for i in 0..FLOAT_SIZE {
                 bytes[i] = page_data[offset + i] as u8;
             }
-            f32::from_be_bytes(bytes)
+            f32::from_le_bytes(bytes)
         } else {
             0.0
         }

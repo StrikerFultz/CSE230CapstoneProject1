@@ -398,7 +398,7 @@ impl CPU {
                 let r = self.get_reg(rs);
                 self.set_reg(rt, if r< (*imm as u32) { 1 } else {0});
             },
-
+            
             CoreInstruction::Mult { rs, rt } => {
                 let r1 = self.get_reg(rs) as i32 as i64;
                 let r2 = self.get_reg(rt) as i32 as i64;
@@ -409,6 +409,18 @@ impl CPU {
                 self.lo = (result & 0xFFFFFFFF) as u32;
                 self.hi = ((result >> 32) & 0xFFFFFFFF) as u32;
             },
+
+            // this implementation treats the operands as unsigned instead of signed
+            // this matches ZyBooks/ZyLabs but is "technically" incorrect
+            // CoreInstruction::Mult { rs, rt } => {
+            //     let r1 = self.get_reg(rs) as u64;
+            //     let r2 = self.get_reg(rt) as u64;
+                
+            //     let result = r1.wrapping_mul(r2);
+
+            //     self.lo = (result & 0xFFFFFFFF) as u32;
+            //     self.hi = ((result >> 32) & 0xFFFFFFFF) as u32;
+            // },
 
             CoreInstruction::Mfhi { rd } => {
                 self.set_reg(rd, self.hi);

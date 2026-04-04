@@ -76,15 +76,17 @@ function runEmulator(sourceCode, initialRegisters, initialMemory, checkMemory) {
     }
   }
 
-  // read memory values
   const finalMemory = {};
   for (const addr of (checkMemory || [])) {
     try {
       const bytes = cpu.get_memory(Number(addr), 4);
       if (bytes && bytes.length >= 4) {
-
-        const unsigned =
-          ((bytes[0] << 24) | (bytes[1] << 16) | (bytes[2] << 8) | bytes[3]) >>> 0;
+        const unsigned = (
+            bytes[0] | 
+            (bytes[1] << 8) | 
+            (bytes[2] << 16) | 
+            (bytes[3] << 24)
+        ) >>> 0;
         
         const signed = unsigned > 0x7FFFFFFF ? unsigned - 0x100000000 : unsigned;
         finalMemory[String(addr)] = signed;
