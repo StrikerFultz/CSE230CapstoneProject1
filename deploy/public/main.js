@@ -394,6 +394,11 @@ async function showLesson(id) {
     });
   }
 
+  // Save current lab's code to localStorage before switching
+  if (cpuEditor && currentLessonId) {
+    localStorage.setItem(`mips_code_${currentLessonId}`, cpuEditor.getValue());
+  }
+
   // Reset emulator state when switching labs
   if (cpu && wasmReady) {
     resetEmulator();
@@ -402,9 +407,10 @@ async function showLesson(id) {
   // clear grade view
   document.getElementById('grade-results').innerHTML = '';
 
-  // Load starter code if available
+  // Load saved code if available, otherwise fall back to starter code
   if (cpuEditor) {
-      cpuEditor.setValue(data.starter_code || "");
+    const saved = localStorage.getItem(`mips_code_${id}`);
+    cpuEditor.setValue(saved !== null ? saved : (data.starter_code || ""));
   }
 
   currentLabData = data;
@@ -808,6 +814,13 @@ cpuEditor.getScrollerElement().style.maxHeight = `${maxEditorHeight}px`;
 cpuEditor.getScrollerElement().style.overflowY = "auto";
 cpuEditor.getScrollerElement().style.overflowX = "auto";
 cpuEditor.refresh();
+
+// Autosave code to localStorage on every change
+cpuEditor.on('change', () => {
+  if (currentLessonId) {
+    localStorage.setItem(`mips_code_${currentLessonId}`, cpuEditor.getValue());
+  }
+});
 
 // Draggable vertical resizer between assembler and right panel
 (function initResizer() {
@@ -1573,6 +1586,13 @@ const requestedLessonId = urlParams.get("lesson") || null;
 
 // Initialize lessons async — pick first from DB if no ?lesson= param
 (async () => {
+  // Hide "Professor View" nav link for TAs — they can only see Students tab
+  const user = window.__currentUser;
+  if (user && user.role === 'ta') {
+    const profLink = document.querySelector('a[href="teacher.html"]');
+    if (profLink) profLink.style.display = 'none';
+  }
+
   const lessons = await allLessons();
   const sortedIds = Object.keys(lessons).sort();
   const initialLessonId = (requestedLessonId && lessons[requestedLessonId])
