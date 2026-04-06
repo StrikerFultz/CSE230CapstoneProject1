@@ -407,14 +407,14 @@ async function showLesson(id) {
   // clear grade view
   document.getElementById('grade-results').innerHTML = '';
 
+  currentLabData = data;
+  currentLessonId = id;
+
   // Load saved code if available, otherwise fall back to starter code
   if (cpuEditor) {
     const saved = localStorage.getItem(`mips_code_${id}`);
     cpuEditor.setValue(saved !== null ? saved : (data.starter_code || ""));
   }
-
-  currentLabData = data;
-  currentLessonId = id;
   labOpenedAt = Date.now();   // start the clock for this lab session
   runCount = 0;               // reset run counter
   loadLatestSubmission(id); 

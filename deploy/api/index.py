@@ -69,6 +69,14 @@ def _require_teacher():
         return None, 'not_teacher'
     return uid, None
 
+def _require_instructor():
+    uid, role = _require_login()
+    if not uid:
+        return None, 'not_logged_in'
+    if role != 'instructor':
+        return None, 'not_instructor'
+    return uid, None
+
 def _safe_error(e, fallback='An internal error occurred'):
     app.logger.error('%s', e, exc_info=True)
     return fallback
@@ -171,9 +179,9 @@ def get_labs():
 
 @app.route('/api/labs', methods=['POST'])
 def create_lab():
-    uid, err = _require_teacher()
+    uid, err = _require_instructor()
     if err:
-        return jsonify({'error': 'Unauthorized'}), 403 if err == 'not_teacher' else 401
+        return jsonify({'error': 'Unauthorized'}), 403 if err == 'not_instructor' else 401
 
     data = request.get_json()
     if not data or 'lab_id' not in data or 'title' not in data:
@@ -235,9 +243,9 @@ def create_lab():
 
 @app.route('/api/labs/<lab_id>', methods=['PUT'])
 def update_lab(lab_id):
-    uid, err = _require_teacher()
+    uid, err = _require_instructor()
     if err:
-        return jsonify({'error': 'Unauthorized'}), 403 if err == 'not_teacher' else 401
+        return jsonify({'error': 'Unauthorized'}), 403 if err == 'not_instructor' else 401
 
     data = request.get_json()
     conn = get_db_connection()
@@ -285,9 +293,9 @@ def update_lab(lab_id):
 
 @app.route('/api/labs/<lab_id>', methods=['DELETE'])
 def delete_lab(lab_id):
-    uid, err = _require_teacher()
+    uid, err = _require_instructor()
     if err:
-        return jsonify({'error': 'Unauthorized'}), 403 if err == 'not_teacher' else 401
+        return jsonify({'error': 'Unauthorized'}), 403 if err == 'not_instructor' else 401
 
     conn = get_db_connection()
     if not conn:
@@ -333,7 +341,7 @@ def get_lab_test_cases(lab_id):
 @app.route('/api/labs/<lab_id>/test-cases', methods=['POST'])
 def create_test_case(lab_id):
     role = session.get('role', '')
-    if role not in ('instructor', 'ta'):
+    if role != 'instructor':
         return jsonify({'error': 'Unauthorized'}), 403
 
     data = request.get_json()
@@ -378,7 +386,7 @@ def create_test_case(lab_id):
 @app.route('/api/labs/<lab_id>/test-cases/<test_case_id>', methods=['PUT'])
 def update_test_case(lab_id, test_case_id):
     role = session.get('role', '')
-    if role not in ('instructor', 'ta'):
+    if role != 'instructor':
         return jsonify({'error': 'Unauthorized'}), 403
 
     data = request.get_json()
@@ -424,7 +432,7 @@ def update_test_case(lab_id, test_case_id):
 @app.route('/api/labs/<lab_id>/test-cases/<test_case_id>', methods=['DELETE'])
 def delete_test_case(lab_id, test_case_id):
     role = session.get('role', '')
-    if role not in ('instructor', 'ta'):
+    if role != 'instructor':
         return jsonify({'error': 'Unauthorized'}), 403
 
     conn = get_db_connection()
@@ -642,9 +650,9 @@ def get_roster():
 
 @app.route('/api/roster/upload', methods=['POST'])
 def upload_roster():
-    uid, err = _require_teacher()
+    uid, err = _require_instructor()
     if err:
-        return jsonify({'error': 'Unauthorized'}), 403 if err == 'not_teacher' else 401
+        return jsonify({'error': 'Unauthorized'}), 403 if err == 'not_instructor' else 401
 
     if 'file' not in request.files:
         return jsonify({'error': 'No file provided'}), 400
@@ -757,9 +765,9 @@ def upload_roster():
 
 @app.route('/api/roster/<roster_id>', methods=['DELETE'])
 def delete_roster_entry(roster_id):
-    uid, err = _require_teacher()
+    uid, err = _require_instructor()
     if err:
-        return jsonify({'error': 'Unauthorized'}), 403 if err == 'not_teacher' else 401
+        return jsonify({'error': 'Unauthorized'}), 403 if err == 'not_instructor' else 401
 
     conn = get_db_connection()
     if not conn:
@@ -782,9 +790,9 @@ def delete_roster_entry(roster_id):
 
 @app.route('/api/roster/clear', methods=['DELETE'])
 def clear_roster():
-    uid, err = _require_teacher()
+    uid, err = _require_instructor()
     if err:
-        return jsonify({'error': 'Unauthorized'}), 403 if err == 'not_teacher' else 401
+        return jsonify({'error': 'Unauthorized'}), 403 if err == 'not_instructor' else 401
 
     conn = get_db_connection()
     if not conn:
@@ -805,9 +813,9 @@ def clear_roster():
 
 @app.route('/api/roster/template', methods=['GET'])
 def roster_template():
-    uid, err = _require_teacher()
+    uid, err = _require_instructor()
     if err:
-        return jsonify({'error': 'Unauthorized'}), 403 if err == 'not_teacher' else 401
+        return jsonify({'error': 'Unauthorized'}), 403 if err == 'not_instructor' else 401
 
     if not EXCEL_AVAILABLE:
         return jsonify({'error': 'Excel support not available on server'}), 500

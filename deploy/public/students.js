@@ -220,7 +220,7 @@ function renderDetail(data) {
         <div class="stu-lab-header-right">
           <span class="stu-lab-status ${statusClass}" style="color:${barColor}">${statusText}</span>
           <span class="stu-lab-score">${hasAttempt ? lab.best_score + '/' + lab.best_possible : '—'}</span>
-          ${hasAttempt ? `<button class="btn-ghost stu-reset-btn" data-lab-id="${lab.lab_id}" style="color:#e53935;font-size:11px;" title="Delete all submissions and reset attempt counter">Reset Attempts</button>` : ''}
+          ${hasAttempt && window.__currentUser && window.__currentUser.role === 'instructor' ? `<button class="btn-ghost stu-reset-btn" data-lab-id="${lab.lab_id}" style="color:#e53935;font-size:11px;" title="Delete all submissions and reset attempt counter">Reset Attempts</button>` : ''}
           <span class="stu-lab-toggle">▾</span>
         </div>
       </div>
@@ -376,6 +376,9 @@ document.addEventListener('click', async (e) => {
 
   e.stopPropagation();
 
+  const user = window.__currentUser;
+  if (!user || user.role !== 'instructor') return;
+
   const labId = e.target.dataset.labId;
   const userId = selectedUserId;
   if (!labId || !userId) return;
@@ -447,7 +450,7 @@ function renderCourseRoster(entries) {
       <td>${escapeHTML(e.asu_id || '—')}</td>
       <td>${escapeHTML(e.email || '—')}</td>
       <td>${statusDot} <span style="color:${statusColor};">${statusLabel}</span></td>
-      <td><button class="btn-ghost roster-delete-btn" data-id="${e.roster_id}">Remove</button></td>
+      <td>${window.__currentUser && window.__currentUser.role === 'instructor' ? `<button class="btn-ghost roster-delete-btn" data-id="${e.roster_id}">Remove</button>` : ''}</td>
     `;
     rosterTbody.appendChild(tr);
   });
@@ -517,4 +520,13 @@ if (rosterClearBtn) {
 (async () => {
   await loadRoster();
   loadCourseRoster();
+
+  const user = window.__currentUser;
+  if (user && user.role === 'ta') {
+    const uploadBtn = document.querySelector('.roster-upload-btn');
+    if (uploadBtn) uploadBtn.style.display = 'none';
+    const templateLink = document.querySelector('a[href="/api/roster/template"]');
+    if (templateLink) templateLink.style.display = 'none';
+    if (rosterClearBtn) rosterClearBtn.style.display = 'none';
+  }
 })();
