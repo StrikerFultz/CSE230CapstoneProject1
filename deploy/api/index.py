@@ -13,6 +13,9 @@ from datetime import datetime
 from dotenv import load_dotenv
 load_dotenv()
 
+from zoneinfo import ZoneInfo
+PHX=  ZoneInfo("America/Phoenix")
+
 logging.basicConfig(
     level=logging.INFO,
     format='[%(asctime)s] %(levelname)s %(name)s: %(message)s',
@@ -562,7 +565,7 @@ def get_student_detail(user_id):
                 'score':            sub['score'],
                 'total_possible':   sub['total_possible'],
                 'test_results':     sub['test_results'],
-                'submitted_at':     sub['submitted_at'].isoformat() if sub['submitted_at'] else None,
+                'submitted_at':     (sub['submitted_at'].astimezone(PHX).strftime('%Y-%m-%d %H:%M:%S') if sub['submitted_at'] else None),
                 'source_code':      sub['source_code'],
                 'duration_seconds': sub.get('duration_seconds'),
                 'run_count':        sub.get('run_count'),
@@ -950,7 +953,7 @@ def export_grades_excel(lab_id):
             final_pct_cell.font = Font(bold=True)
             col += 1
 
-            ws.cell(row=row_idx, column=col, value=sub['submitted_at'].strftime('%Y-%m-%d %H:%M'))
+            ws.cell(row=row_idx, column=col, value=sub['submitted_at'].astimezone(PHX).strftime('%Y-%m-%d %H:%M'))
 
         for column in ws.columns:
             col_letter = column[0].column_letter
@@ -1084,7 +1087,7 @@ def export_submissions_csv(lab_id):
                 row.append(sub.get('lab_id', ''))
             row.extend([
                 sub['score'], sub['total_possible'], f"{pct:.1f}%",
-                sub['submitted_at'].strftime('%Y-%m-%d %H:%M:%S'),
+                sub['submitted_at'].astimezone(PHX).strftime('%Y-%m-%d %H:%M:%S'),
                 sub['source_code'].replace('\\n', '\n').replace('\n', ' | ')
             ])
             writer.writerow(row)
