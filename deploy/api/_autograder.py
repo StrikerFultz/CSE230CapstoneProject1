@@ -395,7 +395,8 @@ def get_attempts(lab_id):
 def reset_attempts(lab_id, user_id):
     if 'user_id' not in session:
         return jsonify({'error': 'Not logged in'}), 401
-    if session.get('role', 'student') not in ('instructor', 'ta'):
+    
+    if session.get('role', 'student') != 'instructor':
         return jsonify({'error': 'Unauthorized — instructors only'}), 403
 
     conn = get_db_connection()

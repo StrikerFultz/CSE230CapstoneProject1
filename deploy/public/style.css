@@ -23,8 +23,7 @@ body {
   position: fixed;
   top: 0;
   left: 0;
-  width: 100%;
-  height: var(--header-height);
+  right: 0;
   z-index: 9999;
   background-color: #c8c8c8;
   border-bottom: 1px solid #999;
@@ -33,12 +32,21 @@ body {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  min-height: 44px;
+  flex-wrap: nowrap;
 }
 
 .topbar-left {
   display: flex;
   align-items: center;
   gap: 10px;
+}
+
+.topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
 }
 
 .brand {
@@ -88,6 +96,7 @@ body {
 .nav {
   display: flex;
   gap: 6px;
+  flex-wrap: nowrap;
 }
 
 .nav a {
@@ -119,6 +128,14 @@ body {
   display: none;
 }
 
+.lesson-container.hidden + .workspace {
+  margin-top: 56px;
+}
+
+.lesson-container:not(.hidden) + .workspace {
+  margin-top: 12px;
+}
+
 .lesson-header {
   display: flex;
   justify-content: center;
@@ -132,15 +149,19 @@ body {
   margin: 0 auto 8px;
 }
 
-.lesson-hide-btn {
-  position: absolute;
-  right: 0;
-  top: 0;
-  border: 1px solid #000;
-  background: #d0d0d0;
+.lesson-toggle-btn {
+  border: 1px solid #999;
+  background: #f0f0f0;
   font-size: 12px;
   padding: 3px 8px;
   cursor: pointer;
+  white-space: nowrap;
+  border-radius: 3px;
+  font-weight: 600;
+}
+
+.lesson-toggle-btn:hover {
+  background: #e0e0e0;
 }
 
 /*shared lesson content helpers*/
@@ -284,6 +305,7 @@ th {
 /*workspace*/
 
 .workspace {
+  margin-top: 12px;
   display: grid;
   grid-template-columns: minmax(0, 1fr) 6px 340px;
   grid-template-areas:
@@ -310,11 +332,8 @@ th {
 }
 
 .panel h3 {
-  background-color: #d0d0d0;
-  border-bottom: 1px solid #000;
   font-size: 13px;
   font-weight: 600;
-  padding: 4px 6px;
   margin: 0;
 }
 
@@ -365,6 +384,27 @@ th {
   grid-area: assembler;
   width: 100%;
   min-width: 0;
+}
+
+.assembler-header {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  background-color: #d0d0d0;
+  border-bottom: 1px solid #000;
+  padding: 4px 6px;
+}
+
+.assembler-header h3 {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.assembler-buttons {
+  display: flex;
+  gap: 6px;
 }
 
 .assembler-content {
