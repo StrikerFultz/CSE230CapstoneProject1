@@ -146,7 +146,7 @@ def get_labs():
         cursor = conn.cursor(cursor_factory=RealDictCursor)
         cursor.execute("""
             SELECT lab_id, course_id, title, description, instructions,
-                starter_code, register_mapping, initial_values,
+                starter_code, solution_code, register_mapping, initial_values,
                 max_memory_kb, time_limit_seconds, max_instructions,
                 total_points, release_date, due_date, is_published, difficulty,
                 use_isolation
@@ -167,6 +167,7 @@ def get_labs():
                 'html':             lab.get('instructions') or '',
                 'description':      lab.get('description'),
                 'starter_code':     lab.get('starter_code'),
+                'solution_code':    lab.get('solution_code') if is_teacher else None,
                 'difficulty':       lab.get('difficulty'),
                 'points':           lab.get('total_points'),
                 'register_mapping': reg_map,

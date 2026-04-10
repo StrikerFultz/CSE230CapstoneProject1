@@ -49,19 +49,37 @@ def seed_database():
         for lab_id, data in curriculum.items():
             print(f"Processing {lab_id}...")
             
-            # Extract use_isolation from JSON (default to False)
             use_iso = data.get('use_isolation', False)
 
             cur.execute("""
-                INSERT INTO labs (lab_id, course_id, title, instructions, starter_code, is_published, use_isolation)
-                VALUES (%s, %s, %s, %s, %s, TRUE, %s)
+                INSERT INTO labs (
+                    lab_id, course_id, title, description, instructions, 
+                    starter_code, solution_code, difficulty, total_points, 
+                    is_published, use_isolation
+                )
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, TRUE, %s)
                 ON CONFLICT (lab_id) DO UPDATE SET
                     title = EXCLUDED.title,
+                    description = EXCLUDED.description,
                     instructions = EXCLUDED.instructions,
                     starter_code = EXCLUDED.starter_code,
+                    solution_code = EXCLUDED.solution_code,
+                    difficulty = EXCLUDED.difficulty,
+                    total_points = EXCLUDED.total_points,
                     is_published = TRUE,
                     use_isolation = EXCLUDED.use_isolation;
-            """, (lab_id, course_id, data['title'], data['html'], data.get('starter_code'), use_iso))
+            """, (
+                lab_id, 
+                course_id, 
+                data['title'], 
+                data.get('description'), 
+                data['html'], 
+                data.get('starter_code'), 
+                data.get('solution_code'),
+                data.get('difficulty', 'beginner'),
+                data.get('points', 100),
+                use_iso
+            ))
 
             cur.execute("DELETE FROM lab_test_cases WHERE lab_id = %s", (lab_id,))
             
@@ -77,14 +95,27 @@ def seed_database():
                     })
 
                     cur.execute("""
-                        INSERT INTO lab_test_cases (lab_id, test_name, points, input_data, expected_output, test_type)
-                        VALUES (%s, %s, %s, %s, %s, 'register')
-                    """, (lab_id, tc['name'], tc['points'], input_data, expected_output))
+                        INSERT INTO lab_test_cases (
+                            lab_id, test_name, test_type, description, 
+                            points, is_hidden, timeout_seconds, 
+                            input_data, expected_output
+                        )
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    """, (
+                        lab_id, 
+                        tc['name'], 
+                        tc.get('test_type', 'register'),
+                        tc.get('description'),
+                        tc['points'], 
+                        tc.get('is_hidden', False),
+                        tc.get('timeout_seconds', 5),
+                        input_data, 
+                        expected_output
+                    ))
 
         conn.commit()
         print("\n--- TRANSACTION COMMITTED ---")
 
-        # FINAL VERIFICATION
         cur.execute("SELECT COUNT(*) FROM labs")
         lab_count = cur.fetchone()[0]
         cur.execute("SELECT COUNT(*) FROM lab_test_cases")
@@ -97,6 +128,7 @@ def seed_database():
     finally:
         cur.close()
         conn.close()
+
 
 if __name__ == "__main__":
     seed_database()

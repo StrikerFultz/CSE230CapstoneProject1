@@ -169,6 +169,18 @@ if (loadStarterBtn) {
     cmEditor.setValue(code);
     log('Loaded starter code for ' + labId);
   });
+
+  const loadSolutionBtn = document.getElementById('tg-load-solution');
+  if (loadSolutionBtn) {
+    loadSolutionBtn.addEventListener('click', () => {
+      const labId = labSelect.value;
+      if (!labId || !labsCache[labId]) { alert('Select a lab first.'); return; }
+      const code = labsCache[labId].solution_code || '';
+      if (!code) { alert('This lab has no solution code.'); return; }
+      cmEditor.setValue(code);
+      log('Loaded solution code for ' + labId);
+    });
+  }
 }
 
 // ─── Emulator controls ───

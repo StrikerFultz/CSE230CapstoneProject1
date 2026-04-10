@@ -46,6 +46,7 @@ async function saveLessonToAPI(labId, title, html, starterCode) {
       title: title,
       instructions: html,
       starter_code: starterCode || null,
+      solution_code: solutionCode || null,
       is_published: true,
       difficulty: 'beginner',
       points: 100
@@ -162,6 +163,11 @@ const starterCodeEditor = document.getElementById("starter-code-editor");
 const starterCodeBody = document.getElementById("starter-code-body");
 const btnCollapseStarter = document.getElementById("btn-collapse-starter");
 
+const solutionCodeSection = document.getElementById("solution-code-section");
+const solutionCodeEditor  = document.getElementById("solution-code-editor");
+const solutionCodeBody    = document.getElementById("solution-code-body");
+const btnCollapseSolution = document.getElementById("btn-collapse-solution");
+
 let currentId = null;
 
 // Helper functions
@@ -214,6 +220,13 @@ async function loadLesson(id) {
   }
   if (starterCodeSection) {
     starterCodeSection.style.display = "";
+  }
+
+  if (solutionCodeEditor) {
+    solutionCodeEditor.value = data.solution_code || "";
+  }
+  if (solutionCodeSection) {
+    solutionCodeSection.style.display = "";
   }
 
   renderPreview();
@@ -277,7 +290,8 @@ async function saveCurrent() {
   const starterCode = starterCodeEditor ? starterCodeEditor.value : "";
 
   // Save to API first
-  const apiSuccess = await saveLessonToAPI(id, title, html, starterCode);
+  const solutionCode = solutionCodeEditor ? solutionCodeEditor.value : "";
+  const apiSuccess = await saveLessonToAPI(id, title, html, starterCode, solutionCode);
   
   // Also save to local storage as backup
   const custom = getCustom();
@@ -542,6 +556,52 @@ document.getElementById('btn-clear-starter')?.addEventListener('click', () => {
   if (starterCodeEditor) starterCodeEditor.value = '';
   if (saveStatus) saveStatus.textContent = 'Unsaved changes';
 });
+
+if (btnCollapseSolution && solutionCodeBody) {
+  btnCollapseSolution.addEventListener("click", () => {
+    const collapsed = solutionCodeBody.classList.toggle("collapsed");
+    btnCollapseSolution.textContent = collapsed ? "Show" : "Hide";
+  });
+}
+
+document.getElementById('btn-save-solution')?.addEventListener('click', async () => {
+  if (!currentId) { alert('No lab selected.'); return; }
+  const code = solutionCodeEditor ? solutionCodeEditor.value : '';
+  try {
+    await apiRequest(`/labs/${currentId}`, {
+      method: 'PUT',
+      body: JSON.stringify({ solution_code: code }),
+    });
+    if (saveStatus) saveStatus.textContent = 'Solution code saved ✓';
+    setTimeout(() => { if (saveStatus) saveStatus.textContent = ''; }, 2000);
+  } catch (err) {
+    alert('Failed to save solution code: ' + err.message);
+  }
+});
+
+document.getElementById('btn-clear-solution')?.addEventListener('click', () => {
+  if (!confirm('Clear the solution code for this lab?')) return;
+  if (solutionCodeEditor) solutionCodeEditor.value = '';
+  if (saveStatus) saveStatus.textContent = 'Unsaved changes';
+});
+
+if (solutionCodeEditor) {
+  solutionCodeEditor.addEventListener("input", () => {
+    if (saveStatus) saveStatus.textContent = "Unsaved changes";
+  });
+
+  solutionCodeEditor.addEventListener("keydown", (e) => {
+    if (e.key === "Tab") {
+      e.preventDefault();
+      const start = solutionCodeEditor.selectionStart;
+      const end   = solutionCodeEditor.selectionEnd;
+      solutionCodeEditor.value =
+        solutionCodeEditor.value.substring(0, start) + "    " +
+        solutionCodeEditor.value.substring(end);
+      solutionCodeEditor.selectionStart = solutionCodeEditor.selectionEnd = start + 4;
+    }
+  });
+}
 
 // Track unsaved changes in starter code
 if (starterCodeEditor) {
