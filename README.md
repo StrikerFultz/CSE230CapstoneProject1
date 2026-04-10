@@ -1,7 +1,7 @@
-# MIPS32 Emulator - Vercel Serverless Port
+# MIPS32 Emulator 
 
 ## Project Overview
-This project is a lab suite and web IDE (similar to ZyBooks), featuring a MIPS32 emulator written in Rust. The Rust code is compiled to WASM so the IDE may integrate the emulator component.
+This project is a lab suite and web IDE (similar to ZyBooks), featuring a MIPS32 emulator written in Rust. The Rust code is compiled to WASM so the IDE may integrate the emulator component. It includes a full autograding pipeline, a professor dashboard for lab and grade management, a test case generator, and role-based access for instructors, TAs, and students.
 
 ### Feature Completion:
 **Emulator (Rust Core)**:
@@ -15,6 +15,12 @@ This project is a lab suite and web IDE (similar to ZyBooks), featuring a MIPS32
 - Serverless Autograder [x]
 - Persistent Lab Progress (Neon/PostgreSQL) [x]
 - Professor Dashboard [x]
+- Role-based Access Control (Instructor / TA / Student) [x]
+- Student Roster Management [x]
+- Manual Grade Overrides [x]
+- Grade Export (Excel / ZIP / CSV) [x]
+- Test Case Generator [x]
+- Solution Code Storage and Verification [x]
 
 ---
 
@@ -49,12 +55,20 @@ mips-emulator/
 │   │   ├── index.py            # Flask app (all API routes)
 │   │   ├── _db.py              # Neon DB connection helper
 │   │   ├── _auth.py            # Auth routes
-│   │   ├── _autograder.py      # Grading logic
+│   │   ├── _autograder.py      # Grading logic + verify endpoint
 │   │   ├── emulator.js         # Node.js WASM grader
 │   │   └── pkg-node/           # Node.js WASM build (generated)
 │   └── public/                 # Static frontend files
-│       ├── index.html
-│       ├── main.js
+│       ├── index.html          # Student lab view
+│       ├── main.js             # Student lab logic
+│       ├── teacher.html        # Professor lab editor
+│       ├── teacher.js
+│       ├── students.html       # Student roster + grade management
+│       ├── students.js
+│       ├── testgen.html        # Test case generator
+│       ├── testgen.js
+│       ├── login.html          # Login page
+│       ├── auth-check.js       # Auth guard (shared)
 │       ├── style.css
 │       └── pkg/                # Browser WASM build (generated)
 └── .gitignore
@@ -74,7 +88,7 @@ Install these before starting:
 - **Node.js 18+**: https://nodejs.org
 - **Vercel CLI**: `npm install -g vercel`
 
-### Step 1 — Clone the Repository
+### Step 1 - Clone the Repository
 
 ```bash
 git clone https://github.com/StrikerFultz/CSE230CapstoneProject1.git
@@ -82,20 +96,20 @@ cd CSE230CapstoneProject1
 git checkout vercel
 ```
 
-### Step 2 — Set Up Neon Database
+### Step 2 - Set Up Neon Database
 
 1. Go to https://neon.tech and create a free account
 2. Click **New Project** and create a project (e.g. `mips-emulator`)
-3. Copy the **pooled connection string** — it looks like:
+3. Copy the **pooled connection string**:
    ```
    postgresql://YOUR_URL
    ```
-4. Run the schema — either paste `schema.sql` into Neon's **SQL Editor** in the dashboard, or run:
+4. Run the schema. Either paste `schema.sql` into Neon's **SQL Editor** in the dashboard, or run:
    ```bash
    psql "YOUR_CONNECTION_STRING" -f schema.sql
    ```
 
-### Step 3 — Create Environment File
+### Step 3 - Create Environment File
 
 Create a `.env` file in the **repo root**:
 
@@ -110,16 +124,28 @@ Generate a secret key with:
 python -c "import secrets; print(secrets.token_hex(32))"
 ```
 
-### Step 4 — Seed the Database with Labs
+### Step 4 - Seed the Database with Labs
 
 ```bash
 pip install psycopg2-binary python-dotenv
 python migrate_labs.py
 ```
 
-This populates the database with all labs and test cases from `labs_curriculum.json`.
+This populates the database with all labs, test cases, starter code, and solution code from `labs_curriculum.json`.
 
-### Step 5 — Build WASM Packages
+To add or update individual labs without re-running the full migration, use the Professor View in the app. The migration script uses `ON CONFLICT DO UPDATE` so it is safe to re-run at any time. It will not duplicate data.
+
+### Step 5 - Create the First Instructor Account
+
+After seeding, register an account through the app's signup page using an ASURITE that exists in the course roster, then manually promote it to instructor via SQL:
+
+```sql
+UPDATE users SET role = 'instructor' WHERE username = 'your_asurite';
+```
+
+Subsequent instructor or TA accounts can be promoted the same way. Students who sign up with an ASURITE on the course roster are automatically assigned the `student` role.
+
+### Step 6 - Build WASM Packages
 
 You need two separate WASM builds from the Rust source:
 
@@ -137,7 +163,7 @@ ls deploy/public/pkg/mips_emu_wasm_bg.wasm
 ls deploy/api/pkg-node/mips_emu_wasm_bg.wasm
 ```
 
-### Step 6 — Set Up Vercel
+### Step 7 - Set Up Vercel
 
 ```bash
 # Log in to Vercel
@@ -153,7 +179,7 @@ When prompted:
 - **Link to existing project?** → N (first time) or Y (if re-linking)
 - **Project name** → `mips-emulator` (or your preferred name)
 
-### Step 7 — Set Vercel Environment Variables
+### Step 8 - Set Vercel Environment Variables
 
 ```bash
 vercel env add DATABASE_URL
@@ -167,13 +193,29 @@ vercel env add EMULATOR_URL
 # Select all environments
 ```
 
-### Step 8 — Deploy
+### Step 9 - Deploy
 
 ```bash
 vercel --prod
 ```
 
 Your app is now live at the URL Vercel provides (e.g. `https://mips-emulator.vercel.app`).
+
+---
+
+## Transferring Labs to a New Instance
+
+Labs are stored in two places: the `labs_curriculum.json` file (source of truth for seeding) and the Neon database. To transfer labs to a new deployment:
+
+**Option A - Re-run the migration script** against the new database. This is the recommended approach if you have an up-to-date `labs_curriculum.json`.
+
+**Option B - Export from the Professor View**. Each lab can be exported individually as a `.lesson.json` file via the Export button in the Professor View, then imported into the new instance using the Import button. This captures the lab HTML, starter code, and solution code but not test cases. Test cases must be re-entered or migrated via SQL.
+
+**Option C - Direct database copy** using Neon's branching or `pg_dump`:
+```bash
+pg_dump "SOURCE_CONNECTION_STRING" --table=labs --table=lab_test_cases > labs_export.sql
+psql "TARGET_CONNECTION_STRING" -f labs_export.sql
+```
 
 ---
 
@@ -214,12 +256,14 @@ Vercel auto-deploys on every push to the production branch.
 
 ## Contributions
 
+Thanks to the members of ASU Capstone I/II from Fall 2025 to Spring 2026:
+
 **Team Members**:
-* Kailey: Scrum Master
-* Angel: Emulator Dev
-* Matthew: Backend
-* Ethan: Emulator / Frontend
+* Angel: Scrum Master
+* Kailey
+* Matthew
+* Ethan
 
 **Additional Members**:
-* Paul: Emulator Dev
-* Jenna: Frontend / UI Dev
+* Paul
+* Jenna
