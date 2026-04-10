@@ -224,6 +224,8 @@ async function loadLesson(id) {
   if (saveStatus) {
     saveStatus.textContent = "Loaded";
   }
+
+  updateStarterLineNums();
 }
 
 async function renderList(selectId = null) {
@@ -433,6 +435,66 @@ if (editor) {
   });
 }
 
+// add formatting to the toolbar
+
+document.querySelectorAll('.fmt-btn[data-cmd]').forEach(btn => {
+  btn.addEventListener('mousedown', (e) => {
+    // mousedown instead of click preserves the editor selection
+    e.preventDefault();
+    const cmd = btn.dataset.cmd;
+    const val = btn.dataset.val || null;
+    document.execCommand(cmd, false, val);
+    renderPreview();
+    if (saveStatus) saveStatus.textContent = 'Unsaved changes';
+  });
+});
+
+document.getElementById('fmt-link')?.addEventListener('click', (e) => {
+  e.preventDefault();
+  const sel = window.getSelection();
+  const existing = sel?.anchorNode?.parentElement?.closest('a');
+  const current = existing?.href || 'https://';
+  const url = prompt('Enter URL:', current);
+  if (url === null) return;
+  editor.focus();
+  if (url.trim() === '') {
+    document.execCommand('unlink', false, null);
+  } else {
+    if (existing) {
+      existing.href = url;
+    } else {
+      document.execCommand('createLink', false, url);
+    }
+    // Ensure new links open in a new tab
+    editor.querySelectorAll('a[href]').forEach(a => { a.target = '_blank'; });
+  }
+  renderPreview();
+  if (saveStatus) saveStatus.textContent = 'Unsaved changes';
+});
+
+document.getElementById('fmt-table')?.addEventListener('click', (e) => {
+  e.preventDefault();
+  const rows = parseInt(prompt('Rows (including header):', '3'));
+  if (!rows || rows < 1) return;
+  const cols = parseInt(prompt('Columns:', '3'));
+  if (!cols || cols < 1) return;
+
+  let html = '<table><thead><tr>';
+  for (let c = 0; c < cols; c++) html += `<th>Header ${c + 1}</th>`;
+  html += '</tr></thead><tbody>';
+  for (let r = 1; r < rows; r++) {
+    html += '<tr>';
+    for (let c = 0; c < cols; c++) html += '<td>Cell</td>';
+    html += '</tr>';
+  }
+  html += '</tbody></table><p><br></p>';
+
+  editor.focus();
+  document.execCommand('insertHTML', false, html);
+  renderPreview();
+  if (saveStatus) saveStatus.textContent = 'Unsaved changes';
+});
+
 if (titleEl) {
   titleEl.addEventListener("input", () => {
     renderPreview();
@@ -448,21 +510,54 @@ if (btnCollapseStarter && starterCodeBody) {
   });
 }
 
+// Line numbers + unsaved tracking for starter code editor
+function updateStarterLineNums() {
+  const lineNumEl = document.getElementById('starter-line-nums');
+  if (!starterCodeEditor || !lineNumEl) return;
+  const count = starterCodeEditor.value.split('\n').length;
+  lineNumEl.innerHTML = Array.from({ length: count }, (_, i) =>
+    `<span>${i + 1}</span>`
+  ).join('');
+  lineNumEl.scrollTop = starterCodeEditor.scrollTop;
+}
+
+// Starter code Save and Clear buttons
+document.getElementById('btn-save-starter')?.addEventListener('click', async () => {
+  if (!currentId) { alert('No lab selected.'); return; }
+  const code = starterCodeEditor ? starterCodeEditor.value : '';
+  try {
+    await apiRequest(`/labs/${currentId}`, {
+      method: 'PUT',
+      body: JSON.stringify({ starter_code: code }),
+    });
+    if (saveStatus) saveStatus.textContent = 'Starter code saved ✓';
+    setTimeout(() => { if (saveStatus) saveStatus.textContent = ''; }, 2000);
+  } catch (err) {
+    alert('Failed to save starter code: ' + err.message);
+  }
+});
+
+document.getElementById('btn-clear-starter')?.addEventListener('click', () => {
+  if (!confirm('Clear the starter code for this lab?')) return;
+  if (starterCodeEditor) starterCodeEditor.value = '';
+  if (saveStatus) saveStatus.textContent = 'Unsaved changes';
+});
+
 // Track unsaved changes in starter code
 if (starterCodeEditor) {
   starterCodeEditor.addEventListener("input", () => {
     if (saveStatus) saveStatus.textContent = "Unsaved changes";
   });
 
-  // Allow Tab key to insert a tab character instead of leaving the textarea
   starterCodeEditor.addEventListener("keydown", (e) => {
     if (e.key === "Tab") {
       e.preventDefault();
       const start = starterCodeEditor.selectionStart;
-      const end = starterCodeEditor.selectionEnd;
+      const end   = starterCodeEditor.selectionEnd;
       starterCodeEditor.value =
-        starterCodeEditor.value.substring(0, start) + "\t" + starterCodeEditor.value.substring(end);
-      starterCodeEditor.selectionStart = starterCodeEditor.selectionEnd = start + 1;
+        starterCodeEditor.value.substring(0, start) + "    " +
+        starterCodeEditor.value.substring(end);
+      starterCodeEditor.selectionStart = starterCodeEditor.selectionEnd = start + 4;
     }
   });
 }

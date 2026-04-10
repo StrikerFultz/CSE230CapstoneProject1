@@ -61,7 +61,27 @@
       </div>
 
       <div class="formatbar">
-        <span>Type HTML in the editor. Preview updates live.</span>
+        <div class="fmt-toolbar">
+          <button type="button" class="fmt-btn" data-cmd="bold" title="Bold"><b>B</b></button>
+          <button type="button" class="fmt-btn" data-cmd="italic" title="Italic"><i>I</i></button>
+          <button type="button" class="fmt-btn" data-cmd="underline" title="Underline"><u>U</u></button>
+          <button type="button" class="fmt-btn" data-cmd="strikeThrough" title="Strikethrough"><s>S</s></button>
+          <span class="fmt-sep"></span>
+          <button type="button" class="fmt-btn" data-cmd="formatBlock" data-val="h1" title="Heading 1">H1</button>
+          <button type="button" class="fmt-btn" data-cmd="formatBlock" data-val="h2" title="Heading 2">H2</button>
+          <button type="button" class="fmt-btn" data-cmd="formatBlock" data-val="h3" title="Heading 3">H3</button>
+          <button type="button" class="fmt-btn" data-cmd="formatBlock" data-val="p" title="Paragraph">¶</button>
+          <span class="fmt-sep"></span>
+          <button type="button" class="fmt-btn" data-cmd="insertUnorderedList" title="Bullet list">• List</button>
+          <button type="button" class="fmt-btn" data-cmd="insertOrderedList" title="Numbered list">1. List</button>
+          <span class="fmt-sep"></span>
+          <button type="button" class="fmt-btn" id="fmt-link" title="Insert / edit link">🔗 Link</button>
+          <button type="button" class="fmt-btn" id="fmt-table" title="Insert table">⊞ Table</button>
+          <button type="button" class="fmt-btn" data-cmd="insertHorizontalRule" title="Horizontal rule">― HR</button>
+          <span class="fmt-sep"></span>
+          <button type="button" class="fmt-btn" data-cmd="undo" title="Undo">↩</button>
+          <button type="button" class="fmt-btn" data-cmd="redo" title="Redo">↪</button>
+        </div>
       </div>
 
       <div class="editor-preview-wrap">
@@ -79,7 +99,11 @@
       <div class="starter-code-section" id="starter-code-section" style="display:none;">
         <div class="starter-code-header">
           <span>Starter Code (MIPS Assembly)</span>
-          <button id="btn-collapse-starter" class="btn-ghost">Hide</button>
+          <div style="display:flex;gap:6px;align-items:center;">
+            <button id="btn-save-starter" class="btn-ghost">Save</button>
+            <button id="btn-clear-starter" class="btn-ghost">Clear</button>
+            <button id="btn-collapse-starter" class="btn-ghost">Hide</button>
+          </div>
         </div>
         <div id="starter-code-body" class="starter-code-body">
           <textarea id="starter-code-editor" class="starter-code-textarea"
