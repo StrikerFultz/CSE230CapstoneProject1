@@ -56,16 +56,19 @@
 
       <!-- Course Roster Section -->
       <div class="export-section" id="roster-section">
-        <div class="export-header">
-          <span>Course Roster</span>
-          <div class="roster-header-actions">
-            <small id="roster-count"></small>
-            <label class="roster-upload-btn">
-              Upload (.csv / .xlsx)
-              <input type="file" id="roster-file-input" accept=".csv,.xlsx,.xls" style="display:none" />
-            </label>
-            <a href="/api/roster/template" class="roster-action-link" title="Download a CSV template">Template ↓</a>
-            <button id="roster-clear-btn" class="roster-action-link roster-clear-link" title="Remove all roster entries">Clear All</button>
+          <div class="export-header">
+            <span>Course Roster</span>
+            <div class="roster-header-actions">
+              <small id="roster-count"></small>
+              <input id="roster-search" class="input" placeholder="Search roster…" style="width:160px;font-size:12px;padding:3px 7px;" />
+              <a id="roster-export-btn" href="#" class="roster-action-link" title="Download current roster as CSV">Download ↓</a>
+              <label class="roster-upload-btn">
+                Upload (.csv / .xlsx)
+                <input type="file" id="roster-file-input" accept=".csv,.xlsx,.xls" style="display:none" />
+              </label>
+              <a href="/api/roster/template" class="roster-action-link" title="Download a CSV template">Template ↓</a>
+              <button id="roster-clear-btn" class="roster-action-link roster-clear-link" title="Remove all roster entries">Clear All</button>
+            </div>
           </div>
         </div>
 

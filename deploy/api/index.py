@@ -966,6 +966,44 @@ def clear_roster():
         return jsonify({'error': _safe_error(e, 'Failed to clear roster')}), 500
 
 
+@app.route('/api/roster/export', methods=['GET'])
+def export_roster():
+    uid, err = _require_teacher()
+    if err:
+        return jsonify({'error': 'Unauthorized'}), 403 if err == 'not_teacher' else 401
+
+    conn = get_db_connection()
+    if not conn:
+        return jsonify({'error': 'Database connection failed'}), 500
+
+    try:
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+        cursor.execute("""
+            SELECT r.asurite, r.asu_id, r.full_name, r.email,
+                   CASE WHEN u.user_id IS NOT NULL THEN 'Registered' ELSE 'Pending' END AS status
+            FROM course_roster r
+            LEFT JOIN users u ON u.username = r.asurite AND u.role = 'student'
+            ORDER BY r.full_name, r.asurite
+        """)
+        rows = cursor.fetchall()
+        conn.close()
+
+        output = StringIO()
+        writer = csv.writer(output)
+        writer.writerow(['Full Name', 'ASURITE', 'ASU ID', 'Email', 'Status'])
+        for r in rows:
+            writer.writerow([r['full_name'] or '', r['asurite'], r['asu_id'] or '',
+                             r['email'] or '', r['status']])
+
+        output.seek(0)
+        ts = datetime.now().strftime('%Y%m%d_%H%M%S')
+        return send_file(BytesIO(output.getvalue().encode('utf-8')),
+                         mimetype='text/csv', as_attachment=True,
+                         download_name=f'roster_{ts}.csv')
+    except Exception as e:
+        return jsonify({'error': _safe_error(e, 'Failed to export roster')}), 500
+
+
 @app.route('/api/roster/template', methods=['GET'])
 def roster_template():
     uid, err = _require_instructor()

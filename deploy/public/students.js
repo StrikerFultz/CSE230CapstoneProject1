@@ -713,23 +713,32 @@ async function loadCourseRoster() {
   }
 }
 
-function renderCourseRoster(entries) {
-  if (!rosterCountEl || !rosterTbody) return;
+// Roster search filter
+document.getElementById('roster-search')?.addEventListener('input', function () {
+  const q = this.value.toLowerCase().trim();
+  if (!q) { renderCourseRoster(allRosterEntries); return; }
+  const filtered = allRosterEntries.filter(e =>
+    (e.full_name  || '').toLowerCase().includes(q) ||
+    (e.asurite    || '').toLowerCase().includes(q) ||
+    (e.asu_id     || '').toLowerCase().includes(q) ||
+    (e.email      || '').toLowerCase().includes(q)
+  );
+  // Render without overwriting allRosterEntries
+  _renderRosterTable(filtered);
+});
 
-  const registered = entries.filter(e => e.is_registered).length;
-  rosterCountEl.textContent = `${registered} / ${entries.length} registered`;
+// Roster CSV download
+document.getElementById('roster-export-btn')?.addEventListener('click', (e) => {
+  e.preventDefault();
+  const a = Object.assign(document.createElement('a'),
+    { href: `${API_BASE}/roster/export`, style: 'display:none' });
+  document.body.appendChild(a); a.click(); a.remove();
+});
 
-  if (!entries.length) {
-    rosterTableEl.style.display = 'none';
-    rosterEmptyEl.style.display = '';
-    rosterEmptyEl.textContent = 'No roster uploaded yet. Use the upload button above to import your class list.';
-    rosterEmptyEl.style.color = '';
-    return;
-  }
+let allRosterEntries = [];
 
-  rosterEmptyEl.style.display = 'none';
-  rosterTableEl.style.display = '';
-
+function _renderRosterTable(entries) {
+  if (!rosterTbody) return;
   rosterTbody.innerHTML = '';
   entries.forEach(e => {
     const tr = document.createElement('tr');
@@ -751,6 +760,26 @@ function renderCourseRoster(entries) {
     `;
     rosterTbody.appendChild(tr);
   });
+}
+
+function renderCourseRoster(entries) {
+  allRosterEntries = entries;
+  if (!rosterCountEl || !rosterTbody) return;
+
+  const registered = entries.filter(e => e.is_registered).length;
+  rosterCountEl.textContent = `${registered} / ${entries.length} registered`;
+
+  if (!entries.length) {
+    rosterTableEl.style.display = 'none';
+    rosterEmptyEl.style.display = '';
+    rosterEmptyEl.textContent = 'No roster uploaded yet. Use the upload button above to import your class list.';
+    rosterEmptyEl.style.color = '';
+    return;
+  }
+
+  rosterEmptyEl.style.display = 'none';
+  rosterTableEl.style.display = '';
+  _renderRosterTable(entries);
 }
 
 if (rosterFileInput) {
