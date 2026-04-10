@@ -464,13 +464,6 @@ saveBtn?.addEventListener('click', async () => {
   }
 });
 
-// ─── Logout ───
-
-document.getElementById('logout-btn')?.addEventListener('click', async () => {
-  try { await apiRequest('/auth/logout', { method: 'POST' }); } catch (_) {}
-  window.location.href = 'login.html';
-});
-
 // ─── Init ───
 
 (async () => {

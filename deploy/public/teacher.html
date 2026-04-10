@@ -15,8 +15,6 @@
       <a href="teacher.html" class="active">Professor View</a>
       <a href="students.html">Students</a>
       <a href="testgen.html">Test Generator</a>
-      <!--the button to logout-->
-      <button id="logout-prof">Log out</button>
     </nav>
   </header>
 
@@ -103,38 +101,6 @@
         <div id="tc-list" class="tc-list">
           <div class="tc-empty">Select a lab to view test cases</div>
         </div>
-      </div>
-
-      <!-- Export / Download Section -->
-      <div class="export-section" id="export-section">
-        <div class="export-header">
-          <span>Download Submissions &amp; Grades</span>
-          <div class="export-controls-inline">
-            <select id="export-lab-select">
-              <option value=""> -- Select Lab --</option>
-              <option value="ALL">ALL LABS</option>
-            </select>
-          </div>
-        </div>
-
-        <div class="export-grid">
-          <div class="export-card">
-            <h4>Grades (Excel)</h4>
-            <p>Best submission per student with manual adjustment column</p>
-            <button id="download-grades-btn" class="btn-primary">Download Grades</button>
-          </div>
-          <div class="export-card">
-            <h4>Source Code (ZIP)</h4>
-            <p>All student .asm files in one download</p>
-            <button id="download-zip-btn" class="btn-secondary">Download ZIP</button>
-          </div>
-          <div class="export-card">
-            <h4>Complete History (CSV)</h4>
-            <p>Every submission attempt with timestamps</p>
-            <button id="download-history-btn" class="btn-secondary">Download History</button>
-          </div>
-        </div>
-        <div id="export-status"></div>
       </div>
 
       <!-- Add / Edit Test Case Modal -->

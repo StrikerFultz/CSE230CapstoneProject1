@@ -164,20 +164,6 @@ const btnCollapseStarter = document.getElementById("btn-collapse-starter");
 
 let currentId = null;
 
-// Logout handler
-document.addEventListener("DOMContentLoaded", () => {
-  const logoutBtn = document.getElementById("logout-prof");
-  if (logoutBtn) {
-    logoutBtn.addEventListener("click", async () => {
-      try {
-        await apiRequest('/auth/logout', { method: 'POST' });
-      } catch (_) {}
-      localStorage.removeItem(AUTH_KEY);
-      window.location.href = "login.html";
-    });
-  }
-});
-
 // Helper functions
 async function updateCount() {
   const customCount = Object.keys(getCustom()).length;
@@ -757,76 +743,6 @@ loadLesson = async function(id) {
   await refreshTestCases();
 };
 
-// ─── Export / Download helpers ───
-
-async function populateExportLabSelect() {
-  const select = document.getElementById('export-lab-select');
-  if (!select) return;
-
-  const lessons = await allLessons();
-  // Keep the first two static options ( -- Select Lab -- , ALL LABS )
-  // Remove any previously added dynamic options
-  while (select.options.length > 2) select.remove(2);
-
-  Object.entries(lessons)
-    .sort((a, b) => a[0].localeCompare(b[0]))
-    .forEach(([id, data]) => {
-      const opt = document.createElement('option');
-      opt.value = id;
-      opt.textContent = `${data.title || id} (${id})`;
-      select.appendChild(opt);
-    });
-}
-
-async function downloadExport(endpoint, fallbackFilename, statusMsg) {
-  const labId = document.getElementById('export-lab-select')?.value;
-  if (!labId) { alert('Please select a lab first'); return; }
-
-  const statusDiv = document.getElementById('export-status');
-  if (statusDiv) statusDiv.innerHTML = `<p>${statusMsg}</p>`;
-
-  try {
-    const response = await fetch(`${API_BASE}/export/${endpoint}/${labId}`, {
-      credentials: 'include'
-    });
-
-    if (!response.ok) {
-      const err = await response.json();
-      throw new Error(err.error || 'Export failed');
-    }
-
-    const blob = await response.blob();
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${labId}_${fallbackFilename}`;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    window.URL.revokeObjectURL(url);
-
-    if (statusDiv) {
-      statusDiv.innerHTML = '<p style="color:green;">Download complete!</p>';
-      setTimeout(() => statusDiv.innerHTML = '', 3000);
-    }
-  } catch (error) {
-    console.error('Download error:', error);
-    if (statusDiv) statusDiv.innerHTML = `<p style="color:red;">Error: ${error.message}</p>`;
-  }
-}
-
-document.getElementById('download-grades-btn')?.addEventListener('click', () => {
-  downloadExport('grades', 'grades.xlsx', 'Generating Excel file…');
-});
-
-document.getElementById('download-zip-btn')?.addEventListener('click', () => {
-  downloadExport('submissions-zip', 'submissions.zip', 'Creating ZIP file…');
-});
-
-document.getElementById('download-history-btn')?.addEventListener('click', () => {
-  downloadExport('submissions', 'history.csv', 'Generating CSV file…');
-});
-
 // pick first lab from DB
 (async () => {
   const lessons = await allLessons();
@@ -835,7 +751,6 @@ document.getElementById('download-history-btn')?.addEventListener('click', () =>
 
   await renderList(firstId);
   await updateCount();
-  await populateExportLabSelect();
 
   if (firstId) {
     loadLesson(firstId);

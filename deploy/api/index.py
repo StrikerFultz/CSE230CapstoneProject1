@@ -306,6 +306,7 @@ def delete_lab(lab_id):
 
     try:
         cursor = conn.cursor()
+        cursor.execute("DELETE FROM score_overrides WHERE lab_id = %s", (lab_id,))
         cursor.execute("DELETE FROM submissions WHERE lab_id = %s", (lab_id,))
         cursor.execute("DELETE FROM lab_test_cases WHERE lab_id = %s", (lab_id,))
         cursor.execute("DELETE FROM labs WHERE lab_id = %s RETURNING lab_id", (lab_id,))
@@ -471,17 +472,32 @@ def list_students():
     try:
         cursor = conn.cursor(cursor_factory=RealDictCursor)
         cursor.execute("""
+            WITH best_subs AS (
+                SELECT DISTINCT ON (s.user_id, s.lab_id)
+                    s.user_id, s.lab_id, s.score, s.total_possible
+                FROM submissions s
+                ORDER BY s.user_id, s.lab_id, s.score DESC, s.submitted_at DESC
+            ),
+            effective AS (
+                SELECT bs.user_id,
+                       COALESCE(ov.override_score, bs.score) AS effective_score,
+                       bs.total_possible
+                FROM best_subs bs
+                LEFT JOIN score_overrides ov
+                       ON ov.user_id = bs.user_id AND ov.lab_id = bs.lab_id
+            )
             SELECT u.user_id, u.username, u.full_name, u.email, u.asu_id,
                    u.created_at, u.last_login,
                    COUNT(DISTINCT s.lab_id)    AS labs_attempted,
                    COUNT(s.submission_id)       AS total_submissions,
                    COALESCE(ROUND(AVG(
-                     CASE WHEN s.total_possible > 0
-                          THEN s.score * 100.0 / s.total_possible ELSE NULL END
+                     CASE WHEN e.total_possible > 0
+                          THEN e.effective_score * 100.0 / e.total_possible ELSE NULL END
                    ), 1), 0)                    AS avg_score_pct,
                    MAX(s.submitted_at)          AS last_submission
             FROM users u
             LEFT JOIN submissions s ON s.user_id = u.user_id
+            LEFT JOIN effective e   ON e.user_id = u.user_id
             WHERE u.role = 'student' AND u.is_active = true
             GROUP BY u.user_id
             ORDER BY u.full_name, u.username
@@ -555,6 +571,14 @@ def get_student_detail(user_id):
             ORDER BY executed_at DESC
         """, (user_id,))
         telemetry = cursor.fetchall()
+
+        cursor.execute("""
+            SELECT lab_id, override_score
+            FROM score_overrides
+            WHERE user_id = %s
+        """, (user_id,))
+        overrides_by_lab = {row['lab_id']: float(row['override_score']) for row in cursor.fetchall()}
+
         conn.close()
 
         subs_by_lab = {}
@@ -586,13 +610,17 @@ def get_student_detail(user_id):
             lid = lab['lab_id']
             lab_subs = subs_by_lab.get(lid, [])
             lab_tel  = tel_by_lab.get(lid, []) # NEW
+
             best_score = max((s['score'] for s in lab_subs), default=None)
             best_possible = lab_subs[0]['total_possible'] if lab_subs else lab['total_points']
+
+            # apply override if one exists
+            effective_score = overrides_by_lab.get(lid, best_score) if best_score is not None else None
 
             lab_details.append({
                 'lab_id': lid, 'title': lab['title'],
                 'difficulty': lab['difficulty'], 'total_points': lab['total_points'],
-                'attempt_count': len(lab_subs), 'best_score': best_score,
+                'attempt_count': len(lab_subs), 'best_score': effective_score,
                 'best_possible': best_possible,
                 'latest_submission': lab_subs[0] if lab_subs else None,
                 'submissions': lab_subs,
@@ -613,6 +641,130 @@ def get_student_detail(user_id):
         })
     except Exception as e:
         return jsonify({'error': _safe_error(e, 'Failed to load student details')}), 500
+    
+@app.route('/api/students/<user_id>/score-override/<lab_id>', methods=['GET'])
+def get_score_override(user_id, lab_id):
+    """Return the current manual override for one student/lab pair, or {} if none."""
+    uid, err = _require_instructor()
+    if err:
+        return jsonify({'error': 'Unauthorized'}), 403 if err == 'not_instructor' else 401
+ 
+    conn = get_db_connection()
+    if not conn:
+        return jsonify({'error': 'Database connection failed'}), 500
+    try:
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+        cursor.execute("""
+            SELECT override_score, note, created_at
+            FROM score_overrides
+            WHERE user_id = %s AND lab_id = %s
+        """, (user_id, lab_id))
+        row = cursor.fetchone()
+        conn.close()
+        if not row:
+            return jsonify({}), 200   # 200 not 404 , absence of override is normal
+        return jsonify({
+            'override_score': float(row['override_score']),
+            'note':           row['note'],
+            'created_at':     row['created_at'].isoformat(),
+        })
+    except Exception as e:
+        conn.close()
+        return jsonify({'error': _safe_error(e)}), 500
+    
+@app.route('/api/students/<user_id>/score-override', methods=['POST'])
+def set_score_override(user_id):
+    """
+    Create or update a manual grade override.
+    Body: { lab_id, override_score, note? }
+    override_score is the FINAL score (auto + adj), not the delta.
+    """
+    uid, err = _require_instructor()
+    if err:
+        return jsonify({'error': 'Unauthorized'}), 403 if err == 'not_instructor' else 401
+ 
+    data = request.get_json()
+    if not data or 'lab_id' not in data or 'override_score' not in data:
+        return jsonify({'error': 'Missing lab_id or override_score'}), 400
+ 
+    lab_id         = data['lab_id']
+    override_score = data['override_score']
+    note           = data.get('note', '')
+ 
+    conn = get_db_connection()
+    if not conn:
+        return jsonify({'error': 'Database connection failed'}), 500
+    try:
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+ 
+        # Validate student exists
+        cursor.execute("SELECT user_id FROM users WHERE user_id = %s", (user_id,))
+        if not cursor.fetchone():
+            conn.close()
+            return jsonify({'error': 'Student not found'}), 404
+ 
+        # Validate lab exists and get max points scored
+        cursor.execute("SELECT total_points FROM labs WHERE lab_id = %s", (lab_id,))
+        lab = cursor.fetchone()
+        if not lab:
+            conn.close()
+            return jsonify({'error': 'Lab not found'}), 404
+ 
+        try:
+            override_score = float(override_score)
+        except (TypeError, ValueError):
+            conn.close()
+            return jsonify({'error': 'override_score must be a number'}), 400
+ 
+        if override_score < 0 or override_score > lab['total_points']:
+            conn.close()
+            return jsonify({'error': f"Score must be between 0 and {lab['total_points']}"}), 400
+ 
+        cursor.execute("""
+            INSERT INTO score_overrides (user_id, lab_id, override_score, note, created_by)
+            VALUES (%s, %s, %s, %s, %s)
+            ON CONFLICT (user_id, lab_id) DO UPDATE SET
+                override_score = EXCLUDED.override_score,
+                note           = EXCLUDED.note,
+                created_by     = EXCLUDED.created_by,
+                created_at     = CURRENT_TIMESTAMP
+        """, (user_id, lab_id, override_score, note, uid))
+ 
+        conn.commit()
+        conn.close()
+        return jsonify({'message': 'Override saved', 'override_score': override_score})
+ 
+    except Exception as e:
+        conn.rollback()
+        conn.close()
+        return jsonify({'error': _safe_error(e, 'Failed to save override')}), 500
+
+@app.route('/api/students/<user_id>/score-override/<lab_id>', methods=['DELETE'])
+def delete_score_override(user_id, lab_id):
+    """Remove a manual grade override, reverting to the auto score."""
+    uid, err = _require_instructor()
+    if err:
+        return jsonify({'error': 'Unauthorized'}), 403 if err == 'not_instructor' else 401
+ 
+    conn = get_db_connection()
+    if not conn:
+        return jsonify({'error': 'Database connection failed'}), 500
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            "DELETE FROM score_overrides WHERE user_id = %s AND lab_id = %s RETURNING override_id",
+            (user_id, lab_id)
+        )
+        if cursor.rowcount == 0:
+            conn.close()
+            return jsonify({'error': 'No override found'}), 404
+        conn.commit()
+        conn.close()
+        return jsonify({'message': 'Override removed'})
+    except Exception as e:
+        conn.rollback()
+        conn.close()
+        return jsonify({'error': _safe_error(e, 'Failed to remove override')}), 500
 
 
 @app.route('/api/roster', methods=['GET'])
@@ -871,21 +1023,31 @@ def export_grades_excel(lab_id):
         if lab_id == "ALL":
             cursor.execute("""
                 SELECT DISTINCT ON (s.user_id, s.lab_id)
-                    u.username, u.user_id, u.email, s.lab_id, s.score,
+                    u.username, u.user_id, u.email, s.lab_id, s.score AS auto_score,
+                    COALESCE(ov.override_score, s.score) AS score,
                     s.total_possible AS max_score,
-                    (s.score::float / NULLIF(s.total_possible, 0) * 100) AS percentage,
-                    s.submitted_at
-                FROM submissions s JOIN users u ON s.user_id = u.user_id
+                    (COALESCE(ov.override_score, s.score)::float / NULLIF(s.total_possible, 0) * 100) AS percentage,
+                    s.submitted_at,
+                    ov.override_score,
+                    ov.note AS override_note
+                FROM submissions s
+                JOIN users u ON s.user_id = u.user_id
+                LEFT JOIN score_overrides ov ON ov.user_id = s.user_id AND ov.lab_id = s.lab_id
                 ORDER BY s.user_id, s.lab_id, s.score DESC, s.submitted_at DESC
-            """)
+            """)# may need to update how this is pulling with updated front end
         else:
             cursor.execute("""
                 SELECT DISTINCT ON (s.user_id)
-                    u.username, u.user_id, u.email, s.score,
+                    u.username, u.user_id, u.email, s.score AS auto_score,
+                    COALESCE(ov.override_score, s.score) AS score,
                     s.total_possible AS max_score,
-                    (s.score::float / NULLIF(s.total_possible, 0) * 100) AS percentage,
-                    s.submitted_at
-                FROM submissions s JOIN users u ON s.user_id = u.user_id
+                    (COALESCE(ov.override_score, s.score)::float / NULLIF(s.total_possible, 0) * 100) AS percentage,
+                    s.submitted_at,
+                    ov.override_score,
+                    ov.note AS override_note
+                FROM submissions s
+                JOIN users u ON s.user_id = u.user_id
+                LEFT JOIN score_overrides ov ON ov.user_id = s.user_id AND ov.lab_id = s.lab_id
                 WHERE s.lab_id = %s
                 ORDER BY s.user_id, s.score DESC, s.submitted_at DESC
             """, (lab_id,))
@@ -923,7 +1085,7 @@ def export_grades_excel(lab_id):
                 ws.cell(row=row_idx, column=col, value=sub.get('lab_id', '')); col += 1
 
             auto_score_col = col
-            ws.cell(row=row_idx, column=col, value=sub['score']); col += 1
+            ws.cell(row=row_idx, column=col, value=sub['auto_score']); col += 1
             max_score_col = col
             ws.cell(row=row_idx, column=col, value=sub['max_score']); col += 1
 
@@ -937,7 +1099,8 @@ def export_grades_excel(lab_id):
                 pct_cell.fill = PatternFill(start_color="FFC7CE", end_color="FFC7CE", fill_type="solid")
             col += 1
 
-            adj_cell = ws.cell(row=row_idx, column=col, value=0.0)
+            adj_delta = (float(sub['override_score']) - float(sub['auto_score'])) if sub.get('override_score') is not None else 0.0
+            adj_cell = ws.cell(row=row_idx, column=col, value=adj_delta)
             adj_cell.fill = PatternFill(start_color="FFFF00", end_color="FFFF00", fill_type="solid")
             adj_cell.font = Font(bold=True)
             adj_col = col; col += 1
