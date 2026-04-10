@@ -42,7 +42,116 @@ async function allLessons() {
 const lessonContainer = document.getElementById("lesson-container");
 const lessonTitle = document.getElementById("lesson-title");
 const lessonBody = document.getElementById("lesson-body");
-const lessonHide = document.getElementById("lesson-hide");
+const lessonToggle = document.getElementById("lesson-toggle");
+const lessonPopout = document.getElementById("lesson-popout");
+
+
+function openLessonPopup() {
+  if (!lessonTitle || !lessonBody) return;
+
+  const title = lessonTitle.textContent || "Lesson";
+  const bodyHtml = lessonBody.innerHTML || "<p>No lesson loaded.</p>";
+
+  const popup = window.open("", "lessonPopup", "width=1000,height=800,resizable=yes,scrollbars=yes");
+
+  if (!popup) {
+    alert("Popup blocked. Please allow popups for this site.");
+    return;
+  }
+
+  popup.document.open();
+  popup.document.write(`
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+      <meta charset="UTF-8" />
+      <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+      <title>${title}</title>
+      <style>
+        body {
+          font-family: "Segoe UI", Arial, sans-serif;
+          background: #dcdcdc;
+          margin: 0;
+          color: #000;
+        }
+
+        .popup-wrap {
+          max-width: 1000px;
+          margin: 0 auto;
+          padding: 24px 32px 40px;
+          background: #e5e5e5;
+          min-height: 100vh;
+        }
+
+        h1 {
+          font-size: 26px;
+          text-align: center;
+          margin: 0 0 20px;
+        }
+
+        .center-table {
+          display: flex;
+          justify-content: center;
+          margin: 12px 0;
+        }
+
+        table {
+          border-collapse: collapse;
+          font-size: 13px;
+        }
+
+        th, td {
+          border: 1px solid #888;
+          padding: 6px 12px;
+          text-align: center;
+        }
+
+        th {
+          background-color: #d6d6d6;
+        }
+
+        pre {
+          max-width: 700px;
+          margin: 16px auto;
+          padding: 14px 18px;
+          text-align: left;
+          white-space: pre-wrap;
+          overflow-x: auto;
+          background: #f3f3f3;
+          border: 1px solid #999;
+          border-radius: 4px;
+          font-family: Consolas, monospace;
+          font-size: 13px;
+        }
+
+        ul, ol {
+          width: fit-content;
+          margin: 12px auto;
+          text-align: left;
+          padding-left: 24px;
+        }
+
+        p, h2, h3, h4, .lesson-example {
+          text-align: center;
+        }
+      </style>
+    </head>
+    <body>
+      <div class="popup-wrap">
+        <h1>${title}</h1>
+        ${bodyHtml}
+      </div>
+    </body>
+    </html>
+  `);
+  popup.document.close();
+}
+
+if (lessonPopout) {
+  lessonPopout.addEventListener("click", () => {
+    openLessonPopup();
+  });
+}
 
 const filesListEl = document.getElementById("labs-menu-list");
 const labsMenuButton = document.getElementById("labs-menu-button");
@@ -153,7 +262,7 @@ async function showLesson(id) {
 
   lessonTitle.textContent = data.title || id;
   lessonBody.innerHTML = data.html || "";
-  lessonContainer.classList.remove("hidden");
+  setLessonVisible(true);
 
   if (filesListEl) {
     filesListEl.querySelectorAll(".file-item").forEach((el) => {
@@ -183,9 +292,22 @@ async function showLesson(id) {
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
-if (lessonHide) {
-  lessonHide.addEventListener("click", () => {
+function setLessonVisible(visible) {
+  if (!lessonContainer || !lessonToggle) return;
+
+  if (visible) {
+    lessonContainer.classList.remove("hidden");
+    lessonToggle.textContent = "Hide lesson";
+  } else {
     lessonContainer.classList.add("hidden");
+    lessonToggle.textContent = "Show lesson";
+  }
+}
+
+if (lessonToggle) {
+  lessonToggle.addEventListener("click", () => {
+    const isHidden = lessonContainer.classList.contains("hidden");
+    setLessonVisible(isHidden);
   });
 }
 
@@ -364,7 +486,6 @@ const initialLessonId =
     showLesson(initialLessonId);
   }
 })();
-
 //console and reg ui
 
 const consoleOut = document.getElementById("console-output");
