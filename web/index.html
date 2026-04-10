@@ -15,26 +15,30 @@
   </head>
   <body>
     <header class="topbar">
-      <div class="topbar-left">
-        <div class="menu-wrap">
-          <button id="labs-menu-button" type="button" aria-expanded="false">☰</button>
-            <div id="labs-menu" class="hidden">
-              <div id="labs-menu-list"></div>
-            </div>
-        </div>
-        <div class="brand">MIPS Emulator</div>
+  <div class="topbar-left">
+    <div class="menu-wrap">
+      <button id="labs-menu-button" type="button" aria-expanded="false">☰</button>
+      <div id="labs-menu" class="hidden">
+        <div id="labs-menu-list"></div>
       </div>
-      <nav class="nav">
-        <a href="index.html" class="active">Labs</a>
-        <a href="teacher.html">Professor View</a>
-      </nav>
-    </header>
+    </div>
+    <div class="brand">MIPS Emulator</div>
+  </div>
+
+  <div class="topbar-right">
+    <nav class="nav">
+      <a href="index.html" class="active">Labs</a>
+      <a href="teacher.html">Professor View</a>
+    </nav>
+    <button id="lesson-popout" class="lesson-toggle-btn" type="button">Pop out lesson</button>
+    <button id="lesson-toggle" class="lesson-toggle-btn" type="button">Hide lesson</button>
+  </div>
+</header>
 
     <!--labs/lessons-->
     <section id="lesson-container" class="lesson-container hidden">
       <div class="lesson-header">
         <h2 id="lesson-title"></h2>
-        <button id="lesson-hide" class="lesson-hide-btn">Hide lesson</button>
       </div>
       <div id="lesson-body"></div>
     </section>
@@ -42,7 +46,14 @@
     <main class="workspace">
       <!-- assembler and editor -->
       <section class="panel assembler">
-        <h3>Assembler</h3>
+        <div class="assembler-header">
+          <h3>Assembler</h3>
+          <div class="buttons assembler-buttons">
+            <button id="run">Run</button>
+            <button id="step">Step</button>
+            <button id="stop">Stop</button>
+          </div>
+        </div>
         <div class="assembler-content">
           <textarea spellcheck="false"></textarea>
         </div>
@@ -82,11 +93,6 @@
       <section class="console">
         <div class="console-header">
           <span>Console</span>
-          <div class="buttons">
-            <button id="run">Run</button>
-            <button id="step">Step</button>
-            <button id="stop">Stop</button>
-          </div>
         </div>
         <div class="console-inner" id="console-output"></div>
 
