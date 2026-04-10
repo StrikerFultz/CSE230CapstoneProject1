@@ -476,10 +476,84 @@ saveBtn?.addEventListener('click', async () => {
   }
 });
 
+const verifyBtn = document.getElementById('tg-verify');
+const verifyResultsEl = document.getElementById('tg-verify-results');
+
+verifyBtn?.addEventListener('click', async () => {
+  const labId = labSelect.value;
+  if (!labId) { alert('Select a lab first.'); return; }
+
+  const source = cmEditor.getValue().trim();
+  if (!source) { alert('No code to verify.'); return; }
+
+  verifyBtn.disabled = true;
+  verifyBtn.textContent = '…';
+  if (verifyResultsEl) { verifyResultsEl.style.display = 'none'; verifyResultsEl.innerHTML = ''; }
+  log('Running against test cases…');
+
+  try {
+    const res = await apiRequest(`/grade/verify/${labId}`, {
+      method: 'POST',
+      body: JSON.stringify({ source_code: source }),
+    });
+
+    const r = res.grade_report;
+    const allPass = r.failed === 0;
+
+    let html = `
+      <div class="tg-verify-summary ${allPass ? 'tg-verify-pass' : 'tg-verify-fail'}">
+        ${allPass ? '✓' : '✗'} ${r.passed}/${r.passed + r.failed} passed
+        — ${r.earned_points}/${r.total_points} pts (${r.percentage}%)
+      </div>
+      <table class="tg-reg-table" style="margin-top:8px;">
+        <thead><tr><th>Test</th><th>Result</th><th>Points</th><th>Details</th></tr></thead>
+        <tbody>
+    `;
+
+    for (const t of r.results) {
+      const pass = t.status === 'PASS';
+      const color = pass ? '#2e7d32' : t.status === 'ERROR' ? '#e65100' : '#c62828';
+      let detail = t.message || '';
+      if (t.mismatches && t.mismatches.length) {
+        detail = t.mismatches.map(m =>
+          `${m.register}: expected ${m.expected}, got ${m.actual}`
+        ).join(' | ');
+      }
+      html += `<tr>
+        <td>${t.name}</td>
+        <td style="color:${color};font-weight:700;">${t.status}</td>
+        <td>${t.earned}/${t.points}</td>
+        <td style="font-size:11px;color:#666;">${detail}</td>
+      </tr>`;
+    }
+
+    html += '</tbody></table>';
+    verifyResultsEl.innerHTML = html;
+    verifyResultsEl.style.display = '';
+    log(`Verify complete: ${r.passed}/${r.passed + r.failed} passed (${r.percentage}%)`);
+  } catch (err) {
+    log('Verify failed: ' + err.message);
+    if (verifyResultsEl) {
+      verifyResultsEl.innerHTML = `<div style="color:#c62828;padding:8px;">Error: ${err.message}</div>`;
+      verifyResultsEl.style.display = '';
+    }
+  } finally {
+    verifyBtn.disabled = false;
+    verifyBtn.textContent = '✓ Run Test Cases';
+  }
+});
+
 // ─── Init ───
 
 (async () => {
   await loadLabs();
+
+  // Pre-select lab from query param if present
+  const params = new URLSearchParams(window.location.search);
+  const preselect = params.get('lab');
+  if (preselect && labSelect) {
+    labSelect.value = preselect;
+  }
 })();
 
 init()

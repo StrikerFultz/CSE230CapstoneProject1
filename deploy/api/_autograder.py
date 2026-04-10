@@ -429,6 +429,44 @@ def get_test_cases_endpoint(lab_id):
     return jsonify({'lab_id': lab_id, 'test_cases': sanitized})
 
 
+@simple_autograder_bp.route('/verify/<lab_id>', methods=['POST'])
+def verify_solution(lab_id):
+    """Run code against a lab's test cases without saving a submission. Instructor only."""
+    role = session.get('role', '')
+    if role not in ('instructor', 'ta'):
+        return jsonify({'error': 'Unauthorized'}), 403
+
+    data = request.get_json()
+    source_code = (data.get('source_code') or '').strip()
+    if not source_code:
+        return jsonify({'error': 'No source code provided'}), 400
+
+    test_cases = get_test_cases_for_lab(lab_id)
+    if not test_cases:
+        return jsonify({'error': f'No test cases found for {lab_id}'}), 404
+
+    conn = get_db_connection()
+    if not conn:
+        return jsonify({'error': 'Database connection failed'}), 500
+    try:
+        cur = conn.cursor()
+        cur.execute("SELECT use_isolation FROM labs WHERE lab_id = %s", (lab_id,))
+        lab_config = cur.fetchone()
+        use_isolation = lab_config[0] if lab_config else False
+    except Exception as e:
+        log.error('verify_solution db error: %s', e, exc_info=True)
+        use_isolation = False
+    finally:
+        conn.close()
+
+    try:
+        grade_report = calculate_grade(test_cases, source_code, use_isolation=use_isolation)
+        return jsonify({'success': True, 'lab_id': lab_id, 'grade_report': grade_report})
+    except Exception as e:
+        log.error('verify_solution grading error: %s', e, exc_info=True)
+        return jsonify({'error': 'Grading failed'}), 500
+
+
 @simple_autograder_bp.route('/latest/<lab_id>', methods=['GET'])
 def get_latest_submission(lab_id):
     if 'user_id' not in session:

@@ -524,6 +524,11 @@ if (btnCollapseStarter && starterCodeBody) {
   });
 }
 
+document.getElementById('btn-verify-solution')?.addEventListener('click', () => {
+  if (!currentId) { alert('No lab selected.'); return; }
+  window.location.href = `testgen.html?lab=${encodeURIComponent(currentId)}`;
+});
+
 // Line numbers + unsaved tracking for starter code editor
 function updateStarterLineNums() {
   const lineNumEl = document.getElementById('starter-line-nums');

@@ -2830,3 +2830,31 @@ th {
   outline: none;
   tab-size: 4;
 }
+
+.tg-verify-results {
+  margin: 0 16px 16px;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+  overflow: hidden;
+  font-size: 13px;
+}
+
+.tg-verify-summary {
+  padding: 8px 12px;
+  font-weight: 700;
+  font-size: 13px;
+}
+
+.tg-verify-pass { background: #e8f5e9; color: #2e7d32; }
+.tg-verify-fail { background: #ffebee; color: #c62828; }
+
+.tg-save-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px;
+}
+
+.tg-save-bar-sep {
+  flex: 1;
+}
