@@ -239,7 +239,13 @@ def grade_submission():
     try:
         data = request.get_json()
         lab_id      = data.get('lab_id')
+
+        if not lab_id or not isinstance(lab_id, str) or len(lab_id) > 50:
+            return jsonify({'error': 'Invalid lab_id'}), 400
+
         source_code = data.get('source_code', '')
+        if len(source_code) > 50_000:
+            return jsonify({'error': 'Source code exceeds maximum allowed size'}), 400
 
         duration_seconds = data.get('duration_seconds')
         run_count        = data.get('run_count', 0)
@@ -347,6 +353,9 @@ def log_run():
     data = request.get_json()
     lab_id = data.get('lab_id')
     source_code = (data.get('source_code') or '').strip().replace('\n', '\\n')
+    if len(source_code) > 50_000:
+        return jsonify({'error': 'Source too large'}), 400
+
     is_step = data.get('is_step', False)
 
     conn = get_db_connection()
@@ -440,6 +449,9 @@ def verify_solution(lab_id):
     source_code = (data.get('source_code') or '').strip()
     if not source_code:
         return jsonify({'error': 'No source code provided'}), 400
+
+    if len(source_code) > 50_000:
+        return jsonify({'error': 'Source too large'}), 400
 
     test_cases = get_test_cases_for_lab(lab_id)
     if not test_cases:
