@@ -35,6 +35,74 @@ document.getElementById('logout-btn')?.addEventListener('click', async () => {
   window.location.href = 'login.html';
 });
 
+ 
+async function buildDownloadBar() {
+  const leftPane = document.querySelector('.left-pane');
+  if (!leftPane) return;
+
+  const searchWrap = document.querySelector('.stu-search-wrap');
+ 
+  const bar = document.createElement('div');
+  bar.id = 'dl-bar';
+  bar.innerHTML = `
+    <div class="dl-bar-inner">
+      <select id="dl-lab-sel" class="dl-bar-select" title="Select lab to export">
+        <option value="ALL">All Labs</option>
+      </select>
+      <div class="dl-bar-btns">
+        <button class="dl-bar-btn dl-excel" id="dl-excel" title="Download grades spreadsheet">
+          Grades (.xlsx)
+        </button>
+        <button class="dl-bar-btn dl-zip" id="dl-zip" title="Download source code">
+          Source (.zip)
+        </button>
+        <button class="dl-bar-btn dl-csv" id="dl-csv" title="Download full history - does not include manual grade adjustments">
+          History (.csv)
+        </button>
+      </div>
+      <div class="dl-bar-status" id="dl-status"></div>
+    </div>
+  `;
+   if (searchWrap) {
+    leftPane.insertBefore(bar, searchWrap);
+  } else {
+    leftPane.prepend(bar);
+  }
+ 
+  // Populate lab options
+  try {
+    const res  = await fetch('/api/labs', { credentials: 'include' });
+    const labs = await res.json();
+    const sel  = document.getElementById('dl-lab-sel');
+    Object.entries(labs).forEach(([id, lab]) => {
+      const o = document.createElement('option');
+      o.value       = id;
+      o.textContent = `${id} — ${lab.title}`;
+      sel.appendChild(o);
+    });
+  } catch { /* non-fatal */ }
+ 
+  const setStatus = msg => {
+    const el = document.getElementById('dl-status');
+    if (el) { el.textContent = msg; setTimeout(() => { el.textContent = ''; }, 3000); }
+  };
+  const go = url => {
+    const a = Object.assign(document.createElement('a'), { href: url, style: 'display:none' });
+    document.body.appendChild(a); a.click(); a.remove();
+  };
+  const lab = () => document.getElementById('dl-lab-sel')?.value || 'ALL';
+ 
+  document.getElementById('dl-excel')?.addEventListener('click', () => {
+    setStatus('Preparing…'); go(`/api/export/grades/${lab()}`);
+  });
+  document.getElementById('dl-zip')?.addEventListener('click', () => {
+    setStatus('Building ZIP…'); go(`/api/export/submissions-zip/${lab()}`);
+  });
+  document.getElementById('dl-csv')?.addEventListener('click', () => {
+    setStatus('Generating…'); go(`/api/export/submissions/${lab()}`);
+  });
+}
+
 // ─── Roster ───
 
 async function loadRoster() {
@@ -219,13 +287,13 @@ function renderDetail(data) {
         </div>
         <div class="stu-lab-header-right">
           <span class="stu-lab-status ${statusClass}" style="color:${barColor}">${statusText}</span>
-          <span class="stu-lab-score">${hasAttempt ? lab.best_score + '/' + lab.best_possible : '—'}</span>
+          <span class="stu-lab-score" id="lab-score-display-${lab.lab_id}-${stu.user_id}">${hasAttempt ? lab.best_score + '/' + lab.best_possible : '—'}</span>
           ${hasAttempt && window.__currentUser && window.__currentUser.role === 'instructor' ? `<button class="btn-ghost stu-reset-btn" data-lab-id="${lab.lab_id}" style="color:#e53935;font-size:11px;" title="Delete all submissions and reset attempt counter">Reset Attempts</button>` : ''}
           <span class="stu-lab-toggle">▾</span>
         </div>
       </div>
       <div class="stu-lab-body">
-        ${!hasAttempt ? '<div class="stu-lab-empty">No submissions yet</div>' : renderSubmissionTable(lab)}
+        ${!hasAttempt ? '<div class="stu-lab-empty">No submissions yet</div>' : renderSubmissionTable(lab, stu.user_id)}
         
         <div class="stu-run-history" style="margin-top: 15px; border-top: 1px solid #eee; padding-top: 10px;">
           <details class="stu-run-details">
@@ -242,10 +310,14 @@ function renderDetail(data) {
     });
 
     labsList.appendChild(card);
+    const isInsctructor = window.__currentUser?.role ==='instructor';
+    if (hasAttempt && isInsctructor){
+      attachOverrideUI(card, lab, stu.user_id);
+    }
   });
 }
 
-function renderSubmissionTable(lab) {
+function renderSubmissionTable(lab, userId) {
   let rows = '';
   lab.submissions.forEach((sub, idx) => {
     const date = new Date(sub.submitted_at).toLocaleString();
@@ -289,19 +361,22 @@ function renderSubmissionTable(lab) {
     const flagIcon = sub.timing_flagged
       ? ' <span title="Timing data was adjusted by the server — client values were inconsistent" style="color:#e53935;cursor:help;">&#9873;</span>'
       : '';
+    const adjId = `adj-cell-${lab.lab_id}-${userId}-${idx}`;
+    const pctId = `pct-cell-${lab.lab_id}-${userId}-${idx}`;
 
     rows += `
-      <tr class="${rowClass}">
+      <tr class="${rowClass}" data-is-best="${isBest}">
         <td>${isBest ? '★ ' : ''}#${lab.submissions.length - idx}</td>
         <td>${date}</td>
         <td>${sub.score}/${sub.total_possible}</td>
-        <td style="font-weight:600;">${pct}%</td>
+        <td class="sub-adj-display" id="${adjId}">—</td>
+        <td style="font-weight:600;" id="${pctId}">${pct}%</td>
         <td>${formatDuration(sub.duration_seconds)}${flagIcon}</td>
         <td>${sub.run_count != null ? sub.run_count : '—'}</td>
         <td><button class="btn-ghost stu-expand-btn" data-target="${uniqueId}">Details</button></td>
       </tr>
       <tr class="stu-sub-detail-row" id="${uniqueId}">
-        <td colspan="7">${detailHTML}</td>
+        <td colspan="8">${detailHTML}</td>
       </tr>
     `;
   });
@@ -309,7 +384,7 @@ function renderSubmissionTable(lab) {
   return `
     <table class="stu-sub-table">
       <thead>
-        <tr><th>#</th><th>Submitted</th><th>Score</th><th>%</th><th>Time Spent</th><th>Runs</th><th></th></tr>
+        <tr><th>#</th><th>Submitted</th><th>Score</th><th>Adjusted</th><th>%</th><th>Time Spent</th><th>Runs</th><th></th></tr>
       </thead>
       <tbody>${rows}</tbody>
     </table>
@@ -392,6 +467,208 @@ document.addEventListener('click', async (e) => {
     alert('Failed to reset attempts: ' + err.message);
   }
 });
+
+
+// ─── Override UI — appended below the submission table inside the card body ───
+ 
+async function attachOverrideUI(card, lab, userId) {
+  const labId   = lab.lab_id;
+  const possible = lab.best_possible ?? lab.total_points ?? 0;
+  const autoScore = lab.best_score ?? 0;
+ 
+  // load existing override
+  let currentOverride = null;
+  let currentNote     = '';
+  try {
+    const res = await fetch(`${API_BASE}/students/${userId}/score-override/${labId}`, {
+      credentials: 'include',
+    });
+    if (res.ok) {
+      const d = await res.json();
+      if (d.override_score != null) {
+        currentOverride = d.override_score;
+        currentNote     = d.note ?? '';
+      }
+    }
+  } catch { /* no override yet */ }
+ 
+  const currentAdj = currentOverride != null
+    ? parseFloat((currentOverride - autoScore).toFixed(2))
+    : 0;
+ 
+  // Build the override strip
+  const strip = document.createElement('div');
+  strip.className = 'stu-override-strip';
+  //strip.dataset.labId = labId;
+  //strip.dataset.userId = userId;
+ 
+  strip.innerHTML = `
+    <div class="stu-override-label">
+      Manual grade adjustment
+      ${currentOverride != null ? `<span class="stu-override-tag">adjusted</span>` : ''}
+    </div>
+    <div class="stu-override-controls">
+      <button class="stu-adj-btn stu-adj-minus" type="button">−</button>
+      <input  class="stu-adj-input"
+              type="number" step="0.1"
+              value="${currentAdj.toFixed(2)}"
+              min="${(-autoScore).toFixed(2)}"
+              max="${(possible - autoScore).toFixed(1)}"
+              title="Adjustment added to auto score. Final = ${autoScore} + adj" />
+      <button class="stu-adj-btn stu-adj-plus" type="button">+</button>
+      <span class="stu-adj-preview" id="adj-preview-${labId}-${userId}">
+        = ${(autoScore + currentAdj).toFixed(1)} / ${possible}
+        (${possible > 0 ? (((autoScore + currentAdj) / possible) * 100).toFixed(1) : 0}%)
+      </span>
+      <input  class="stu-adj-note"
+              type="text"
+              placeholder="Reason / note…"
+              value="${escapeHTML(currentNote)}" />
+      <button class="stu-adj-save" type="button">Save</button>
+      ${currentOverride != null ? `<button class="stu-adj-clear" type="button" title="Remove override">Clear</button>` : ''}
+      <span class="stu-adj-status" id="adj-status-${labId}-${userId}"></span>
+    </div>
+  `;
+ 
+  // Insert after the submission table, before the run history
+  const runHistory = card.querySelector('.stu-run-history');
+  const body       = card.querySelector('.stu-lab-body');
+  if (runHistory) body.insertBefore(strip, runHistory);
+  else body.appendChild(strip);
+ 
+  const adjInput  = strip.querySelector('.stu-adj-input');
+  const noteInput = strip.querySelector('.stu-adj-note');
+  const saveBtn   = strip.querySelector('.stu-adj-save');
+  const clearBtn  = strip.querySelector('.stu-adj-clear');
+  const statusEl  = strip.querySelector('.stu-adj-status');
+  const previewEl = strip.querySelector(`#adj-preview-${labId}-${userId}`);
+  const overrideTag = () => strip.querySelector('.stu-override-tag');
+ 
+  function clamp(v) {
+    return Math.max(-autoScore, Math.min(possible - autoScore, +parseFloat(v || 0).toFixed(2)));
+  }
+  function updatePreview(adj) {
+    const final = Math.round((autoScore + adj) * 10) / 10;
+    const pct   = possible > 0 ? ((final / possible) * 100).toFixed(1) : '0.0';
+    if (previewEl) previewEl.textContent = `= ${final} / ${possible} (${pct}%)`;
+    // Also update the Adj column cells in the submission table for the best row
+    updateAdjCells(card, lab, userId, adj, final, possible);
+  }
+ 
+  strip.querySelector('.stu-adj-minus').addEventListener('click', () => {
+    const v = clamp(parseFloat(adjInput.value || 0) - 0.1);
+    adjInput.value = v.toFixed(1); updatePreview(v);
+  });
+  strip.querySelector('.stu-adj-plus').addEventListener('click', () => {
+    const v = clamp(parseFloat(adjInput.value || 0) + 0.1);
+    adjInput.value = v.toFixed(1); updatePreview(v);
+  });
+  adjInput.addEventListener('input', () => {
+    updatePreview(clamp(adjInput.value));
+  });
+ 
+  // Initialize cells with existing override
+  if (currentAdj !== 0) updateAdjCells(card, lab, userId, currentAdj, autoScore + currentAdj, possible);
+ 
+  async function saveOverride(overrideScore, note) {
+    saveBtn.textContent = '…'; saveBtn.disabled = true; statusEl.textContent = '';
+    try {
+      const res = await fetch(`${API_BASE}/students/${userId}/score-override`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ lab_id: labId, override_score: overrideScore, note }),
+      });
+      if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.error || `HTTP ${res.status}`); }
+ 
+      // Update header score display
+      const scoreDisplay = document.getElementById(`lab-score-display-${labId}-${userId}`);
+      if (scoreDisplay) {
+        scoreDisplay.textContent = `${overrideScore} / ${possible}`;
+        scoreDisplay.style.color = overrideScore !== autoScore ? '#0d6efd' : '';
+      }
+ 
+      // Show/ensure override tag
+      if (!overrideTag()) {
+        const label = strip.querySelector('.stu-override-label');
+        const tag = document.createElement('span');
+        tag.className = 'stu-override-tag'; tag.textContent = 'adjusted';
+        label.appendChild(tag);
+      }
+      if (!strip.querySelector('.stu-adj-clear')) {
+        const cb = document.createElement('button');
+        cb.className = 'stu-adj-clear'; cb.type = 'button'; cb.title = 'Remove override';
+        cb.textContent = 'Clear';
+        saveBtn.insertAdjacentElement('afterend', cb);
+        cb.addEventListener('click', () => clearOverride());
+      }
+ 
+      saveBtn.textContent = '✓'; saveBtn.classList.add('saved');
+      statusEl.textContent = 'Saved'; statusEl.className = 'stu-adj-status ok';
+      setTimeout(() => {
+        saveBtn.textContent = 'Save'; saveBtn.classList.remove('saved');
+        saveBtn.disabled = false; statusEl.textContent = '';
+      }, 2000);
+    } catch (err) {
+      saveBtn.textContent = 'Save'; saveBtn.disabled = false;
+      statusEl.textContent = err.message; statusEl.className = 'stu-adj-status err';
+    }
+  }
+ 
+  async function clearOverride() {
+    if (!confirm('Remove the manual grade adjustment for this lab?')) return;
+    try {
+      const res = await fetch(`${API_BASE}/students/${userId}/score-override/${labId}`, {
+        method: 'DELETE', credentials: 'include',
+      });
+      if (!res.ok) throw new Error('Failed to clear override');
+ 
+      adjInput.value = '0.0';
+      updatePreview(0);
+      const tag = overrideTag(); if (tag) tag.remove();
+      const cb  = strip.querySelector('.stu-adj-clear'); if (cb) cb.remove();
+      const scoreDisplay = document.getElementById(`lab-score-display-${labId}-${userId}`);
+      if (scoreDisplay) {
+        scoreDisplay.textContent = `${autoScore}/${possible}`;
+        scoreDisplay.style.color = '';
+      }
+      statusEl.textContent = 'Cleared'; statusEl.className = 'stu-adj-status ok';
+      setTimeout(() => { statusEl.textContent = ''; }, 2000);
+    } catch (err) {
+      alert(err.message);
+    }
+  }
+ 
+  saveBtn.addEventListener('click', () => {
+    const adj      = clamp(parseFloat(adjInput.value) || 0);
+    adjInput.value = adj.toFixed(1);
+    const finalScore = Math.round((autoScore + adj) * 10) / 10;
+    saveOverride(finalScore, noteInput.value.trim());
+  });
+  if (clearBtn) clearBtn.addEventListener('click', () => clearOverride());
+}
+ 
+// Update the Adj column cells in the submission table for a given lab card
+function updateAdjCells(card, lab, userId, adj, finalScore, possible) {
+  const tbody = card.querySelector('tbody');
+  if (!tbody) return;
+  const rows = tbody.querySelectorAll('tr.stu-sub-best, tr[data-is-best="true"]');
+  rows.forEach(tr => {
+    const adjCell = tr.querySelector('.sub-adj-display');
+    const pctCell = tr.querySelector('td[id^="pct-cell"]');
+    if (adjCell) {
+      adjCell.textContent = adj === 0 ? '—'
+        : (adj > 0 ? `+${adj.toFixed(1)}` : adj.toFixed(1));
+      adjCell.style.color      = adj !== 0 ? '#0d6efd' : '';
+      adjCell.style.fontWeight = adj !== 0 ? '700' : '';
+    }
+    if (pctCell && possible > 0) {
+      pctCell.textContent = `${((finalScore / possible) * 100).toFixed(0)}%`;
+      pctCell.style.color = adj !== 0 ? '#0d6efd' : '';
+    }
+  });
+}
+ 
 
 // ─── Roster Management ───
 
@@ -518,6 +795,7 @@ if (rosterClearBtn) {
 // ─── Init ───
 
 (async () => {
+  await buildDownloadBar();
   await loadRoster();
   loadCourseRoster();
 

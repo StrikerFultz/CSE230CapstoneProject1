@@ -90,6 +90,18 @@ CREATE TABLE public.submissions (
     CONSTRAINT submissions_lab_fkey FOREIGN KEY (lab_id) REFERENCES public.labs(lab_id)
 );
 
+CREATE TABLE public.score_overrides (
+    override_id uuid DEFAULT public.uuid_generate_v4() PRIMARY KEY,
+    user_id uuid NOT NULL REFERENCES public.users(user_id),
+    lab_id character varying(50) NOT NULL REFERENCES public.labs(lab_id),
+    override_score numeric(6,2) NOT NULL, -- change here for value for adjustment to change currently allows 6 places before . and 2 after ex: 999999.99 +- 
+    note text,
+    created_by uuid REFERENCES public.users(user_id),
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(user_id, lab_id)
+);
+
+
 -- Enrollments
 CREATE TABLE public.enrollments (
     enrollment_id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
