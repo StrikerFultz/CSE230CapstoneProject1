@@ -310,32 +310,38 @@ impl Parser {
     }
 
     pub fn parse_text(&mut self) -> Result<(), EmuError> {
-        // alert("Parsing text section");
-        let x = self.peek(0);
-        let second_token = self.peek(1);
-        if let Some(token) = x {
+        // 1. Process labels (can be multiple on one line like 'L1: L2: addi...')
+        while let Some(token) = self.peek(0) {
+            if token.token_type == TokenType::Identifier 
+                && self.peek(1).map_or(false, |t| t.token_type == TokenType::Colon) {
+                
+                let label_token = self.expect(TokenType::Identifier)?;
+                self.expect(TokenType::Colon)?;
+                
+                let label_name = label_token.lexeme.clone();
+                let line_num = label_token.line_number;
+
+                // Immediate duplicate check
+                if self.symbol_table.insert(label_name.to_string(), 0).is_some() {
+                    return Err(self.error(format!("Line {}: Duplicate label {}", line_num, label_name)));
+                } else {
+                    self.program_statements.push(ProgramStatement::Label(Label { name: label_name }));
+                }
+            } else {
+                break;
+            }
+        }
+
+        // 2. Process potential instruction following the labels
+        if let Some(token) = self.peek(0) {
             if token.token_type == TokenType::Mnemonic {
                 let insn = self.parse_instruction()?;
-                // return instruction from parsing 
                 self.program_statements.push(ProgramStatement::Instruction(insn));
                 self.line_numbers.push(self.current_line);
                 self.instruction_index += 1;
-
-            } else if token.token_type == TokenType::Identifier 
-                && let Some(second) = second_token && second.token_type == TokenType::Colon {
-
-                let label = token.lexeme.clone();
-                let line_num = token.line_number;
-                if self.symbol_table.insert(label.to_string(), 0).is_some() {
-                    return Err(self.error(format!("Line {}: Duplicate label {}", line_num, label)));
-                } else {
-                    // alert(format!("Inserted label: {} at address: {}", label, self.symbol_table.get(&label).unwrap_or(&0)).as_str());
-                    self.program_statements.push(ProgramStatement::Label(Label { name: label }));
-                }
-
             } else if token.token_type != TokenType::Comment {
-                 // nothing recognized
-                return Err(self.error(format!("At line {}: Unexpected token {:?}", token.line_number, token.lexeme)));
+                // If it's not an instruction, a label, or a comment, it's an error
+                return Err(self.error(format!("At line {}: Unexpected token {:?}", self.current_line, token.lexeme)));
             }
         }
         Ok(())

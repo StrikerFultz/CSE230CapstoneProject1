@@ -193,6 +193,15 @@ impl WasmCPU {
     pub fn set_memory_word(&mut self, address: u32, value: i32) {
         self.cpu.memory.set_word(address, value);
     }
+
+    #[wasm_bindgen]
+    pub fn set_isolation(&mut self, enabled: bool) {
+        if enabled {
+            self.cpu.memory.freeze_inputs();
+        } else {
+            self.cpu.memory.thaw_inputs();
+        }
+    }
 }
 
 #[cfg(test)]
