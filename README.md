@@ -5,22 +5,28 @@ This project is a lab suite and web IDE (similar to ZyBooks), featuring a MIPS32
 
 ### Feature Completion:
 **Emulator (Rust Core)**:
-- Core Emulator [x]
-- ISA Specifications [x]
-- Memory Manager [x]
-- MMIO Spec [x]
+- [x] Core Emulator
+- [x] ISA Specifications
+- [x] Memory Manager
+- [x] MMIO Spec
 
 **Full Stack**:
-- Web IDE [x]
-- Serverless Autograder [x]
-- Persistent Lab Progress (Neon/PostgreSQL) [x]
-- Professor Dashboard [x]
-- Role-based Access Control (Instructor / TA / Student) [x]
-- Student Roster Management [x]
-- Manual Grade Overrides [x]
-- Grade Export (Excel / ZIP / CSV) [x]
-- Test Case Generator [x]
-- Solution Code Storage and Verification [x]
+- [x] Web IDE 
+- [x] Serverless Autograder 
+- [x] Persistent Lab Progress (Neon/PostgreSQL) 
+- [x] Professor Dashboard 
+- [x] Role-based Access Control (Instructor / TA / Student) 
+- [x] Student Roster Management 
+- [x] Manual Grade Overrides 
+- [x] Grade Export (Excel / ZIP / CSV) 
+- [x] Test Case Generator 
+- [x] Solution Code Storage and Verification
+
+### Deployment Checklist
+- [x] **Project summary and intended use** — see [Project Overview](#project-overview)
+- [x] **Installation instructions and technical documentation** — see [Full Setup Guide](#full-setup-guide-from-clone-to-live)
+- [x] **Library versioning** — see `requirements.txt`, `Cargo.toml`, `package.json`, and `pyproject.toml`
+- [x] **User guide explaining intended usage** — see [User Guide](#user-guide)
 
 ---
 
@@ -30,6 +36,41 @@ The application is split into three main components to fit Vercel's stateless co
 1. **Frontend**: Static HTML/JS/CSS served via `@vercel/static`.
 2. **API Backend**: Python (Flask) serverless functions for user management, lab logic, and grade submission.
 3. **Emulator Service**: A Node.js serverless function that imports the WASM core (compiled for `nodejs`) to grade student code in-process.
+
+---
+
+## User Guide
+
+### Students
+
+1. Contact your instructor to receive access to the course.
+1. Log in with your ASURITE at the login page once added to the roster.
+2. Select a lab from the list on the left panel.
+3. Read the lab instructions and write MIPS assembly in the code editor.
+4. Click **Run** to execute your code locally in the browser. Register values, memory contents, and console output are displayed in real time.
+5. When satisfied, click **Submit** to send your code to the autograder. Your score is recorded automatically based on the lab's test cases.
+
+### Instructors
+
+1. Log in and navigate to the **Professor View** (`teacher.html`).
+2. Create or edit labs and test cases, manage student submissions and grades, and manage roster information.
+3. Use the **Verify** button to run your solution code against the test cases before publishing.
+4. Import or export labs as `.lesson.json` files for backup or transfer between semesters.
+5. Navigate to the **Students** page (`students.html`) to manage the roster, view grades, override individual scores, and export the grade book as Excel, CSV, or ZIP.
+6. Use the **Test Case Generator** (`testgen.html`) to quickly build test suites for new labs.
+
+### Teaching Assistants
+
+TAs can view student grades and roster information to assist the instructor with course management. Instructors must directly update the role in the PostgreSQL Database to elevate permissions.
+
+### Role Assignment
+
+Students who register with an ASURITE on the course roster are automatically assigned the `student` role. Instructors and TAs must be promoted via SQL:
+
+```sql
+UPDATE users SET role = 'instructor' WHERE username = 'your_asurite';
+UPDATE users SET role = 'ta' WHERE username = 'ta_asurite';
+```
 
 ---
 
@@ -84,7 +125,7 @@ Install these before starting:
 
 - **Rust toolchain**: https://rustup.rs
 - **wasm-pack**: `cargo install wasm-pack`
-- **Python 3.9+**: https://python.org
+- **Python 3.12+**: https://python.org
 - **Node.js 18+**: https://nodejs.org
 - **Vercel CLI**: `npm install -g vercel`
 
@@ -93,7 +134,6 @@ Install these before starting:
 ```bash
 git clone https://github.com/StrikerFultz/CSE230CapstoneProject1.git
 cd CSE230CapstoneProject1
-git checkout vercel
 ```
 
 ### Step 2 - Set Up Neon Database
