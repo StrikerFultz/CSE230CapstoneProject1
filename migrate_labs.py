@@ -23,7 +23,7 @@ DB_CONFIG = {
 
 def seed_database():
     try:
-        with open('labs_curriculum.json', 'r') as f:
+        with open('labs_curriculum.json', 'r', encoding='utf-8') as f:
             curriculum = json.load(f)
         print(f"Successfully loaded {len(curriculum)} labs from JSON.")
     except FileNotFoundError:
