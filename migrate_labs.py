@@ -46,6 +46,28 @@ def seed_database():
         else:
             course_id = course[0]
 
+        # Insert default instructor account
+        cur.execute("SELECT user_id FROM users WHERE role = 'instructor' LIMIT 1")
+        if not cur.fetchone():
+            cur.execute("""
+                INSERT INTO users (
+                    username, email, full_name, asu_id,
+                    password_hash, role, is_active, must_reset_password
+                ) VALUES (
+                    'professor',
+                    'professor@asu.edu',
+                    'professor',
+                    '0123456789',
+                    'scrypt:32768:8:1$Mx2pURNfkyrkWdFk$7c1bd0c23a6e8d975de91e9eec47d6715c73b204763ac0286e1fc551eeaab0f1e954dd050a8f31b09f00bcdf3fc5a801cb2ec72d49615c05a0351c9ac23c6f5e',
+                    'instructor',
+                    TRUE,
+                    TRUE
+                )
+            """)
+            print("Default instructor account created with username and password: professor.\n[!] Change the password upon initial login!")
+        else:
+            print("Instructor account already exists, skipping.")
+
         for lab_id, data in curriculum.items():
             print(f"Processing {lab_id}...")
             

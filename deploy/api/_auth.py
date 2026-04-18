@@ -108,7 +108,7 @@ def login():
         cursor = conn.cursor(cursor_factory=RealDictCursor)
         cursor.execute("""
             SELECT user_id, username, email, full_name, asu_id,
-                   password_hash, role, is_active
+                   password_hash, role, is_active, must_reset_password
             FROM users WHERE username = %s
         """, (username,))
         user = cursor.fetchone()
@@ -129,6 +129,7 @@ def login():
 
         return jsonify({
             'message': 'Login successful',
+            'must_reset_password': bool(user.get('must_reset_password', False)),
             'user': {
                 'user_id':   str(user['user_id']),
                 'username':  user['username'],
@@ -141,6 +142,46 @@ def login():
     except Exception as e:
         log.error("Login error: %s", e, exc_info=True)
         return jsonify({'error': 'Login failed'}), 500
+    finally:
+        conn.close()
+
+
+@auth_bp.route('/change-password', methods=['POST'])
+def change_password():
+    if 'user_id' not in session:
+        return jsonify({'error': 'Not logged in'}), 401
+
+    data = request.get_json()
+    current_password = data.get('current_password', '')
+    new_password     = data.get('new_password', '')
+
+    if not current_password or not new_password:
+        return jsonify({'error': 'Both current and new password are required'}), 400
+    if len(new_password) < 4:
+        return jsonify({'error': 'New password must be at least 4 characters'}), 400
+
+    conn = get_db_connection()
+    if not conn:
+        return jsonify({'error': 'Database connection failed'}), 500
+    try:
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+        cursor.execute("SELECT password_hash FROM users WHERE user_id = %s",
+                       (session['user_id'],))
+        user = cursor.fetchone()
+
+        if not user or not check_password_hash(user['password_hash'], current_password):
+            return jsonify({'error': 'Current password is incorrect'}), 401
+
+        cursor.execute("""
+            UPDATE users SET password_hash = %s, must_reset_password = FALSE
+            WHERE user_id = %s
+        """, (generate_password_hash(new_password), session['user_id']))
+        conn.commit()
+        return jsonify({'message': 'Password updated successfully'})
+    except Exception as e:
+        log.error("change_password error: %s", e, exc_info=True)
+        conn.rollback()
+        return jsonify({'error': 'Failed to update password'}), 500
     finally:
         conn.close()
 
@@ -163,7 +204,7 @@ def me():
     try:
         cursor = conn.cursor(cursor_factory=RealDictCursor)
         cursor.execute("""
-            SELECT user_id, username, email, full_name, asu_id, role, is_active
+            SELECT user_id, username, email, full_name, asu_id, role, is_active, must_reset_password
             FROM users WHERE user_id = %s
         """, (session['user_id'],))
         user = cursor.fetchone()
@@ -180,6 +221,7 @@ def me():
                 'full_name': user.get('full_name', ''),
                 'asu_id':    user.get('asu_id', ''),
                 'role':      user['role'],
+                'must_reset_password': bool(user.get('must_reset_password', False)),
             }
         })
     except Exception as e:

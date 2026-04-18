@@ -8,3 +8,5 @@ __pycache__/
 *.pyc
 deploy/public/pkg/
 deploy/api/pkg-node/
+deploy/.vercel
+deploy/.env*.local

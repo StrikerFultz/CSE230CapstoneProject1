@@ -17,6 +17,11 @@ export async function checkAuth(options = {}) {
     const data = await res.json();
     const user = data.user;
 
+    if (user.must_reset_password) {
+      window.location.href = 'reset-password.html';
+      return null;
+    }
+
     // Redirect TAs away from blocked pages
     if (user.role === 'ta') {
       const currentPage = window.location.pathname.split('/').pop();

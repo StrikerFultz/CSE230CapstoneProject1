@@ -25,6 +25,7 @@ CREATE TABLE public.users (
     created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
     last_login timestamp with time zone,
     is_active boolean DEFAULT true,
+    must_reset_password boolean DEFAULT false,
     CONSTRAINT users_pkey PRIMARY KEY (user_id),
     CONSTRAINT users_username_key UNIQUE (username),
     CONSTRAINT users_email_key UNIQUE (email)
