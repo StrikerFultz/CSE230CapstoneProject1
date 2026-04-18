@@ -328,8 +328,12 @@ function newLesson() {
   titleEl.value = "";
   editor.innerHTML = "";
 
-  if (solutionCodeEditor) solutionCodeEditor.value = "";
+  if (starterCodeEditor) starterCodeEditor.value = "";
+  if (solutionCodeSection) solutionCodeEditor.value = "";
+
+  if (starterCodeEditor) starterCodeEditor.style.display = "";
   if (solutionCodeSection) solutionCodeSection.style.display = "";
+
   if (tcListEl) tcListEl.innerHTML = '<div class="tc-empty">Select a lab to view test cases</div>';
 
   renderPreview();
