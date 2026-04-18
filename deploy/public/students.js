@@ -293,8 +293,7 @@ function renderDetail(data) {
         
         <div class="stu-run-history" style="margin-top: 15px; border-top: 1px solid #eee; padding-top: 10px;">
           <details class="stu-run-details">
-            <summary style="cursor:pointer; font-size: 13px; color: #666; font-weight: 600;">View Run History (${lab.telemetry ? lab.telemetry.length : 0} runs)</summary>
-            ${renderRunTable(lab.telemetry || [])}
+          <summary style="cursor:pointer; font-size: 13px; color: #666; font-weight: 600;">View Run History (${lab.telemetry ? lab.telemetry.length : 0} runs)${lab.telemetry && lab.telemetry.length && window.__currentUser?.role === 'instructor' ? ` <button class="btn-ghost stu-clear-telemetry-btn" data-lab-id="${lab.lab_id}" data-user-id="${stu.user_id}" style="color:#e53935;font-size:11px;margin-left:8px;" title="Delete all run history for this lab">Clear</button>` : ''}</summary>            ${renderRunTable(lab.telemetry || [])}
           </details>
         </div>
       </div>
@@ -398,17 +397,43 @@ function renderRunTable(telemetry) {
   let rows = '';
   telemetry.forEach((t, idx) => {
     const date = new Date(t.executed_at).toLocaleString();
-    const type = t.is_step ? 'Step' : 'Run';
-    const code = (t.source_code || '').replace(/\\n/g, '\n');
+    const raw = (t.source_code || '').replace(/\\n/g, '\n');
+    const isPaste = raw.startsWith('[PASTE:');
+
+    let type, chipBg, chipColor;
+    if (isPaste) {
+      type = 'Paste';
+      chipBg = '#fff3e0';
+      chipColor = '#e65100';
+    } else if (t.is_step) {
+      type = 'Step';
+      chipBg = '#eee';
+      chipColor = '#555';
+    } else {
+      type = 'Run';
+      chipBg = '#eee';
+      chipColor = '#555';
+    }
+
+    let codeDisplay = raw;
+    let pasteInfo = '';
+    if (isPaste) {
+      const match = raw.match(/^\[PASTE:(\d+)chars\]\s?([\s\S]*)$/);
+      if (match) {
+        pasteInfo = `<span style="font-size:11px;color:#e65100;font-weight:600;">${match[1]} characters pasted</span>`;
+        codeDisplay = match[2];
+      }
+    }
 
     rows += `
-      <tr>
+      <tr${isPaste ? ' style="background:#fff8f0;"' : ''}>
         <td style="font-size: 12px;">${date}</td>
-        <td><span class="chip" style="font-size: 10px; padding: 2px 6px; background: #eee; border-radius: 4px;">${type}</span></td>
+        <td><span class="chip" style="font-size: 10px; padding: 2px 6px; background: ${chipBg}; color: ${chipColor}; border-radius: 4px; font-weight: 600;">${type}</span></td>
         <td>
+          ${pasteInfo}
           <details class="stu-sub-code-details">
             <summary style="font-size: 11px; color: #3498db; cursor: pointer;">Code</summary>
-            <pre class="stu-sub-code" style="max-height: 150px; overflow-y: auto;">${escapeHTML(code)}</pre>
+            <pre class="stu-sub-code" style="max-height: 150px; overflow-y: auto;">${escapeHTML(codeDisplay)}</pre>
           </details>
         </td>
       </tr>
@@ -469,6 +494,28 @@ document.addEventListener('click', async (e) => {
   }
 });
 
+document.addEventListener('click', async (e) => {
+  if (!e.target.classList.contains('stu-clear-telemetry-btn')) return;
+
+  e.stopPropagation();
+  e.preventDefault();
+
+  const user = window.__currentUser;
+  if (!user || user.role !== 'instructor') return;
+
+  const labId = e.target.dataset.labId;
+  const userId = e.target.dataset.userId;
+  if (!labId || !userId) return;
+
+  if (!confirm(`Delete all run history for this student on "${labId}"?`)) return;
+
+  try {
+    await apiRequest(`/grade/telemetry/${labId}/${userId}`, { method: 'DELETE' });
+    selectStudent(userId);
+  } catch (err) {
+    alert('Failed to clear run history: ' + err.message);
+  }
+});
 
 // ─── Override UI — appended below the submission table inside the card body ───
  

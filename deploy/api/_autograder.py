@@ -426,6 +426,32 @@ def reset_attempts(lab_id, user_id):
         conn.close()
 
 
+@simple_autograder_bp.route('/telemetry/<lab_id>/<user_id>', methods=['DELETE'])
+def clear_telemetry(lab_id, user_id):
+    if 'user_id' not in session:
+        return jsonify({'error': 'Not logged in'}), 401
+
+    if session.get('role', 'student') != 'instructor':
+        return jsonify({'error': 'Unauthorized — instructors only'}), 403
+
+    conn = get_db_connection()
+    if not conn:
+        return jsonify({'error': 'Database connection failed'}), 500
+    try:
+        cur = conn.cursor()
+        cur.execute("DELETE FROM run_telemetry WHERE user_id = %s AND lab_id = %s",
+                    (user_id, lab_id))
+        deleted = cur.rowcount
+        conn.commit()
+        return jsonify({'success': True, 'lab_id': lab_id,
+                        'user_id': user_id, 'deleted_count': deleted})
+    except Exception as e:
+        log.error('Clear telemetry error: %s', e, exc_info=True)
+        return jsonify({'error': 'Failed to clear telemetry'}), 500
+    finally:
+        conn.close()
+
+
 @simple_autograder_bp.route('/test-cases/<lab_id>', methods=['GET'])
 def get_test_cases_endpoint(lab_id):
     test_cases = get_test_cases_for_lab(lab_id)
