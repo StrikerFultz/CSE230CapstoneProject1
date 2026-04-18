@@ -4,6 +4,12 @@ const API_BASE = '/api';
 const STORAGE_KEY = "customLessons";
 const AUTH_KEY = "professorAuthed";
 
+function fmtHex(n) {
+  const num = Number(n);
+  if (isNaN(num)) return n;
+  return '0x' + (num >>> 0).toString(16).toUpperCase().padStart(8, '0');
+}
+
 // API helper functions
 async function apiRequest(endpoint, options = {}) {
   try {
@@ -714,10 +720,10 @@ function readKV(containerId) {
     const inputs = row.querySelectorAll('input');
     const k = inputs[0].value.trim();
     const v = inputs[1].value.trim();
+
     if (k) {
-      // Try to parse as number; keep as string if it's not numeric
       const num = Number(v);
-      obj[k] = isNaN(num) ? v : num;
+      obj[k.toLowerCase().startsWith('0x') ? String(parseInt(k, 16)) : k] = isNaN(num) ? v : num;
     }
   });
   return obj;
@@ -730,11 +736,14 @@ function clearKV(containerId) {
 
 // ─ Rendering test case cards ─
 
-function objToMiniTable(obj, colA, colB) {
+function objToMiniTable(obj, colA, colB, hexKeys = false) {
   const entries = Object.entries(obj || {});
   if (!entries.length) return '<em style="color:#999;font-size:11px;">none</em>';
   let html = `<table><thead><tr><th>${colA}</th><th>${colB}</th></tr></thead><tbody>`;
-  entries.forEach(([k, v]) => { html += `<tr><td>${k}</td><td>${v}</td></tr>`; });
+  entries.forEach(([k, v]) => {
+    const dk = hexKeys ? fmtHex(k) : k;
+    html += `<tr><td>${dk}</td><td>${v}</td></tr>`;
+  });
   html += '</tbody></table>';
   return html;
 }
@@ -783,11 +792,11 @@ function renderTestCaseCards(testCases) {
           </div>
           <div class="tc-card-section">
             <h5>Initial Memory</h5>
-            ${objToMiniTable(initMem, 'Address', 'Value')}
+            ${objToMiniTable(initMem, 'Address', 'Value', true)}
           </div>
           <div class="tc-card-section">
             <h5>Expected Memory</h5>
-            ${objToMiniTable(expMem, 'Address', 'Value')}
+            ${objToMiniTable(expMem, 'Address', 'Value', true)}
           </div>
         </div>
         ${tc.description ? `<div style="font-size:11px;color:#666;margin-bottom:6px;">${tc.description}</div>` : ''}
@@ -867,9 +876,9 @@ function openModalForEdit(tc) {
   const exp = tc.expected_output || {};
 
   Object.entries(inp.registers || {}).forEach(([k, v]) => addKVRow('tc-init-regs', '$t0', '0', k, v));
-  Object.entries(inp.memory    || {}).forEach(([k, v]) => addKVRow('tc-init-mem',  '268435456', '0', k, v));
+  Object.entries(inp.memory    || {}).forEach(([k, v]) => addKVRow('tc-init-mem',  '268435456', '0', fmtHex(k), v));
   Object.entries(exp.registers || {}).forEach(([k, v]) => addKVRow('tc-exp-regs',  '$t0', '30', k, v));
-  Object.entries(exp.memory    || {}).forEach(([k, v]) => addKVRow('tc-exp-mem',   '268435456', '30', k, v));
+  Object.entries(exp.memory    || {}).forEach(([k, v]) => addKVRow('tc-exp-mem',   '268435456', '30', fmtHex(k), v));
 
   tcModal.style.display = 'flex';
 }

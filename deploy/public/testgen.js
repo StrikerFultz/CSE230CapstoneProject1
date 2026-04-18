@@ -201,7 +201,11 @@ function applyInitialValues() {
 }
 
 function resetEmulator() {
-  if (cpu && wasmReady) cpu.reset();
+  if (cpu && wasmReady) {
+    cpu.set_isolation(false);
+    cpu.reset();
+  }
+  
   consoleOut.textContent = 'Ready.\n';
   isProgramLoaded = false;
   lastRegs = {};
@@ -290,9 +294,15 @@ runBtn?.addEventListener('click', async () => {
 stepBtn?.addEventListener('click', async () => {
   if (!wasmReady || !cpu) { log('WASM not ready.'); return; }
   if (!isProgramLoaded) { if (!loadProgram()) return; }
+
+  if (simulateIsoEl && simulateIsoEl.checked) {
+    cpu.set_isolation(true);
+  }
+
   const nextInsn = cpu.next_instruction();
   log(nextInsn);
   if (nextInsn === '---') {
+    cpu.set_isolation(false);
     handleResult({ error: 'Termination', snapshot: { registers: lastRegs } });
     return;
   }
@@ -441,6 +451,15 @@ saveBtn?.addEventListener('click', async () => {
     expectedRegs[cb.dataset.reg] = Number(cb.dataset.val);
   });
 
+  function normalizeMemKeys(obj) {
+    const out = {};
+    for (const [k, v] of Object.entries(obj)) {
+      const num = k.toLowerCase().startsWith('0x') ? parseInt(k, 16) : Number(k);
+      out[isNaN(num) ? k : String(num)] = v;
+    }
+    return out;
+  }
+
   const expectedMem = readKV('tg-captured-mem');
 
   if (!Object.keys(expectedRegs).length && !Object.keys(expectedMem).length) {
@@ -456,11 +475,11 @@ saveBtn?.addEventListener('click', async () => {
     timeout_seconds: 5,
     input_data: {
       registers: readKV('tg-init-regs'),
-      memory:    readKV('tg-init-mem'),
+      memory:    normalizeMemKeys(readKV('tg-init-mem')),
     },
     expected_output: {
       registers: expectedRegs,
-      memory:    expectedMem,
+      memory:    normalizeMemKeys(expectedMem),
     },
   };
 

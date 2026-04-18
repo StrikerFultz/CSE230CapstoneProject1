@@ -944,6 +944,24 @@ cpuEditor.on('change', () => {
   }
 });
 
+if (window.__currentUser?.role === 'student') {
+  cpuEditor.on('paste', (cm, e) => {
+    const pasted = e.clipboardData?.getData('text') || '';
+    if (!pasted) return;
+
+    fetch(`${API_BASE}/grade/log-run`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        lab_id: currentLessonId,
+        source_code: `[PASTE:${pasted.length}chars] ${pasted.substring(0, 500)}`,
+        is_step: false,
+      }),
+    }).catch(() => {});
+  });
+}
+
 // Draggable vertical resizer between assembler and right panel
 (function initResizer() {
   const resizer = document.getElementById("v-resizer");
