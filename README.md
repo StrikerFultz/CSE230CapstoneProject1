@@ -185,17 +185,9 @@ This populates the database with all labs, test cases, starter code, and solutio
 
 To add or update individual labs without re-running the full migration, use the Professor View in the app. The migration script uses `ON CONFLICT DO UPDATE` so it is safe to re-run at any time. It will not duplicate data.
 
-### Step 5 - Create the First Instructor Account
+Running the script will also create an initial account with default credentials. You will be required to reset your password after initial login.
 
-After seeding, register an account through the app's signup page using an ASURITE that exists in the course roster, then manually promote it to instructor via SQL:
-
-```sql
-UPDATE users SET role = 'instructor' WHERE username = 'your_asurite';
-```
-
-Subsequent instructor or TA accounts can be promoted the same way. Students who sign up with an ASURITE on the course roster are automatically assigned the `student` role.
-
-### Step 6 - Build WASM Packages
+### Step 5 - Build WASM Packages
 
 You need two separate WASM builds from the Rust source:
 
@@ -213,7 +205,7 @@ ls deploy/public/pkg/mips_emu_wasm_bg.wasm
 ls deploy/api/pkg-node/mips_emu_wasm_bg.wasm
 ```
 
-### Step 7 - Set Up Vercel
+### Step 6 - Set Up Vercel
 
 ```bash
 # Log in to Vercel
@@ -229,7 +221,7 @@ When prompted:
 - **Link to existing project?** → N (first time) or Y (if re-linking)
 - **Project name** → `mips-emulator` (or your preferred name)
 
-### Step 8 - Set Vercel Environment Variables
+### Step 7 - Set Vercel Environment Variables
 
 ```bash
 vercel env add DATABASE_URL
@@ -243,7 +235,7 @@ vercel env add EMULATOR_URL
 # Select all environments
 ```
 
-### Step 9 - Deploy
+### Step 8 - Deploy
 
 ```bash
 vercel --prod
