@@ -18,9 +18,12 @@ async function apiRequest(endpoint, options = {}) {
     
     if (!response.ok) {
       const error = await response.json();
-      throw new Error(error.error || 'API request failed');
+      const err = new Error(error.error || 'API request failed');
+
+      err.status = response.status;
+      throw err;
     }
-    
+        
     return await response.json();
   } catch (error) {
     console.error('API Error:', error);
@@ -39,7 +42,7 @@ async function fetchLessonsFromAPI() {
   }
 }
 
-async function saveLessonToAPI(labId, title, html, starterCode) {
+async function saveLessonToAPI(labId, title, html, starterCode, solutionCode) {
   try {
     const labData = {
       lab_id: labId,
@@ -54,20 +57,23 @@ async function saveLessonToAPI(labId, title, html, starterCode) {
     
     // Try to update first
     try {
-      await apiRequest(`/labs/${labId}`, {
+      const res = await apiRequest(`/labs/${labId}`, {
         method: 'PUT',
         body: JSON.stringify(labData)
       });
       console.log('Lab updated in database');
       return true;
+      
     } catch (updateError) {
-      // If update fails, try to create
-      await apiRequest('/labs', {
-        method: 'POST',
-        body: JSON.stringify(labData)
-      });
-      console.log('Lab created in database');
-      return true;
+      if (updateError.status === 404) {
+        await apiRequest('/labs', {
+          method: 'POST',
+          body: JSON.stringify(labData)
+        });
+        console.log('Lab created in database');
+        return true;
+      }
+      throw updateError;
     }
   } catch (error) {
     console.error('Failed to save lab to database:', error);
@@ -288,14 +294,13 @@ async function saveCurrent() {
   const title = titleEl.value.trim() || id;
   const html = editor.innerHTML;
   const starterCode = starterCodeEditor ? starterCodeEditor.value : "";
-
-  // Save to API first
   const solutionCode = solutionCodeEditor ? solutionCodeEditor.value : "";
+
   const apiSuccess = await saveLessonToAPI(id, title, html, starterCode, solutionCode);
   
   // Also save to local storage as backup
   const custom = getCustom();
-  custom[id] = { title, html, starter_code: starterCode };
+  custom[id] = { title, html, starter_code: starterCode, solution_code: solutionCode };
   setCustom(custom);
 
   currentId = id;
@@ -316,8 +321,11 @@ function newLesson() {
   idEl.value = "";
   titleEl.value = "";
   editor.innerHTML = "";
-  if (starterCodeEditor) starterCodeEditor.value = "";
-  if (starterCodeSection) starterCodeSection.style.display = "";
+
+  if (solutionCodeEditor) solutionCodeEditor.value = "";
+  if (solutionCodeSection) solutionCodeSection.style.display = "";
+  if (tcListEl) tcListEl.innerHTML = '<div class="tc-empty">Select a lab to view test cases</div>';
+
   renderPreview();
   selectListItem(null);
   if (timeEl) timeEl.textContent = "";
@@ -359,8 +367,9 @@ function exportCurrent() {
   const title = titleEl.value.trim() || id;
   const html = editor.innerHTML;
   const starter_code = starterCodeEditor ? starterCodeEditor.value : "";
+  const solution_code = solutionCodeEditor ? solutionCodeEditor.value : "";
 
-  const payload = { id, title, html, starter_code };
+  const payload = { id, title, html, starter_code, solution_code };
   const blob = new Blob([JSON.stringify(payload, null, 2)], {
     type: "application/json",
   });
@@ -383,11 +392,11 @@ async function importFromFile(file) {
 
       let toSave = {};
       if (obj && typeof obj === "object" && obj.id && obj.html) {
-        toSave[obj.id] = { title: obj.title || obj.id, html: obj.html, starter_code: obj.starter_code || "" };
+        toSave[obj.id] = { title: obj.title || obj.id, html: obj.html, starter_code: obj.starter_code || "", solution_code: obj.solution_code || "" };
       } else {
         for (const [id, val] of Object.entries(obj)) {
           if (val && typeof val === "object" && val.html) {
-            toSave[id] = { title: val.title || id, html: val.html, starter_code: val.starter_code || "" };
+            toSave[id] = { title: val.title || id, html: val.html, starter_code: val.starter_code || "", solution_code: val.solution_code || "" };
           }
         }
       }
@@ -399,7 +408,7 @@ async function importFromFile(file) {
 
       // Save to API and local storage
       for (const [id, data] of Object.entries(toSave)) {
-        await saveLessonToAPI(id, data.title, data.html, data.starter_code);
+        await saveLessonToAPI(id, data.title, data.html, data.starter_code, data.solution_code);
       }
 
       const custom = getCustom();

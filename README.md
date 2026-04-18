@@ -77,42 +77,52 @@ UPDATE users SET role = 'ta' WHERE username = 'ta_asurite';
 ## Repository Structure
 
 ```
-mips-emulator/
-├── Cargo.toml                  # Rust project config
-├── Cargo.lock
-├── rust-toolchain.toml
-├── src/                        # Rust emulator source code
-│   ├── lib.rs
-│   ├── cpu.rs
-│   └── ...
-├── schema.sql                  # Database schema
-├── migrate_labs.py             # Lab seeding script
-├── labs_curriculum.json        # Lab content and test cases
-├── deploy/                     # Vercel deployment directory
-│   ├── vercel.json             # Vercel routing config
-│   ├── requirements.txt        # Python dependencies
-│   ├── package.json            # Node.js config
-│   ├── api/                    # Serverless functions
-│   │   ├── index.py            # Flask app (all API routes)
-│   │   ├── _db.py              # Neon DB connection helper
-│   │   ├── _auth.py            # Auth routes
-│   │   ├── _autograder.py      # Grading logic + verify endpoint
-│   │   ├── emulator.js         # Node.js WASM grader
-│   │   └── pkg-node/           # Node.js WASM build (generated)
-│   └── public/                 # Static frontend files
-│       ├── index.html          # Student lab view
-│       ├── main.js             # Student lab logic
-│       ├── teacher.html        # Professor lab editor
-│       ├── teacher.js
-│       ├── students.html       # Student roster + grade management
-│       ├── students.js
-│       ├── testgen.html        # Test case generator
-│       ├── testgen.js
-│       ├── login.html          # Login page
-│       ├── auth-check.js       # Auth guard (shared)
-│       ├── style.css
-│       └── pkg/                # Browser WASM build (generated)
-└── .gitignore
+CSE230CapstoneProject1/
+├── src/                          # Rust emulator source code
+│   ├── assembler.rs              # MIPS assembler
+│   ├── cpu.rs                    # CPU execution engine
+│   ├── instruction.rs            # Instruction decoding
+│   ├── lexer.rs                  # Assembly lexer
+│   ├── lib.rs                    # WASM entry point
+│   ├── main.rs                   # CLI entry point for autograder
+│   ├── memory.rs                 # Memory management
+│   ├── mmio.rs                   # Memory-mapped I/O
+│   ├── parser.rs                 # Assembly parser
+│   └── program.rs                # Program representation
+├── deploy/                       # Vercel deployment root
+│   ├── api/                      # Serverless functions
+│   │   ├── _auth.py              # Authentication routes
+│   │   ├── _autograder.py        # Grading logic + verify endpoint
+│   │   ├── _db.py                # Neon DB connection helper
+│   │   ├── emulator.js           # Node.js WASM grader
+│   │   ├── index.py              # Flask app (all API routes)
+│   │   └── pkg-node/             # Node.js WASM build (generated)
+│   ├── public/                   # Static frontend files
+│   │   ├── auth-check.js         # Auth guard
+│   │   ├── index.html            # Student lab view / IDE
+│   │   ├── login.html            # Login page
+│   │   ├── main.js               # Student lab logic
+│   │   ├── students.html         # Student roster + grade management
+│   │   ├── students.js           # Roster logic
+│   │   ├── style.css             # Global styles
+│   │   ├── teacher.html          # Professor lab editor
+│   │   ├── teacher.js            # Professor dashboard logic
+│   │   ├── testgen.html          # Test case generator UI
+│   │   ├── testgen.js            # Test case generator logic
+│   │   ├── reset-password.html   # Password reset UI
+│   │   └── pkg/                  # Browser WASM build (generated)
+│   ├── package.json              # Node.js config (engine >= 18)
+│   ├── pyproject.toml            # Python project metadata
+│   ├── requirements.txt          # Python dependencies (pinned)
+│   └── vercel.json               # Vercel routing + build config
+├── .gitignore
+├── Cargo.lock                    # Rust dependency lockfile
+├── Cargo.toml                    # Rust project config
+├── README.md                     # Setup guide and documentation
+├── labs_curriculum.json          # Lab content, test cases, and solutions
+├── migrate_labs.py               # Database seeding script
+├── rust-toolchain.toml           # Pins Rust to nightly channel
+└── schema.sql                    # PostgreSQL schema
 ```
 
 ---

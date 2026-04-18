@@ -308,6 +308,7 @@ def delete_lab(lab_id):
     try:
         cursor = conn.cursor()
         cursor.execute("DELETE FROM score_overrides WHERE lab_id = %s", (lab_id,))
+        cursor.execute("DELETE FROM run_telemetry WHERE lab_id = %s", (lab_id,))
         cursor.execute("DELETE FROM submissions WHERE lab_id = %s", (lab_id,))
         cursor.execute("DELETE FROM lab_test_cases WHERE lab_id = %s", (lab_id,))
         cursor.execute("DELETE FROM labs WHERE lab_id = %s RETURNING lab_id", (lab_id,))
