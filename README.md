@@ -259,7 +259,7 @@ Labs are stored in two places: the `labs_curriculum.json` file (source of truth 
 
 **Option A - Re-run the migration script** against the new database. This is the recommended approach if you have an up-to-date `labs_curriculum.json`.
 
-**Option B - Export from the Professor View**. Each lab can be exported individually as a `.lesson.json` file via the Export button in the Professor View, then imported into the new instance using the Import button. This captures the lab HTML, starter code, and solution code but not test cases. Test cases must be re-entered or migrated via SQL.
+**Option B - Export from the Professor View**. Each lab can be exported individually as a `.lesson.json` file via the Export button in the Professor View, then imported into the new instance using the Import button. This captures the lab HTML, starter code, solution code, and test cases.
 
 **Option C - Direct database copy** using Neon's branching or `pg_dump`:
 ```bash

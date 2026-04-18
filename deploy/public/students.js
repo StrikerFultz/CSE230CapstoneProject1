@@ -321,7 +321,7 @@ function renderSubmissionTable(lab, userId) {
     const date = new Date(sub.submitted_at).toLocaleString();
     const pct = sub.total_possible > 0 ? ((sub.score / sub.total_possible) * 100).toFixed(0) : 0;
 
-    const isBest = !bestFound && sub.score === lab.best_score;
+    const isBest = !bestFound && sub.score === lab.raw_best_score;
     if (isBest) bestFound = true;
 
     const rowClass = isBest ? 'stu-sub-best' : '';
@@ -495,7 +495,7 @@ function updateAdjCells(card, lab, userId, adj, finalScore, possible) {
 async function attachOverrideUI(card, lab, userId) {
   const labId    = lab.lab_id;
   const possible = lab.best_possible ?? lab.total_points ?? 0;
-  const autoScore = lab.best_score ?? 0;
+  const autoScore = lab.raw_best_score ?? 0;
 
   // load existing override
   let currentOverride = null;

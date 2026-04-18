@@ -617,12 +617,14 @@ def get_student_detail(user_id):
             best_possible = lab_subs[0]['total_possible'] if lab_subs else lab['total_points']
 
             # apply override if one exists
-            effective_score = overrides_by_lab.get(lid, best_score) if best_score is not None else None
+            raw_best = best_score
+            effective = overrides_by_lab.get(lid, best_score) if best_score is not None else None
 
             lab_details.append({
                 'lab_id': lid, 'title': lab['title'],
                 'difficulty': lab['difficulty'], 'total_points': lab['total_points'],
-                'attempt_count': len(lab_subs), 'best_score': effective_score,
+                'attempt_count': len(lab_subs), 'best_score': effective,
+                'raw_best_score': raw_best,
                 'best_possible': best_possible,
                 'latest_submission': lab_subs[0] if lab_subs else None,
                 'submissions': lab_subs,
@@ -1066,7 +1068,7 @@ def export_grades_excel(lab_id):
                     u.username, u.user_id, u.email, s.lab_id, s.score AS auto_score,
                     COALESCE(ov.override_score, s.score) AS score,
                     s.total_possible AS max_score,
-                    (COALESCE(ov.override_score, s.score)::float / NULLIF(s.total_possible, 0) * 100) AS percentage,
+                    (s.score::float / NULLIF(s.total_possible, 0) * 100) AS percentage,
                     s.submitted_at,
                     ov.override_score,
                     ov.note AS override_note
@@ -1081,7 +1083,7 @@ def export_grades_excel(lab_id):
                     u.username, u.user_id, u.email, s.score AS auto_score,
                     COALESCE(ov.override_score, s.score) AS score,
                     s.total_possible AS max_score,
-                    (COALESCE(ov.override_score, s.score)::float / NULLIF(s.total_possible, 0) * 100) AS percentage,
+                    (s.score::float / NULLIF(s.total_possible, 0) * 100) AS percentage,
                     s.submitted_at,
                     ov.override_score,
                     ov.note AS override_note

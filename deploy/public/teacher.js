@@ -63,7 +63,7 @@ async function saveLessonToAPI(labId, title, html, starterCode, solutionCode) {
       });
       console.log('Lab updated in database');
       return true;
-      
+
     } catch (updateError) {
       if (updateError.status === 404) {
         await apiRequest('/labs', {
@@ -360,7 +360,7 @@ function openInLabs() {
   window.location.href = `index.html?lesson=${encodeURIComponent(id)}`;
 }
 
-function exportCurrent() {
+async function exportCurrent() {
   const id = idEl.value.trim();
   if (!id) return;
 
@@ -369,7 +369,12 @@ function exportCurrent() {
   const starter_code = starterCodeEditor ? starterCodeEditor.value : "";
   const solution_code = solutionCodeEditor ? solutionCodeEditor.value : "";
 
-  const payload = { id, title, html, starter_code, solution_code };
+  let test_cases = [];
+  try {
+    test_cases = await fetchTestCases(id);
+  } catch (_) {}
+
+  const payload = { id, title, html, starter_code, solution_code, test_cases };
   const blob = new Blob([JSON.stringify(payload, null, 2)], {
     type: "application/json",
   });
@@ -392,11 +397,11 @@ async function importFromFile(file) {
 
       let toSave = {};
       if (obj && typeof obj === "object" && obj.id && obj.html) {
-        toSave[obj.id] = { title: obj.title || obj.id, html: obj.html, starter_code: obj.starter_code || "", solution_code: obj.solution_code || "" };
+        toSave[obj.id] = { title: obj.title || obj.id, html: obj.html, starter_code: obj.starter_code || "", solution_code: obj.solution_code || "", test_cases: obj.test_cases || [] };
       } else {
         for (const [id, val] of Object.entries(obj)) {
           if (val && typeof val === "object" && val.html) {
-            toSave[id] = { title: val.title || id, html: val.html, starter_code: val.starter_code || "", solution_code: val.solution_code || "" };
+            toSave[id] = { title: val.title || id, html: val.html, starter_code: val.starter_code || "", solution_code: val.solution_code || "", test_cases: val.test_cases || [] };
           }
         }
       }
@@ -409,6 +414,22 @@ async function importFromFile(file) {
       // Save to API and local storage
       for (const [id, data] of Object.entries(toSave)) {
         await saveLessonToAPI(id, data.title, data.html, data.starter_code, data.solution_code);
+
+        if (data.test_cases && data.test_cases.length) {
+          for (const tc of data.test_cases) {
+            try {
+              await createTestCase(id, {
+                test_name: tc.test_name,
+                points: tc.points,
+                description: tc.description || '',
+                is_hidden: tc.is_hidden || false,
+                timeout_seconds: tc.timeout_seconds || 5,
+                input_data: tc.input_data || {},
+                expected_output: tc.expected_output || {},
+              });
+            } catch (_) {}
+          }
+        }
       }
 
       const custom = getCustom();
